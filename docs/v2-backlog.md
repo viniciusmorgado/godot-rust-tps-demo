@@ -19,3 +19,4 @@ Serão avaliadas ao abrir a branch `v2`.
 | 11 | `player/player.gd` (port 1) | Zerar `velocity` no respawn abaixo de −40 | O teleporte para a posição inicial preserva a velocidade de queda acumulada; na v1 é mantido por fidelidade |
 | 12 | `player/player.gd` (port 1) | Remover a referência `crosshair` nunca lida (ou usá-la) | Declarada em `player.gd:30` e não lida em lugar nenhum; na v1 é mantida por fidelidade |
 | 13 | `player/bullet/bullet.gd` (port 2) | Evitar o `explode` duplo quando `time_alive` expira e há colisão no mesmo frame | Dois RPCs `explode` no mesmo frame reiniciam a animação; na v1 é mantido por fidelidade |
+| 14 | `door/door.gd` (port 3) | Tipar `_on_door_body_entered` com `Gd<Player>` já na fronteira (`try_cast` no sinal) em vez de `Gd<Node3D>` + `try_cast` no corpo | O `body is Player` do original vira um `try_cast` dentro do handler; na v1 é mantido por fidelidade |

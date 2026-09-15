@@ -1,14 +1,12 @@
 [gd_scene format=3 uid="uid://bcnpdinrepean"]
 
-[ext_resource type="Script" uid="uid://7v3r683kok5s" path="res://door/door.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://bivo3ncbyf02f" path="res://door/model/door.dae" id="2"]
 [ext_resource type="AudioStream" uid="uid://c2nls7s14emyc" path="res://door/open_close.wav" id="3"]
 
 [sub_resource type="BoxShape3D" id="1"]
 size = Vector3(8.85286, 6.2089, 11.0664)
 
-[node name="Door" type="Area3D" unique_id=635988643]
-script = ExtResource("1")
+[node name="Door" type="Door" unique_id=635988643]
 
 [node name="DoorModel2" parent="." unique_id=1109006140 instance=ExtResource("2")]
 

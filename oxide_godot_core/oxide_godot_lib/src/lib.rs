@@ -7,6 +7,7 @@ mod camera_noise_shake;
 mod player_input;
 mod player;
 mod bullet;
+mod door;
 
 struct OxideGodot;
 
