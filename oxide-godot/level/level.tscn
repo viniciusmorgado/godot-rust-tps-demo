@@ -4,7 +4,6 @@
 [ext_resource type="PackedScene" uid="uid://bpihm2o3g658" path="res://level/geometry/scenes/props.tscn" id="2"]
 [ext_resource type="VoxelGIData" uid="uid://bw86lhn5p1ovp" path="res://level/geometry/giprobe_data.res" id="5"]
 [ext_resource type="AudioStream" uid="uid://vxxm8xm1fr6y" path="res://level/level_music.ogg" id="8"]
-[ext_resource type="Script" uid="uid://6ec6m14rhsxi" path="res://level/debug.gd" id="9"]
 [ext_resource type="CompressedTexture3D" uid="uid://b2x2pkclq230n" path="res://level/level.GPUParticlesCollisionSDF3D_data.exr" id="11_mt3nw"]
 [ext_resource type="PackedScene" uid="uid://dln4kthc3tvfv" path="res://level/forklift/flying_forklift.tscn" id="12"]
 [ext_resource type="PackedScene" uid="uid://dgvowmn3iop44" path="res://level/geometry/scenes/lights.tscn" id="13"]
@@ -145,7 +144,7 @@ transform = Transform3D(-1, 0, -1.50996e-07, 0, 1, 0, 1.50996e-07, 0, -1, -68.24
 libraries/ = SubResource("AnimationLibrary_35gwb")
 autoplay = &"mawaru"
 
-[node name="Debug" type="Label" parent="." unique_id=103499872]
+[node name="Debug" type="DebugLabel" parent="." unique_id=103499872]
 offset_left = 10.0
 offset_top = 10.0
 offset_right = 40.0
@@ -153,7 +152,6 @@ offset_bottom = 14.0
 text = "FPS: 0
 VSync:
 Memory:"
-script = ExtResource("9")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1649569551]
 transform = Transform3D(0.671837, 0, -0.740699, 0, 1, 0, 0.740699, 0, 0.671837, -4.05309, -1.12911, 4)
