@@ -2,6 +2,7 @@ use godot::prelude::*;
 
 mod debug_label;
 mod part_disappear;
+mod blast;
 
 struct OxideGodot;
 

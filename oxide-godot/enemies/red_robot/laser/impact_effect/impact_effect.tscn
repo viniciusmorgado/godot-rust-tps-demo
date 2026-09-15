@@ -4,7 +4,6 @@
 [ext_resource type="Texture2D" uid="uid://bpm6frbylo5an" path="res://effects_shared/BlastTexture.png" id="2"]
 [ext_resource type="ArrayMesh" uid="uid://dsxo5so87px6f" path="res://enemies/red_robot/laser/impact_effect/LightRaysMesh_Plane.mesh" id="3"]
 [ext_resource type="Texture2D" uid="uid://clqkmuqdlo4rh" path="res://enemies/red_robot/laser/impact_effect/LightRays.png" id="4"]
-[ext_resource type="Script" uid="uid://bk20efkdq4v3m" path="res://enemies/red_robot/laser/impact_effect/blast.gd" id="5"]
 [ext_resource type="Shader" uid="uid://cdmq65xiexdf8" path="res://enemies/red_robot/laser/impact_effect/EmissionAlbedoParticle.gdshader" id="6"]
 [ext_resource type="Material" uid="uid://yxudvmlt7e3h" path="res://enemies/red_robot/laser/impact_effect/EmissionEmbers.tres" id="8"]
 [ext_resource type="Texture2D" uid="uid://crq55yidge8wt" path="res://enemies/red_robot/laser/impact_effect/SmokePuffNormals.png" id="10"]
@@ -167,8 +166,7 @@ point_count = 3
 offsets = PackedFloat32Array(0, 0.19571, 0.576407, 1)
 colors = PackedColorArray(1, 0, 0, 0, 1, 0, 0, 1, 0.09375, 0.09375, 0.09375, 1, 0.105469, 0.105469, 0.105469, 0)
 
-[node name="Blast" type="Node3D" unique_id=1361742302]
-script = ExtResource("5")
+[node name="Blast" type="Blast" unique_id=1361742302]
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=405518197]
 libraries/ = SubResource("AnimationLibrary_y0aew")
