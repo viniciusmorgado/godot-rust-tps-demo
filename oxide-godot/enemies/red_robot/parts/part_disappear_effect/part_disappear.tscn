@@ -2,7 +2,6 @@
 
 [ext_resource type="Texture2D" uid="uid://bb6a2c0n7pgsk" path="res://enemies/red_robot/laser/impact_effect/SmokePuff.png" id="1"]
 [ext_resource type="Texture2D" uid="uid://crq55yidge8wt" path="res://enemies/red_robot/laser/impact_effect/SmokePuffNormals.png" id="2"]
-[ext_resource type="Script" uid="uid://dxd6xoeg627y6" path="res://enemies/red_robot/parts/part_disappear_effect/part_disappear.gd" id="3"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7wgk7"]
 transparency = 1
@@ -40,7 +39,7 @@ height = 0.4
 _data = [Vector2(0, 0), 0.0, 0.37234, 0, 0, Vector2(0.462338, 0.981818), 5.18966, -5.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
 point_count = 3
 
-[node name="PartDisappearPuff" type="CPUParticles3D" unique_id=196349505]
+[node name="PartDisappearPuff" type="PartDisappear" unique_id=196349505]
 material_override = SubResource("StandardMaterial3D_7wgk7")
 cast_shadow = 0
 emitting = false
@@ -56,7 +55,6 @@ direction = Vector3(0, 1, 0)
 gravity = Vector3(0, 2, 0)
 scale_amount_curve = SubResource("Curve_7k7vy")
 color_ramp = SubResource("Gradient_lbh1j")
-script = ExtResource("3")
 
 [node name="MiniBlasts" type="CPUParticles3D" parent="." unique_id=2084239265]
 material_override = SubResource("StandardMaterial3D_yf5wm")
