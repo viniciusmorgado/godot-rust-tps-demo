@@ -170,7 +170,7 @@ que o `type` e as propriedades permaneçam.
 | 1 | Entrar no level; F3 alterna o overlay; linhas `FPS: 60.0` (com `.0`), `VSync: Enabled/Disabled`, `Memory: xx.xx MiB`, `Online: No` (sem linha de ID em single-player); valores mudam a cada frame |
 | 2 | Matar um robô: cada peça, ao sumir, dispara mini-blasts na hora e o puff de fumaça 0,2 s depois; o efeito some sozinho (~3,2 s) |
 | 3 | Deixar o robô atirar: o impacto anima, os raios de luz ficam voltados para a câmera enquanto se move ao redor, e o efeito some ao fim da animação |
-| 4 | Atirar (tremor leve), ser atingido (médio), ser acertado pelo robô (forte, saturado); a câmera volta exatamente à posição de repouso; intensidade/duração iguais ao original |
+| 4 | Atirar (tremor leve, 0,35) e ser acertado pelo laser do robô (forte, 13,0 saturado em 1,2); o nível médio (0,75, RPC `hit`) só ocorre em multiplayer com bala de outro jogador — não verificável single-player; a câmera volta exatamente à posição de repouso; intensidade/duração iguais ao original |
 | 5 | Mover (WASD/analógico), olhar (mouse e analógico; mais lento ao mirar), pitch trava em −89,9°/70°, mira por toque curto (fica) e por hold (solta), animações de câmera shoot/far, pular, atirar acerta o ponto sob o crosshair, cair do mapa escurece a tela (preta em −32) e volta com fade-out |
 
 ## Complexity Tracking
