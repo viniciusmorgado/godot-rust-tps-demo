@@ -1,31 +1,37 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.1.0 → 1.2.0 (MINOR — expansão do Princípio II e novo bullet no Princípio I)
+Version change: 1.2.0 → 1.3.0 (MINOR — expansão material das regras da fase v1 no Princípio I e
+novo bullet no Princípio II)
 
 Princípios:
-  Expandido: II. Ciclo de Porte Verificável → adicionadas as subseções "Ordem de porte de baixo
-  para cima" e "Preservação de nomes de propriedades" (inseridas entre "Vínculo por tipo, nunca
-  por script" e "Build obrigatório")
-  Expandido: I. Porte em Três Fases (v1 → v2 → v3) → novo bullet em "Regras de governança das
-  fases" exigindo registro de melhorias em `docs/v2-backlog.md`
-  Demais conteúdo de ambos os princípios mantido intacto por instrução explícita
+  Expandido: I. Porte em Três Fases (v1 → v2 → v3) → três novos bullets ao final de "Regras de
+  governança das fases": (1) exceção explícita para correção conservadora de bugs do upstream na
+  v1; (2) critério para distinguir bug de melhoria (em caso de dúvida, é melhoria → backlog v2);
+  (3) quatro requisitos obrigatórios de toda correção (spec, isolamento no código com comentário
+  `// upstream bug fix: ...`, mensagem de commit, `docs/upstream-bugs.md`).
+  Expandido: II. Ciclo de Porte Verificável → novo bullet ao final de "Validação headless como
+  definition of done": erros do upstream eliminados por correção DEVEM sair do catálogo do
+  `CLAUDE.md` no mesmo commit.
+  Demais bullets de ambos os princípios mantidos intactos por instrução explícita.
 
 Seções:
   Modificada: Governança → parágrafo "Revisão de conformidade" recebeu uma frase adicional ao
-  final, cobrindo ordem de dependências, nomes de propriedades e registro em
-  `docs/v2-backlog.md`. Os demais parágrafos de Governança foram mantidos intactos por instrução
-  explícita.
+  final, exigindo que revisões confirmem os quatro requisitos de cada correção de bug e que
+  nenhuma melhoria entre sob o rótulo de correção. Demais parágrafos de Governança intactos.
 
-Novos caminhos documentais referenciados pelos princípios (não fazem parte desta constituição e
-não foram criados por este comando — ver Scope Guard):
-  - `docs/port-order.md` (grafo/ordem de dependências do port)
-  - `docs/v2-backlog.md` (registro de melhorias para a v2)
+Novos caminhos documentais referenciados (não fazem parte desta constituição e não foram criados
+por este comando — ver Scope Guard):
+  - `docs/upstream-bugs.md` (registro de defeitos do upstream corrigidos na v1) — criar no
+    primeiro commit que aplicar uma correção.
 
 Templates verificados (não modificados — fora do escopo deste comando):
-  - .specify/templates/plan-template.md: gate "Constitution Check" segue válido; nenhuma
-    alteração necessária.
+  - .specify/templates/plan-template.md: gate "Constitution Check" segue válido; specs de v1 que
+    contenham correção de bug devem declará-la (requisito (a)) e o gate deve conferir os quatro
+    requisitos.
   - .specify/templates/spec-template.md, tasks-template.md, checklist-template.md: nenhuma
-    referência direta à constituição encontrada; nenhuma ação necessária agora.
+    referência direta à constituição; nenhuma ação necessária.
+  - CLAUDE.md: o catálogo de erros pré-existentes passa a ser mantido sob a nova regra do
+    Princípio II; nenhuma alteração necessária agora.
 
 Itens adiados (TODO): nenhum.
 -->
@@ -59,6 +65,9 @@ Este projeto é o porte do Godot TPS Demo (GDScript) para Rust via godot-rust/gd
 - Cada spec, plan e task DEVE declarar a que fase pertence e respeitar as restrições daquela fase. Uma task de v1 que introduza abstração, refatoração ou otimização viola esta constituição e deve ser rejeitada ou movida para o backlog da v2.
 - Notas de melhoria identificadas durante a v1 são registradas como backlog para a v2, sem serem implementadas.
 - Melhorias identificadas durante a v1 DEVEM ser registradas em `docs/v2-backlog.md` (uma entrada por melhoria, com o script/cena de origem e a motivação) no mesmo commit em que foram percebidas. "Anotar" sem registrar nesse arquivo não satisfaz esta regra.
+- **Correção conservadora de bugs do upstream (exceção explícita ao "sem melhorias" da v1)**: um defeito objetivo do demo original — comportamento que o próprio código claramente pretendia e não entrega (ex.: caminho de node inexistente, referência nula, nome de animação errado) — PODE ser corrigido na v1. A correção DEVE ser conservadora: apenas o suficiente para o bug deixar de ocorrer, sem adentrar em grandes modificações em relação à fonte original; nada de reestruturar, extrair, renomear ou "aproveitar" para melhorar o código ao redor. Melhorias e refatorações idiomáticas continuam reservadas à v2.
+- Critério para distinguir bug de melhoria: é bug quando a intenção do código original é inequívoca e o resultado observado a contradiz (a porta deveria abrir e não abre). É melhoria — e portanto proibida na v1 — quando o original funciona como escrito e a mudança o tornaria "melhor" (exclusão real no raycast, recapturar rotação da câmera, não recalcular texto oculto). Em caso de dúvida, é melhoria: vai para o backlog v2.
+- Toda correção de bug na v1 DEVE ser (a) declarada na spec da feature com a descrição do defeito e da correção mínima, (b) implementada de forma isolada e identificável dentro do commit do port (comentário `// upstream bug fix: ...` no ponto exato), (c) mencionada na mensagem do commit, e (d) registrada em `docs/upstream-bugs.md` (defeito, script/cena, correção aplicada, commit) para servir de referência à v2 e a eventual contribuição upstream.
 
 ### II. Ciclo de Porte Verificável
 
@@ -88,6 +97,7 @@ Todo script GDScript portado segue um ciclo fixo, e um port só é considerado c
 - Nenhum port é dado como concluído sem validação executada em Godot headless: no mínimo (a) o import do projeto confirmando o carregamento da extensão (`Initialize godot-rust ...`) e (b) a execução da cena afetada sem erros novos em relação à baseline conhecida do demo upstream.
 - Erros pré-existentes do demo upstream não contam como regressão, mas DEVEM estar catalogados no guia operacional (`CLAUDE.md`) para serem distinguíveis de erros introduzidos pelo port.
 - O commit de cada port DEVE registrar em sua mensagem qual script foi portado e qual(is) cena(s) tiveram o tipo do node trocado.
+- Erros do upstream que deixam de existir por correção de bug DEVEM ser removidos do catálogo de erros pré-existentes do `CLAUDE.md` no mesmo commit, para que o catálogo reflita sempre a baseline vigente.
 
 **Separação entre regra e operação**
 - Esta constituição define O QUE é obrigatório. Caminhos de binários, comandos exatos, versões de ferramentas e notas de API pertencem ao `CLAUDE.md` na raiz do repositório e NÃO devem ser incorporados aqui; mudanças nesses detalhes não constituem emenda.
@@ -103,6 +113,6 @@ Esta constituição tem precedência sobre qualquer outra prática, convenção,
 - MINOR: adição de um novo princípio ou seção, ou expansão material das regras de uma fase existente.
 - PATCH: esclarecimentos, correções de redação ou ajustes não semânticos.
 
-**Revisão de conformidade**: toda spec, plan e task DEVE declarar explicitamente a fase (v1, v2 ou v3) à qual pertence, conforme o Princípio I. Revisões de planejamento e de código DEVEM verificar que o trabalho respeita as restrições da fase declarada — em particular, que nenhuma abstração, refatoração ou otimização seja introduzida durante a v1. Revisões DEVEM igualmente verificar o cumprimento do Princípio II (Ciclo de Porte Verificável) em todo port de script GDScript. Trabalho que viole a fase vigente deve ser rejeitado ou redirecionado ao backlog da fase correta. Revisões de port DEVEM ainda confirmar que a ordem de dependências foi respeitada, que nenhum nome de propriedade exportada ou replicada foi alterado, e que melhorias percebidas foram registradas em `docs/v2-backlog.md`.
+**Revisão de conformidade**: toda spec, plan e task DEVE declarar explicitamente a fase (v1, v2 ou v3) à qual pertence, conforme o Princípio I. Revisões de planejamento e de código DEVEM verificar que o trabalho respeita as restrições da fase declarada — em particular, que nenhuma abstração, refatoração ou otimização seja introduzida durante a v1. Revisões DEVEM igualmente verificar o cumprimento do Princípio II (Ciclo de Porte Verificável) em todo port de script GDScript. Trabalho que viole a fase vigente deve ser rejeitado ou redirecionado ao backlog da fase correta. Revisões de port DEVEM ainda confirmar que a ordem de dependências foi respeitada, que nenhum nome de propriedade exportada ou replicada foi alterado, e que melhorias percebidas foram registradas em `docs/v2-backlog.md`. Revisões DEVEM confirmar que toda correção de bug na v1 atende aos quatro requisitos do Princípio I (spec, isolamento no código, commit, `docs/upstream-bugs.md`) e que nenhuma melhoria foi introduzida sob o rótulo de correção.
 
-**Versão**: 1.2.0 | **Ratificação**: 2026-09-15 | **Última Emenda**: 2026-09-15
+**Versão**: 1.3.0 | **Ratificação**: 2026-09-15 | **Última Emenda**: 2026-09-15
