@@ -5,6 +5,7 @@ mod part_disappear;
 mod blast;
 mod camera_noise_shake;
 mod player_input;
+mod player;
 
 struct OxideGodot;
 

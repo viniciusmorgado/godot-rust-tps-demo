@@ -30,16 +30,16 @@ pub struct PlayerInputSynchronizer {
 
     // Synchronized controls
     #[export]
-    aiming: bool,
+    pub(crate) aiming: bool,
     #[export]
-    shoot_target: Vector3,
+    pub(crate) shoot_target: Vector3,
     #[export]
-    motion: Vector2,
+    pub(crate) motion: Vector2,
     #[export]
-    shooting: bool,
+    pub(crate) shooting: bool,
     // This is handled via RPC for now
     #[export]
-    jumping: bool,
+    pub(crate) jumping: bool,
 
     // Camera and effects
     #[export]
@@ -51,7 +51,7 @@ pub struct PlayerInputSynchronizer {
     #[export]
     camera_rot: Option<Gd<Node3D>>,
     #[export]
-    camera_camera: Option<Gd<Camera3D>>,
+    pub(crate) camera_camera: Option<Gd<Camera3D>>,
     #[export]
     color_rect: Option<Gd<ColorRect>>,
 }
@@ -181,7 +181,7 @@ impl IMultiplayerSynchronizer for PlayerInputSynchronizer {
 #[godot_api]
 impl PlayerInputSynchronizer {
     #[func]
-    fn get_aim_rotation(&self) -> f64 {
+    pub(crate) fn get_aim_rotation(&self) -> f64 {
         let camera_x_rot: f32 = self
             .camera_rot
             .as_ref()
@@ -200,7 +200,7 @@ impl PlayerInputSynchronizer {
     }
 
     #[func]
-    fn get_camera_base_quaternion(&self) -> Quaternion {
+    pub(crate) fn get_camera_base_quaternion(&self) -> Quaternion {
         self.camera_base
             .as_ref()
             .unwrap()
@@ -210,7 +210,7 @@ impl PlayerInputSynchronizer {
     }
 
     #[func]
-    fn get_camera_rotation_basis(&self) -> Basis {
+    pub(crate) fn get_camera_rotation_basis(&self) -> Basis {
         self.camera_rot.as_ref().unwrap().get_global_transform().basis
     }
 

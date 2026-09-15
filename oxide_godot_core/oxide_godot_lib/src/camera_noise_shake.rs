@@ -49,7 +49,7 @@ impl ICamera3D for CameraNoiseShake {
 impl CameraNoiseShake {
     // Add trauma to start/continue the shake.
     #[func]
-    fn add_trauma(&mut self, amount: f64) {
+    pub(crate) fn add_trauma(&mut self, amount: f64) {
         self.trauma = (self.trauma + amount as f32).min(MAX_TRAUMA);
     }
 }

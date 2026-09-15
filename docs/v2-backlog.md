@@ -15,3 +15,6 @@ Serão avaliadas ao abrir a branch `v2`.
 | 7 | `player/player_input.gd` (port 5) | Excluir de fato o corpo do jogador no raycast (`exclude` com o RID do `CharacterBody3D` pai) | O original passa `Array([self], TYPE_RID, "", null)` = `[RID(0)]` (o sincronizador não é corpo físico); exclusão inefetiva, preservada na v1 |
 | 8 | `player/player_input.gd` (port 5) | `OnEditor<Gd<T>>` em vez de `Option<Gd<T>>` para as 6 referências obrigatórias (`camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect`) | Elimina `unwrap()` por frame e faz o editor sinalizar referência ausente |
 | 9 | `player/player_input.gd` (port 5) | Replicar `jumping` ou remover o `@export` | Exportado mas fora da `SceneReplicationConfig`; só faz sentido via RPC `jump` |
+| 10 | `player/player.gd` (port 1) | Iniciar `airborne_time` em 0 (ou ignorar o primeiro pouso) | Com 100 inicial, o primeiro contato com o chão dispara `land` e o som de pouso ao spawnar; na v1 é mantido por fidelidade |
+| 11 | `player/player.gd` (port 1) | Zerar `velocity` no respawn abaixo de −40 | O teleporte para a posição inicial preserva a velocidade de queda acumulada; na v1 é mantido por fidelidade |
+| 12 | `player/player.gd` (port 1) | Remover a referência `crosshair` nunca lida (ou usá-la) | Declarada em `player.gd:30` e não lida em lugar nenhum; na v1 é mantida por fidelidade |
