@@ -61,7 +61,7 @@ Usos: `part_disappear` → `mini_blasts: OnReady<Gd<CpuParticles3D>>` (`"MiniBla
 `animation_player: OnReady<Gd<AnimationPlayer>>` (`"AnimationPlayer"`).
 
 Exceção: `blast.gd`'s `@onready var camera = get_tree().get_root().get_camera_3d()` não é um
-`$Path` → campo `camera: Option<Gd<Camera3D>>` preenchido no início de `ready()` (D9).
+`$Path` → campo `camera: Option<Gd<Camera3D>>` preenchido no início de `ready()` (D8).
 
 **Alternatives**: `get_node_as::<T>("Path")` dentro de `ready()` — funciona, mas `OnReady` é a
 tradução direta de `@onready`; rejeitado por ser menos literal.

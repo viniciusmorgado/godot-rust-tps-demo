@@ -51,7 +51,7 @@ grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # esperado: vazio (ou s
 
 ```bash
 cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <cena>.tscn 2>&1 | tee /tmp/run.log
-grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Nonexistent|panicked' /tmp/run.log   # esperado: vazio
+grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked' /tmp/run.log   # esperado: vazio
 ```
 
 Exit 124 (timeout) é o resultado esperado; exit 0 também é aceitável. A validação é a ausência de

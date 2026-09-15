@@ -82,11 +82,11 @@ Quando o laser do robô atinge algo, aparece um efeito de impacto animado: a cad
 
 ### User Story 4 - Tremor de câmera portado (Priority: P4)
 
-Ao atirar, ao ser atingido ou ao ser acertado pelo robô, a câmera do jogador treme: um "trauma" se acumula (limitado a 1,2), decai a 1,5 por segundo, e enquanto houver trauma a câmera recebe uma rotação de guinada/arfagem/rolagem por ruído proporcional ao quadrado do trauma, somada à sua rotação inicial. O restante do jogo (ainda no original) continua chamando `add_trauma(...)` com 0,35 ao atirar, 0,75 ao ser atingido e 13,0 quando o robô acerta o jogador, sem nenhuma alteração.
+Ao atirar, ao ser atingido pela bala de outro jogador ou ao ser acertado pelo laser do robô, a câmera do jogador treme: um "trauma" se acumula (limitado a 1,2), decai a 1,5 por segundo, e enquanto houver trauma a câmera recebe uma rotação de guinada/arfagem/rolagem por ruído proporcional ao quadrado do trauma, somada à sua rotação inicial. O restante do jogo (ainda no original) continua chamando `add_trauma(...)` com 0,35 ao atirar, 0,75 ao ser atingido (RPC `hit`, disparado por `bullet.gd` — só alcançável em multiplayer, pois as balas do próprio jogador têm exceção de colisão com ele) e 13,0 quando o laser do robô acerta o jogador, sem nenhuma alteração.
 
 **Why this priority**: Primeiro script cuja API é chamada por código que permanece no original (`player.gd`, `red_robot.gd`). Comprova que a interface pública (nome de método) sobrevive à troca de tipo do node. Também introduz estado interno persistente e geração de ruído.
 
-**Independent Test**: Atirar e ser atingido no level; a câmera deve tremer com a mesma intensidade e duração que no original e voltar exatamente à rotação inicial ao final. Validação headless: execução de `player/player.tscn` sem erros novos.
+**Independent Test**: Atirar e ser acertado pelo laser do robô no level (o nível 0,75 é verificado por leitura de código — exige multiplayer); a câmera deve tremer com a mesma intensidade e duração que no original e voltar exatamente à rotação inicial ao final. Validação headless: execução de `player/player.tscn` sem erros novos.
 
 **Acceptance Scenarios**:
 
@@ -94,7 +94,7 @@ Ao atirar, ao ser atingido ou ao ser acertado pelo robô, a câmera do jogador t
 2. **Given** trauma = 1,0, **When** `add_trauma(13.0)` é chamado, **Then** trauma = 1,2 (teto), não mais.
 3. **Given** trauma > 0, **When** um frame de duração `delta` roda, **Then** trauma diminui 1,5×`delta` (sem ficar negativo) e a rotação da câmera = rotação inicial + (arfagem, guinada, rolagem) onde cada componente = limite × trauma² × ruído em [-1, 1], com limites 0,05 (guinada), 0,05 (arfagem) e 0,1 (rolagem).
 4. **Given** trauma acaba de chegar a 0 num frame, **When** esse frame termina, **Then** a rotação da câmera é exatamente a rotação inicial (ruído × 0) e nos frames seguintes a câmera não é mais alterada.
-5. **Given** o script `player.gd` e o `red_robot.gd` continuam no original, **When** o jogador atira, é atingido ou é acertado pelo robô, **Then** as chamadas existentes a `add_camera_shake_trauma`/`add_trauma` funcionam sem qualquer edição nesses scripts.
+5. **Given** o script `player.gd` e o `red_robot.gd` continuam no original, **When** o jogador atira, é atingido pela bala de outro jogador (multiplayer) ou é acertado pelo laser do robô, **Then** as chamadas existentes a `add_camera_shake_trauma`/`add_trauma` funcionam sem qualquer edição nesses scripts.
 6. **Given** duas execuções do jogo, **When** o tremor acontece, **Then** o padrão de ruído pode diferir entre execuções (semente aleatória, como no original), mas a intensidade e duração são as mesmas.
 
 ---
