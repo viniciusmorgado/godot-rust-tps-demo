@@ -439,7 +439,7 @@ Itens 1 (Settings tipado) e 2 (`Hittable`) **já existem** — não duplicar. No
 | 11 | `player/player.gd` (port 1) | Zerar `velocity` no respawn abaixo de −40 | O teleporte preserva a velocidade de queda acumulada |
 | 12 | `player/player.gd` (port 1) | Remover a referência `crosshair` nunca usada (ou usá-la) | Declarada em `player.gd:30` e não lida; na v1 é mantida por fidelidade |
 | 13 | `player/bullet/bullet.gd` (port 2) | Evitar o `explode` duplo quando `time_alive` expira e há colisão no mesmo frame | Dois RPCs `explode` no mesmo frame reiniciam a animação |
-| 14 | `door/door.gd` (port 3) | Tipar `_on_door_body_entered` com `Gd<Player>` via `try_cast` já no sinal / considerar fechar a porta | Só o primeiro `Player` abre e nunca fecha; a v1 só corrige a referência do node |
+| 14 | `door/door.gd` (port 3) | Tipar `_on_door_body_entered` com `Gd<Player>` via `try_cast` já no sinal | Só o primeiro `Player` abre e nunca fecha; a v1 só corrige a referência do node |
 
 O item 9 existente (`jumping` replicado/`@export`) já cobre o quirk "jogador zera `jumping`";
 não duplicar.

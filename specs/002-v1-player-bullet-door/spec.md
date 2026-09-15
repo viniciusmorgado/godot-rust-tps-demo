@@ -48,7 +48,7 @@ O jogador continua a ser exatamente o mesmo personagem: anda, corre, pula, pousa
 12. **Given** uma bala de **outro** jogador atinge este jogador (só em multiplayer — as balas do próprio jogador têm exceção de colisão com ele, `player.gd:142`), **When** `bullet` chama `hit.rpc()` no colisor, **Then** o jogador recebe `add_camera_shake_trauma(0.75)`. Verificado por leitura de código; não observável single-player.
 13. **Given** o jogador cai abaixo de y = −40, **When** o frame de física roda, **Then** é teleportado para a posição inicial capturada ao entrar na cena.
 14. **Given** o peer local não é servidor, **When** o node entra na cena, **Then** o processamento por frame é desligado e, a cada frame de física, apenas `current_animation` (replicado) é animado — ramo verificado por leitura de código e headless (validação é single-player, onde o peer é servidor e autoridade).
-15. **Given** `red_robot.gd`, `level.gd`, `door.gd` (até o port 3) e `part.gd` continuam no original, **When** usam `is Player`, `player_id`, `name`, `add_camera_shake_trauma`, `hit`, **Then** tudo resolve sem edição nesses scripts.
+15. **Given** `red_robot.gd`, `level.gd` e `door.gd` (até o port 3) continuam no original, **When** usam `is Player`, `player_id`, `name`, `add_camera_shake_trauma`, `hit`, **Then** tudo resolve sem edição nesses scripts.
 
 ---
 
@@ -181,7 +181,7 @@ A porta abre (animação "doorsimple_opening") quando o jogador entra na sua ár
 - **SC-005**: O histórico do marco tem exatamente 3 commits `Port …` (um por script) e nenhum toca os 7 scripts fora de escopo; o commit da porta menciona a correção do bug.
 - **SC-006**: Build de debug sem nenhum warning novo em todos os commits.
 - **SC-007**: Nenhuma linha portada introduz abstração, refatoração ou otimização; a única diferença de comportamento em relação ao original é a porta abrir, e ela está isolada por comentário, declarada aqui, no commit e em `docs/upstream-bugs.md` (4/4 requisitos da cláusula).
-- **SC-008**: `red_robot.gd`, `level.gd`, `part.gd` e a bala continuam encontrando `Player`, `player_id`, `name`, `hit` e `add_camera_shake_trauma` pelos nomes originais — nenhum aviso de tipo/método/propriedade inexistente nos logs headless nem no editor.
+- **SC-008**: `red_robot.gd`, `level.gd` e a bala continuam encontrando `Player`, `player_id`, `name`, `hit` e `add_camera_shake_trauma` pelos nomes originais — nenhum aviso de tipo/método/propriedade inexistente nos logs headless nem no editor.
 - **SC-009**: `door.tscn` instancia sem erro e, em teste isolado, abre exatamente uma vez para um `Player`.
 
 ## Assumptions
