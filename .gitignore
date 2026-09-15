@@ -24,3 +24,6 @@ rust-project.json
 
 # Blender versioning
 *.blend[0-9]*
+
+# Python
+__pycache__/
