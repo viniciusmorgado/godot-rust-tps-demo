@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = ["oxide_godot_lib"]
+
+# Convention: ALL template dependencies live in [workspace.dependencies] below and are inherited via `{ workspace = true }` in the member crate — never declare a dependency directly in a member's [dependencies]/[dev-dependencies].
+[workspace.dependencies]
+godot = "0.5.5"

@@ -1,0 +1,26 @@
+# Godot
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+# Imported translations (automatically generated from CSV files)
+*.translation
+.mono/
+data_*/
+mono_crash.*.json
+
+# Rust
+debug/
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+rust-project.json
+
+# System/tool-specific ignores
+.directory
+.DS_Store
+*~
+
+# Blender versioning
+*.blend[0-9]*

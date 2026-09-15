@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cjq1xb305wq1b"]
+
+[resource]
+resource_name = "ShadelessBlack"
+shading_mode = 0
+albedo_color = Color(0, 0, 0, 1)

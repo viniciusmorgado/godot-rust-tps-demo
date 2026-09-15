@@ -1,0 +1,845 @@
+[gd_scene format=3 uid="uid://c80nbk7u633n6"]
+
+[ext_resource type="Script" uid="uid://4pwshyfo5i0d" path="res://menu/menu.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://gnsovrtic7g4" path="res://menu/experiment.hdr" id="2_bpuaq"]
+[ext_resource type="PackedScene" uid="uid://div25sd40yx1d" path="res://player/model/player.glb" id="3"]
+[ext_resource type="AudioStream" uid="uid://bfq26n228ipa" path="res://menu/menu_intro_music.ogg" id="5"]
+[ext_resource type="Texture2D" uid="uid://ckwsj2km1edy6" path="res://menu/tps_demo.png" id="6"]
+[ext_resource type="Texture2D" uid="uid://c6gsd2mdmea8w" path="res://menu/floor.png" id="6_qhdg0"]
+[ext_resource type="FontFile" uid="uid://b8tvpu085c6v4" path="res://menu/button_font.tres" id="13"]
+[ext_resource type="StyleBox" uid="uid://dd2346b4rjg8j" path="res://menu/button_pressed.tres" id="14"]
+[ext_resource type="StyleBox" uid="uid://b5jvmt5xa2afe" path="res://menu/button_normal.tres" id="15"]
+[ext_resource type="StyleBox" uid="uid://b807o31rnpht1" path="res://menu/button_focus.tres" id="16"]
+[ext_resource type="StyleBox" uid="uid://bsth0dexb32e8" path="res://menu/button_hover.tres" id="17"]
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_aosi0"]
+panorama = ExtResource("2_bpuaq")
+
+[sub_resource type="Sky" id="Sky_0dm4h"]
+sky_material = SubResource("PanoramaSkyMaterial_aosi0")
+
+[sub_resource type="Environment" id="2"]
+background_mode = 2
+sky = SubResource("Sky_0dm4h")
+ambient_light_source = 2
+ambient_light_color = Color(0.164706, 0.184314, 0.270588, 1)
+glow_enabled = true
+glow_levels/1 = 1.0
+glow_levels/4 = 1.0
+glow_levels/7 = 0.5
+glow_mix = 0.153
+glow_blend_mode = 4
+glow_hdr_threshold = 0.36
+fog_enabled = true
+fog_light_color = Color(0, 0, 0, 1)
+volumetric_fog_enabled = true
+volumetric_fog_temporal_reprojection_enabled = false
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_6xg6v"]
+
+[sub_resource type="NoiseTexture3D" id="NoiseTexture3D_gixss"]
+noise = SubResource("FastNoiseLite_6xg6v")
+
+[sub_resource type="FogMaterial" id="FogMaterial_e2dgj"]
+density = 0.002
+emission = Color(1, 2, 3, 1)
+edge_fade = 1.0
+density_texture = SubResource("NoiseTexture3D_gixss")
+
+[sub_resource type="QuadMesh" id="3"]
+size = Vector2(4096, 4096)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_froyn"]
+albedo_color = Color(0.419608, 0.419608, 0.419608, 1)
+albedo_texture = ExtResource("6_qhdg0")
+
+[sub_resource type="AnimationNodeBlend2" id="5"]
+resource_local_to_scene = true
+filter_enabled = true
+filters = ["Robot_Skeleton/Skeleton3D:eyelid.d.L", "Robot_Skeleton/Skeleton3D:eyelid.d.R", "Robot_Skeleton/Skeleton3D:eyelid.u.L", "Robot_Skeleton/Skeleton3D:eyelid.u.R", "Robot_Skeleton/Skeleton3D:eyes"]
+
+[sub_resource type="AnimationNodeAnimation" id="6"]
+resource_local_to_scene = true
+animation = &"Idlecombatrest"
+
+[sub_resource type="AnimationNodeAnimation" id="7"]
+resource_local_to_scene = true
+animation = &"eyes"
+
+[sub_resource type="AnimationNodeBlendTree" id="8"]
+resource_local_to_scene = true
+graph_offset = Vector2(-776.416, 238.649)
+nodes/output/position = Vector2(420, 120)
+nodes/Blend/node = SubResource("5")
+nodes/Blend/position = Vector2(180, 120)
+nodes/CombatRest/node = SubResource("6")
+nodes/CombatRest/position = Vector2(-120, 100)
+nodes/Eyes/node = SubResource("7")
+nodes/Eyes/position = Vector2(-40, 220)
+node_connections = [&"output", 0, &"Blend", &"Blend", 0, &"CombatRest", &"Blend", 1, &"Eyes"]
+
+[sub_resource type="Theme" id="9"]
+Button/colors/font_color = Color(1, 1, 1, 1)
+Button/colors/font_color_disabled = Color(0.9, 0.9, 0.9, 0.2)
+Button/colors/font_color_hover = Color(1, 1, 1, 1)
+Button/colors/font_color_pressed = Color(1, 1, 1, 1)
+Button/constants/h_separation = 2
+Button/fonts/font = ExtResource("13")
+Button/styles/disabled = null
+Button/styles/focus = ExtResource("16")
+Button/styles/hover = ExtResource("17")
+Button/styles/normal = ExtResource("15")
+Button/styles/pressed = ExtResource("14")
+Label/colors/font_color = Color(1, 1, 1, 1)
+Label/colors/font_color_shadow = Color(0, 0, 0, 0)
+Label/colors/font_outline_modulate = Color(1, 1, 1, 1)
+Label/constants/line_spacing = 3
+Label/constants/shadow_as_outline = 0
+Label/constants/shadow_offset_x = 1
+Label/constants/shadow_offset_y = 1
+Label/fonts/font = ExtResource("13")
+Label/styles/normal = null
+
+[node name="Menu" type="Node" unique_id=638347746]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=126264825]
+environment = SubResource("2")
+
+[node name="FogVolume" type="FogVolume" parent="WorldEnvironment" unique_id=1450914945]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.54524, 0.476703, 0.346051)
+size = Vector3(16, 4, 16)
+material = SubResource("FogMaterial_e2dgj")
+
+[node name="PlayerModel" parent="." unique_id=2066740528 instance=ExtResource("3")]
+
+[node name="SoundEffects" type="Node" parent="." unique_id=460902806]
+
+[node name="Step" type="AudioStreamPlayer" parent="SoundEffects" unique_id=2018925167]
+
+[node name="Floor" type="MeshInstance3D" parent="." unique_id=1102617400]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("3")
+surface_material_override/0 = SubResource("StandardMaterial3D_froyn")
+
+[node name="SpotLight3D" type="SpotLight3D" parent="." unique_id=497422568]
+transform = Transform3D(0.967027, 0, 0.254675, -0.225291, 0.466312, 0.855452, -0.118758, -0.88462, 0.450936, 0.557445, 2.31204, 0.556668)
+shadow_enabled = true
+
+[node name="SpotLightBounce" type="SpotLight3D" parent="." unique_id=1671765117]
+transform = Transform3D(-0.967027, -1.26906e-07, -0.254675, 0.225291, 0.466312, -0.855451, 0.118758, -0.88462, -0.450936, -0.206581, -0.720626, 0.088479)
+light_color = Color(1, 0.654902, 0.0509804, 1)
+light_energy = 0.3
+light_specular = 0.0
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1138212063]
+transform = Transform3D(0.871624, -0.0363083, 0.488828, 0, 0.997253, 0.0740721, -0.490175, -0.064563, 0.86923, 0.0702285, 1.22404, 2.09675)
+
+[node name="Music" type="AudioStreamPlayer" parent="." unique_id=1759199230]
+stream = ExtResource("5")
+autoplay = true
+
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=2091175254]
+root_node = NodePath("../PlayerModel")
+tree_root = SubResource("8")
+anim_player = NodePath("../PlayerModel/AnimationPlayer")
+parameters/Blend/blend_amount = 1.0
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=62116410]
+offset_left = 20.1403
+offset_top = 5.03506
+offset_right = 1044.14
+offset_bottom = 238.035
+texture = ExtResource("6")
+
+[node name="UI" type="Control" parent="." unique_id=996434165]
+layout_mode = 3
+anchor_left = 0.00106799
+anchor_right = 1.00107
+anchor_bottom = 1.0
+theme = SubResource("9")
+
+[node name="Main" type="Control" parent="UI" unique_id=1279337218]
+layout_mode = 1
+anchor_left = -0.000673103
+anchor_top = -0.00189865
+anchor_right = 0.999327
+anchor_bottom = 0.998101
+offset_left = -4.10107
+offset_top = 2.05054
+offset_right = -4.10107
+offset_bottom = 2.05054
+
+[node name="Play" type="Button" parent="UI/Main" unique_id=433382165]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 390.0
+offset_right = 400.0
+offset_bottom = 440.0
+theme_override_font_sizes/font_size = 30
+text = "PLAY"
+alignment = 0
+
+[node name="PlayOnline" type="Button" parent="UI/Main" unique_id=886691214]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 490.0
+offset_right = 400.0
+offset_bottom = 540.0
+theme_override_font_sizes/font_size = 30
+text = "PLAY ONLINE"
+alignment = 0
+
+[node name="Settings" type="Button" parent="UI/Main" unique_id=29625528]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 590.0
+offset_right = 400.0
+offset_bottom = 640.0
+theme_override_font_sizes/font_size = 30
+text = "SETTINGS"
+alignment = 0
+
+[node name="Quit" type="Button" parent="UI/Main" unique_id=2144747608]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 690.0
+offset_right = 400.0
+offset_bottom = 740.0
+theme_override_font_sizes/font_size = 30
+text = "QUIT"
+alignment = 0
+
+[node name="Online" type="Control" parent="UI" unique_id=1985942088]
+visible = false
+anchors_preset = 0
+anchor_left = -0.000673103
+anchor_top = -0.00189865
+anchor_right = 0.999327
+anchor_bottom = 0.998101
+offset_left = -4.10107
+offset_top = 2.05054
+offset_right = -4.10107
+offset_bottom = 2.05054
+
+[node name="Host" type="Button" parent="UI/Online" unique_id=2082688446]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 490.0
+offset_right = 400.0
+offset_bottom = 540.0
+theme_override_font_sizes/font_size = 30
+text = "Host"
+alignment = 0
+
+[node name="Port" type="SpinBox" parent="UI/Online" unique_id=48668762]
+layout_mode = 0
+offset_left = 500.0
+offset_top = 490.0
+offset_right = 800.0
+offset_bottom = 540.0
+min_value = 1025.0
+max_value = 49151.0
+value = 4383.0
+
+[node name="Connect" type="Button" parent="UI/Online" unique_id=1882467567]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 590.0
+offset_right = 400.0
+offset_bottom = 640.0
+theme_override_font_sizes/font_size = 30
+text = "Connect"
+alignment = 0
+
+[node name="Address" type="LineEdit" parent="UI/Online" unique_id=598641841]
+layout_mode = 0
+offset_left = 500.0
+offset_top = 590.0
+offset_right = 800.0
+offset_bottom = 640.0
+theme_override_font_sizes/font_size = 30
+text = "127.0.0.1"
+
+[node name="Back" type="Button" parent="UI/Online" unique_id=1785058496]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 690.0
+offset_right = 400.0
+offset_bottom = 740.0
+theme_override_font_sizes/font_size = 30
+text = "Back"
+alignment = 0
+
+[node name="Settings" type="VBoxContainer" parent="UI" unique_id=1539731661]
+visible = false
+layout_mode = 0
+anchor_left = 0.109896
+anchor_top = 0.23148
+anchor_right = 0.808854
+anchor_bottom = 1.00278
+theme_override_constants/separation = 8
+
+[node name="DisplayMode" type="HBoxContainer" parent="UI/Settings" unique_id=1456867160]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/DisplayMode" unique_id=1814026126]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Display Mode:"
+
+[node name="Windowed" type="Button" parent="UI/Settings/DisplayMode" unique_id=756156554]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Window"
+
+[node name="Fullscreen" type="Button" parent="UI/Settings/DisplayMode" unique_id=128625350]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Fullscreen"
+
+[node name="ExclusiveFullscreen" type="Button" parent="UI/Settings/DisplayMode" unique_id=1982209388]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Exclusive Fullscreen"
+
+[node name="VSync" type="HBoxContainer" parent="UI/Settings" unique_id=1950350597]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/VSync" unique_id=2109792651]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Vertical Synchronization:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/VSync" unique_id=414202777]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Enabled" type="Button" parent="UI/Settings/VSync" unique_id=4175107]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Enabled"
+
+[node name="Adaptive" type="Button" parent="UI/Settings/VSync" unique_id=104800148]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Adaptive"
+
+[node name="Mailbox" type="Button" parent="UI/Settings/VSync" unique_id=1817706592]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Mailbox"
+
+[node name="MaxFPS" type="HBoxContainer" parent="UI/Settings" unique_id=1148378915]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/MaxFPS" unique_id=1319814599]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "FPS Limit:"
+
+[node name="30" type="Button" parent="UI/Settings/MaxFPS" unique_id=349274292]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "30"
+
+[node name="40" type="Button" parent="UI/Settings/MaxFPS" unique_id=601350247]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "40"
+
+[node name="60" type="Button" parent="UI/Settings/MaxFPS" unique_id=1316643254]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "60"
+
+[node name="72" type="Button" parent="UI/Settings/MaxFPS" unique_id=49360362]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "72"
+
+[node name="90" type="Button" parent="UI/Settings/MaxFPS" unique_id=1324308453]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "90"
+
+[node name="120" type="Button" parent="UI/Settings/MaxFPS" unique_id=1737890205]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "120"
+
+[node name="144" type="Button" parent="UI/Settings/MaxFPS" unique_id=79917878]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "144"
+
+[node name="Unlimited" type="Button" parent="UI/Settings/MaxFPS" unique_id=533403582]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Unlimited"
+
+[node name="ResolutionScale" type="HBoxContainer" parent="UI/Settings" unique_id=19911945]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/ResolutionScale" unique_id=516787099]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Resolution Scale:"
+
+[node name="UltraPerformance" type="Button" parent="UI/Settings/ResolutionScale" unique_id=142600755]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Ultra Performance"
+
+[node name="Performance" type="Button" parent="UI/Settings/ResolutionScale" unique_id=1702326269]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Performance"
+
+[node name="Balanced" type="Button" parent="UI/Settings/ResolutionScale" unique_id=1689476050]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Balanced"
+
+[node name="Quality" type="Button" parent="UI/Settings/ResolutionScale" unique_id=1389564962]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Quality"
+
+[node name="UltraQuality" type="Button" parent="UI/Settings/ResolutionScale" unique_id=1310532278]
+modulate = Color(1, 0.627451, 0.25098, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Ultra Quality"
+
+[node name="Native" type="Button" parent="UI/Settings/ResolutionScale" unique_id=978291612]
+modulate = Color(1, 0.376471, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Native"
+
+[node name="ScaleFilter" type="HBoxContainer" parent="UI/Settings" unique_id=1017563364]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/ScaleFilter" unique_id=968750842]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Resolution Scale Filter:"
+
+[node name="Nearest" type="Button" parent="UI/Settings/ScaleFilter" unique_id=455958696]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Nearest"
+
+[node name="Bilinear" type="Button" parent="UI/Settings/ScaleFilter" unique_id=321763514]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Bilinear"
+
+[node name="FSR1" type="Button" parent="UI/Settings/ScaleFilter" unique_id=1879333939]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "AMD FSR 1.0"
+
+[node name="MetalFXSpatial" type="Button" parent="UI/Settings/ScaleFilter" unique_id=1285124171]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "MetalFX Spatial"
+
+[node name="FSR2" type="Button" parent="UI/Settings/ScaleFilter" unique_id=480647464]
+modulate = Color(1, 0.627451, 0.25098, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "AMD FSR 2.2"
+
+[node name="MetalFXTemporal" type="Button" parent="UI/Settings/ScaleFilter" unique_id=1450129499]
+modulate = Color(1, 0.627451, 0.25098, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "MetalFX Temporal"
+
+[node name="HSeparator2" type="HSeparator" parent="UI/Settings" unique_id=1680250124]
+layout_mode = 2
+
+[node name="TAA" type="HBoxContainer" parent="UI/Settings" unique_id=1248738753]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/TAA" unique_id=2025168532]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Temporal Antialiasing:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/TAA" unique_id=732253335]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Enabled" type="Button" parent="UI/Settings/TAA" unique_id=1398158229]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Enabled"
+
+[node name="MSAA" type="HBoxContainer" parent="UI/Settings" unique_id=190979908]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/MSAA" unique_id=839402567]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Multisample Antialiasing:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/MSAA" unique_id=516295948]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="2X" type="Button" parent="UI/Settings/MSAA" unique_id=1053850328]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "2×"
+
+[node name="4X" type="Button" parent="UI/Settings/MSAA" unique_id=527457744]
+modulate = Color(1, 0.627451, 0.25098, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "4×"
+
+[node name="8X" type="Button" parent="UI/Settings/MSAA" unique_id=613177525]
+modulate = Color(1, 0.376471, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "8×"
+
+[node name="ScreenSpaceAA" type="HBoxContainer" parent="UI/Settings" unique_id=828568315]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/ScreenSpaceAA" unique_id=377145755]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Screen-Space Antialiasing:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/ScreenSpaceAA" unique_id=1619630717]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="FXAA" type="Button" parent="UI/Settings/ScreenSpaceAA" unique_id=884760904]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+keep_pressed_outside = true
+text = "FXAA"
+
+[node name="SMAA" type="Button" parent="UI/Settings/ScreenSpaceAA" unique_id=477751064]
+modulate = Color(1, 1, 0.3137255, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+keep_pressed_outside = true
+text = "SMAA"
+
+[node name="ShadowMapping" type="HBoxContainer" parent="UI/Settings" unique_id=1511937078]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/ShadowMapping" unique_id=1029609967]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Shadow Mapping:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/ShadowMapping" unique_id=1578627253]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Enabled" type="Button" parent="UI/Settings/ShadowMapping" unique_id=1904307764]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Enabled"
+
+[node name="GIType" type="HBoxContainer" parent="UI/Settings" unique_id=1525708964]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/GIType" unique_id=737390969]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Global Illumination Type:"
+
+[node name="LightmapGI" type="Button" parent="UI/Settings/GIType" unique_id=44793426]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "LightmapGI"
+
+[node name="VoxelGI" type="Button" parent="UI/Settings/GIType" unique_id=1983823264]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "VoxelGI"
+
+[node name="SDFGI" type="Button" parent="UI/Settings/GIType" unique_id=1578657799]
+modulate = Color(1, 0.627451, 0.25098, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "SDFGI"
+
+[node name="GIQuality" type="HBoxContainer" parent="UI/Settings" unique_id=870441429]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/GIQuality" unique_id=1493844638]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Global Illumination Quality:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/GIQuality" unique_id=1585433100]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Low" type="Button" parent="UI/Settings/GIQuality" unique_id=1000151434]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Low"
+
+[node name="High" type="Button" parent="UI/Settings/GIQuality" unique_id=1235652684]
+modulate = Color(1, 0.376471, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "High"
+
+[node name="SSAO" type="HBoxContainer" parent="UI/Settings" unique_id=1305397337]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/SSAO" unique_id=57007525]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Screen-space Ambient Occlusion:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/SSAO" unique_id=1680579275]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Medium" type="Button" parent="UI/Settings/SSAO" unique_id=786353232]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Medium"
+
+[node name="High" type="Button" parent="UI/Settings/SSAO" unique_id=962935294]
+modulate = Color(1, 0.376471, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "High"
+
+[node name="SSIL" type="HBoxContainer" parent="UI/Settings" unique_id=2069718655]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/SSIL" unique_id=1096216149]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Screen-space Indirect Lighting:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/SSIL" unique_id=251857440]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Medium" type="Button" parent="UI/Settings/SSIL" unique_id=738846535]
+modulate = Color(1, 0.627451, 0.25098, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Medium"
+
+[node name="High" type="Button" parent="UI/Settings/SSIL" unique_id=1944455120]
+modulate = Color(1, 0.376471, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "High"
+
+[node name="Bloom" type="HBoxContainer" parent="UI/Settings" unique_id=2060184356]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/Bloom" unique_id=151275605]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Bloom:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/Bloom" unique_id=1945798888]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Enabled" type="Button" parent="UI/Settings/Bloom" unique_id=1138793223]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Enabled"
+
+[node name="VolumetricFog" type="HBoxContainer" parent="UI/Settings" unique_id=1631429580]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Label" type="Label" parent="UI/Settings/VolumetricFog" unique_id=324136324]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Volumetric Fog:"
+
+[node name="Disabled" type="Button" parent="UI/Settings/VolumetricFog" unique_id=1570878569]
+modulate = Color(0.376471, 1, 0.376471, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Disabled"
+
+[node name="Enabled" type="Button" parent="UI/Settings/VolumetricFog" unique_id=2040088370]
+modulate = Color(1, 1, 0.313726, 1)
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Enabled"
+
+[node name="HSeparator" type="HSeparator" parent="UI/Settings" unique_id=536412912]
+modulate = Color(1, 1, 1, 0)
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="UI/Settings" unique_id=1209396316]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Apply" type="Button" parent="UI/Settings/Actions" unique_id=1898348177]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Apply"
+
+[node name="Cancel" type="Button" parent="UI/Settings/Actions" unique_id=433030297]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Cancel"
+
+[node name="Loading" type="HBoxContainer" parent="UI" unique_id=1639148534]
+visible = false
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 100.0
+offset_top = -135.0
+offset_right = -130.0
+offset_bottom = -100.0
+
+[node name="Label" type="Label" parent="UI/Loading" unique_id=1961373571]
+layout_mode = 2
+text = "Loading..."
+
+[node name="Progress" type="ProgressBar" parent="UI/Loading" unique_id=1379961033]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+
+[node name="DoneTimer" type="Timer" parent="UI/Loading" unique_id=459006344]
+wait_time = 0.5
+one_shot = true
+
+[connection signal="pressed" from="UI/Main/Play" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="UI/Main/PlayOnline" to="." method="_on_play_online_pressed"]
+[connection signal="pressed" from="UI/Main/Settings" to="." method="_on_settings_pressed"]
+[connection signal="pressed" from="UI/Main/Quit" to="." method="_on_quit_pressed"]
+[connection signal="pressed" from="UI/Online/Host" to="." method="_on_host_pressed"]
+[connection signal="pressed" from="UI/Online/Connect" to="." method="_on_connect_pressed"]
+[connection signal="pressed" from="UI/Online/Back" to="." method="_on_cancel_pressed"]
+[connection signal="pressed" from="UI/Settings/Actions/Apply" to="." method="_on_apply_pressed"]
+[connection signal="pressed" from="UI/Settings/Actions/Cancel" to="." method="_on_cancel_pressed"]
+[connection signal="timeout" from="UI/Loading/DoneTimer" to="." method="_on_loading_done_timer_timeout"]
