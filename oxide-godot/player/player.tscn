@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://ctlx3bqglonsx" path="res://player/player.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://div25sd40yx1d" path="res://player/model/player.glb" id="2"]
-[ext_resource type="Script" uid="uid://m1xn31x0lssx" path="res://player/player_input.gd" id="2_g11dy"]
 [ext_resource type="Texture2D" uid="uid://vpkjqsku35mr" path="res://player/crosshair.png" id="3"]
 [ext_resource type="AudioStream" uid="uid://do3ko5enqvvrb" path="res://player/audio/step_random_pitch.tres" id="4"]
 [ext_resource type="AudioStream" uid="uid://evwr35k4yn6g" path="res://player/audio/jump.wav" id="5"]
@@ -339,9 +338,8 @@ script = ExtResource("1")
 [node name="ServerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=823630467]
 replication_config = SubResource("SceneReplicationConfig_o4rt5")
 
-[node name="InputSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=93726692 node_paths=PackedStringArray("camera_animation", "crosshair", "camera_base", "camera_rot", "camera_camera", "color_rect")]
+[node name="InputSynchronizer" type="PlayerInputSynchronizer" parent="." unique_id=93726692 node_paths=PackedStringArray("camera_animation", "crosshair", "camera_base", "camera_rot", "camera_camera", "color_rect")]
 replication_config = SubResource("SceneReplicationConfig_8yuxf")
-script = ExtResource("2_g11dy")
 camera_animation = NodePath("../CameraBase/Animation")
 crosshair = NodePath("../Crosshair")
 camera_base = NodePath("../CameraBase")
