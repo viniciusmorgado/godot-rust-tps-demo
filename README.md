@@ -7,6 +7,14 @@ The original demo is written in GDScript. This repository replaces **every** scr
 class registered through GDExtension; the scenes, models, textures, audio and lightmaps are the
 original ones.
 
+## Screenshots
+
+| SDFGI | VoxelGI |
+|---|---|
+| ![SDFGI](repo/sdf_gi.png) | ![VoxelGI](repo/voxel_gi.png) |
+
+<sub>Captured from the finished Rust port (global illumination selectable in the in-game settings).</sub>
+
 ## Layout
 
 ```
