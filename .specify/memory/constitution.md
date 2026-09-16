@@ -1,37 +1,30 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.2.0 → 1.3.0 (MINOR — expansão material das regras da fase v1 no Princípio I e
-novo bullet no Princípio II)
+Version change: 1.3.0 → 1.3.1 (PATCH — dois esclarecimentos no Princípio II; nenhuma regra nova,
+nenhuma removida, nenhuma redefinição)
 
 Princípios:
-  Expandido: I. Porte em Três Fases (v1 → v2 → v3) → três novos bullets ao final de "Regras de
-  governança das fases": (1) exceção explícita para correção conservadora de bugs do upstream na
-  v1; (2) critério para distinguir bug de melhoria (em caso de dúvida, é melhoria → backlog v2);
-  (3) quatro requisitos obrigatórios de toda correção (spec, isolamento no código com comentário
-  `// upstream bug fix: ...`, mensagem de commit, `docs/upstream-bugs.md`).
-  Expandido: II. Ciclo de Porte Verificável → novo bullet ao final de "Validação headless como
-  definition of done": erros do upstream eliminados por correção DEVEM sair do catálogo do
-  `CLAUDE.md` no mesmo commit.
+  Esclarecido: II. Ciclo de Porte Verificável → "Vínculo por tipo, nunca por script", primeiro
+  bullet: quando o `extends` do script é ANCESTRAL do tipo do node ao qual está attached na cena,
+  a base da classe Rust é o tipo do node na cena (a troca de `type` não rebaixa o node). Caso que
+  motivou: `flying_forklift.gd` (Marco D) — `extends Node3D` attached a um node `CharacterBody3D`
+  com `CollisionShape3D` filho.
+  Esclarecido: II. Ciclo de Porte Verificável → "Preservação de nomes de propriedades", novo
+  bullet ao final: o nome da classe Rust registrada não pode coincidir com classe do engine nem com
+  identificador de topo (`const`, `class_name`, `var`) de nenhum `.gd` remanescente — o GDScript
+  rejeita o script inteiro ("The member X shadows a native class"). Caso que motivou: `RedRobot`
+  → `EnemyRobot` (Marco C) — colisão com `const RedRobot` em `level.gd:6`.
   Demais bullets de ambos os princípios mantidos intactos por instrução explícita.
 
-Seções:
-  Modificada: Governança → parágrafo "Revisão de conformidade" recebeu uma frase adicional ao
-  final, exigindo que revisões confirmem os quatro requisitos de cada correção de bug e que
-  nenhuma melhoria entre sob o rótulo de correção. Demais parágrafos de Governança intactos.
-
-Novos caminhos documentais referenciados (não fazem parte desta constituição e não foram criados
-por este comando — ver Scope Guard):
-  - `docs/upstream-bugs.md` (registro de defeitos do upstream corrigidos na v1) — criar no
-    primeiro commit que aplicar uma correção.
+Seções: Governança inalterada.
 
 Templates verificados (não modificados — fora do escopo deste comando):
-  - .specify/templates/plan-template.md: gate "Constitution Check" segue válido; specs de v1 que
-    contenham correção de bug devem declará-la (requisito (a)) e o gate deve conferir os quatro
-    requisitos.
+  - .specify/templates/plan-template.md: gate "Constitution Check" segue válido; plans devem
+    conferir a base efetiva do node e a ausência de colisão de nome antes do Phase 0.
   - .specify/templates/spec-template.md, tasks-template.md, checklist-template.md: nenhuma
     referência direta à constituição; nenhuma ação necessária.
-  - CLAUDE.md: o catálogo de erros pré-existentes passa a ser mantido sob a nova regra do
-    Princípio II; nenhuma alteração necessária agora.
+  - CLAUDE.md: já contém o comando de conferência de colisão de nomes (regra operacional, não
+    constitucional); nenhuma alteração necessária.
 
 Itens adiados (TODO): nenhum.
 -->
@@ -74,7 +67,7 @@ Este projeto é o porte do Godot TPS Demo (GDScript) para Rust via godot-rust/gd
 Todo script GDScript portado segue um ciclo fixo, e um port só é considerado concluído quando todas as etapas abaixo foram cumpridas e evidenciadas:
 
 **Vínculo por tipo, nunca por script**
-- Cada script `.gd` DEVE virar exatamente uma classe Rust registrada via gdext, com a MESMA classe base do script original (ex.: `extends CharacterBody3D` → `#[class(base=CharacterBody3D)]`).
+- Cada script `.gd` DEVE virar exatamente uma classe Rust registrada via gdext, com a MESMA classe base do script original (ex.: `extends CharacterBody3D` → `#[class(base=CharacterBody3D)]`). Esclarecimento: quando o `extends` do script é um ANCESTRAL do tipo do node ao qual ele está attached na cena (ex.: `extends Node3D` num node `CharacterBody3D`), a base da classe Rust é o tipo do node na cena — a troca de `type` não pode rebaixar o node nem descartar o que a cena lhe deu (corpo físico, filhos que dependem do tipo). O `extends` de ancestral é apenas uma declaração mais frouxa do GDScript; o comportamento observável vem do node. A spec do port DEVE registrar o caso quando ocorrer.
 - A classe Rust é vinculada à cena trocando o `type` do node na `.tscn` (equivalente ao "Change Type" do editor) e removendo o `script` e o `ext_resource` do `.gd`. É PROIBIDO manter um `.gd` attached ao node como ponte, wrapper ou fallback.
 - Métodos expostos com `#[func]` DEVEM preservar o nome original do GDScript, para que as `[connection]` das cenas, chamadas `has_method()` e `.rpc()` existentes continuem válidas sem edição.
 - O `.gd` e seu `.gd.uid` DEVEM ser removidos no mesmo commit em que o node passa a usar a classe Rust.
@@ -89,6 +82,7 @@ Todo script GDScript portado segue um ciclo fixo, e um port só é considerado c
 **Preservação de nomes de propriedades**
 - Além dos nomes de métodos, toda propriedade exportada (`@export`) ou replicada por `MultiplayerSynchronizer` (listada em `SceneReplicationConfig` nas cenas) DEVE manter o nome original do GDScript ao virar `#[export]`/`#[var]`. Renomear uma dessas propriedades quebra silenciosamente valores salvos nas cenas e a replicação multiplayer, sem erro em tempo de compilação nem de import.
 - Antes de concluir um port, o autor DEVE conferir na `.tscn` afetada quais propriedades do script são referenciadas (valores exportados, `properties/N/path` de replicação, `node_paths`) e garantir que todas existem na classe Rust com o mesmo nome e tipo compatível.
+- O NOME da classe Rust registrada NÃO pode coincidir com nenhuma classe do engine nem com identificador de topo (`const`, `class_name`, `var`) de qualquer `.gd` que ainda exista no projeto: o GDScript rejeita o script inteiro ("The member X shadows a native class") e o jogo deixa de carregar. Conferir antes de nomear (comando no `CLAUDE.md`); em caso de colisão, o nome do port muda — nunca o `.gd` remanescente.
 
 **Build obrigatório**
 - Toda alteração em código Rust DEVE ser seguida de `cargo build` (perfil debug) com sucesso e sem warnings novos, antes de qualquer validação ou commit. A biblioteca dinâmica em `target/debug/` é o artefato que o Godot carrega; código não compilado não existe para o jogo.
@@ -115,4 +109,4 @@ Esta constituição tem precedência sobre qualquer outra prática, convenção,
 
 **Revisão de conformidade**: toda spec, plan e task DEVE declarar explicitamente a fase (v1, v2 ou v3) à qual pertence, conforme o Princípio I. Revisões de planejamento e de código DEVEM verificar que o trabalho respeita as restrições da fase declarada — em particular, que nenhuma abstração, refatoração ou otimização seja introduzida durante a v1. Revisões DEVEM igualmente verificar o cumprimento do Princípio II (Ciclo de Porte Verificável) em todo port de script GDScript. Trabalho que viole a fase vigente deve ser rejeitado ou redirecionado ao backlog da fase correta. Revisões de port DEVEM ainda confirmar que a ordem de dependências foi respeitada, que nenhum nome de propriedade exportada ou replicada foi alterado, e que melhorias percebidas foram registradas em `docs/v2-backlog.md`. Revisões DEVEM confirmar que toda correção de bug na v1 atende aos quatro requisitos do Princípio I (spec, isolamento no código, commit, `docs/upstream-bugs.md`) e que nenhuma melhoria foi introduzida sob o rótulo de correção.
 
-**Versão**: 1.3.0 | **Ratificação**: 2026-09-15 | **Última Emenda**: 2026-09-15
+**Versão**: 1.3.1 | **Ratificação**: 2026-09-15 | **Última Emenda**: 2026-09-15

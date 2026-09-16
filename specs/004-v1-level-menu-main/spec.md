@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Fase**: v1 — Raw Port (Princípio I da constituição v1.3.0). Nenhuma abstração, refatoração ou otimização; melhorias percebidas vão para `docs/v2-backlog.md`. Nenhum bug do upstream é conhecido nos quatro scripts; se um defeito objetivo surgir durante o port, a cláusula de correção conservadora se aplica (declarar em spec, isolar com comentário, mencionar no commit, registrar em `docs/upstream-bugs.md`) — caso contrário, nada muda.
+**Fase**: v1 — Raw Port (Princípio I da constituição v1.3.1). Nenhuma abstração, refatoração ou otimização; melhorias percebidas vão para `docs/v2-backlog.md`. Nenhum bug do upstream é conhecido nos quatro scripts; se um defeito objetivo surgir durante o port, a cláusula de correção conservadora se aplica (declarar em spec, isolar com comentário, mencionar no commit, registrar em `docs/upstream-bugs.md`) — caso contrário, nada muda.
 
 **Input**: User description: "Portar para Rust a empilhadeira voadora, o level, o menu e o main do Godot TPS Demo, mantendo o jogo jogável e idêntico a cada script. Só settings.gd (autoload) fica em GDScript (marco E). Marco D de docs/port-order.md (itens 11–14)."
 
@@ -203,7 +203,7 @@ O boot do jogo continua igual: a cena principal desliga o relay de multiplayer, 
 
 ## Assumptions
 
-- Fase v1 (constituição v1.3.0); nenhuma correção de bug prevista.
+- Fase v1 (constituição v1.3.1); nenhuma correção de bug prevista.
 - Validação visual (SC-002) pelo usuário, incluindo o menu de configurações completo; validação automatizada exclusivamente headless. O revisor pode rodar um harness de paridade fora do repositório.
 - Validação single-player: o peer local é servidor (`OfflineMultiplayerPeer`); host/connect reais e ramos "cliente" (FR-006, FR-016) são verificados por leitura de código e pelo host automático em headless.
 - Fora de escopo: `settings.gd` (Marco E); acesso tipado ao `Settings`; qualquer melhoria; multiplayer real com dois peers.
