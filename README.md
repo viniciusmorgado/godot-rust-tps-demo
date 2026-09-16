@@ -28,7 +28,7 @@ the same code: v2 and v3 are two independent reference templates, and v1 is kept
 | **Godot ↔ Rust boundary** | Whatever the original did dynamically stays dynamic (`has_method`, `has_signal`, `rpc("name")`, autoload reached by path); node types swapped in the scenes | Typed `Gd<T>` references between classes, typed signals, typed autoload | ECS world owned by a Rust singleton; nodes read/write components |
 | **Upstream behavior** | Preserved, including quirks; only objective upstream bugs fixed, minimally (3 so far, see `docs/upstream-bugs.md`) | Quirks reviewed one by one from `docs/v2-backlog.md` (26 items) | Inherits v2 |
 | **Intended use** | Historical reference, benchmark baseline, example of a raw port | Reference template for Godot + Rust projects without ECS | Reference template for Godot + Rust projects with ECS |
-| **Status** | **Complete** — 15/15 scripts ported, 0 `.gd` left, game playable end to end | Not started | Not started |
+| **Status** | **Complete** — 15/15 scripts ported, 0 `.gd` left, game playable end to end | In progress | Not started |
 
 > **Note:** for real projects, take examples only from **v2** and **v3**. v1 deliberately keeps
 > GDScript idioms, dynamic calls and upstream quirks so that behavior could be compared script by
