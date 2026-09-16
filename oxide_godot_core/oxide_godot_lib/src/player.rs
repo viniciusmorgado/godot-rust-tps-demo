@@ -92,7 +92,7 @@ impl ICharacterBody3D for Player {
 #[godot_api]
 impl Player {
     #[func]
-    fn set_player_id(&mut self, value: i32) {
+    pub(crate) fn set_player_id(&mut self, value: i32) {
         self.player_id = value;
         self.base()
             .get_node_as::<MultiplayerSynchronizer>("InputSynchronizer")

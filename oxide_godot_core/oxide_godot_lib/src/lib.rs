@@ -11,6 +11,7 @@ mod door;
 mod part;
 mod red_robot;
 mod flying_forklift;
+mod level;
 
 struct OxideGodot;
 

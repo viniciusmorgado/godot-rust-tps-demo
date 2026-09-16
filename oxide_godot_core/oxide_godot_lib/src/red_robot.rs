@@ -264,7 +264,7 @@ impl ICharacterBody3D for EnemyRobot {
 #[godot_api]
 impl EnemyRobot {
     #[signal]
-    fn exploded();
+    pub(crate) fn exploded();
 
     #[func]
     fn resume_approach(&mut self) {
