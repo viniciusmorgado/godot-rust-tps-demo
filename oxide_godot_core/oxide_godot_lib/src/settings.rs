@@ -6,10 +6,7 @@ use godot::classes::{
 use godot::prelude::*;
 
 mod graphics;
-// Re-exported for the 5 consumers to name as `settings::GiType` etc. Unused within this crate
-// until Phase 3 (User Story 2, tasks T019-T023) migrates them off dynamic access — allowed here
-// because that migration is explicitly a later, separate commit (research.md R7), not a gap.
-#[allow(unused_imports)]
+// Re-exported so the 5 consumers can name these as `settings::GiType` etc.
 pub use graphics::{GiQuality, GiType, GraphicsSettings, ScaleFilter, SsaoQuality, SsilQuality};
 use graphics::{ApplyPlan, WireValue, plan};
 
@@ -44,12 +41,11 @@ pub struct Settings {
     // `GraphicsSettings::default_for`/`from_wire` need it, never exposed to the engine.
     metalfx_supported: bool,
 
-    // TRANSITIONAL (US1): kept `#[var]` and read/written directly by `graphics()`/
-    // `set_graphics()`/`apply_graphics_settings`/`save_settings` at each call, exactly as `v1`
-    // did, because the 5 consumers have not migrated off dynamic access yet. Loses `#[var]` and
-    // becomes the private save/load I/O buffer only in the last commit of User Story 2
-    // (research.md R7).
-    #[var]
+    // The single in-memory source of truth, parsed once at `ready` from `config_file`.
+    graphics: GraphicsSettings,
+
+    // Private I/O buffer only: loaded once at `ready`, reused (not recreated) by `save_settings`
+    // so a hand-edited file's unknown sections/keys and key order survive a save (research.md R7).
     config_file: Gd<ConfigFile>,
 }
 
@@ -60,12 +56,17 @@ impl INode for Settings {
         Self {
             base,
             metalfx_supported,
+            graphics: GraphicsSettings::default_for(metalfx_supported),
             config_file: ConfigFile::new_gd(),
         }
     }
 
     fn ready(&mut self) {
-        self.load_settings();
+        self.config_file.load(CONFIG_FILE_PATH);
+        let present = read_wire(&self.config_file);
+        let (graphics, malformed) = GraphicsSettings::from_wire(present, self.metalfx_supported);
+        warn_malformed(&malformed);
+        self.graphics = graphics;
     }
 
     fn input(&mut self, input_event: Gd<InputEvent>) {
@@ -84,52 +85,26 @@ impl INode for Settings {
     }
 }
 
-#[godot_api]
 impl Settings {
-    #[func]
-    fn load_settings(&mut self) {
-        self.config_file.load(CONFIG_FILE_PATH);
-        // Initialize defaults for values not found in the existing configuration file, so we
-        // don't have to specify them every time we use `ConfigFile.get_value()` — same outcome
-        // as `v1`, now derived from the single typed source of truth instead of a duplicated
-        // literal dictionary.
-        let defaults = GraphicsSettings::default_for(self.metalfx_supported).to_wire();
-        for ((section, key), value) in WIRE_KEYS.into_iter().zip(defaults) {
-            if !self.config_file.has_section_key(section, key) {
-                self.config_file.set_value(section, key, &wire_to_variant(value));
-            }
-        }
-    }
-
-    #[func]
-    pub fn save_settings(&mut self) {
-        self.config_file.save(CONFIG_FILE_PATH);
-    }
-
-    #[func]
     pub fn apply_graphics_settings(&mut self, window: Gd<Window>, environment: Gd<Environment>, scene_root: Gd<Node>) {
-        let settings = self.graphics();
-        let plan = plan(&settings);
+        let plan = plan(&self.graphics);
         Self::apply(&plan, window, environment, scene_root);
     }
 
-    /// Typed read. TRANSITIONAL (US1): re-parses `config_file` at every call, exactly like
-    /// `apply_graphics_settings` already must — becomes a plain field copy once `ready` parses
-    /// the model exactly once (last commit of US2, research.md R7).
-    pub fn graphics(&self) -> GraphicsSettings {
-        let present = read_wire(&self.config_file);
-        let (settings, malformed) = GraphicsSettings::from_wire(present, self.metalfx_supported);
-        warn_malformed(&malformed);
-        settings
+    /// `save_settings` writes the model into the SAME loaded `config_file` object (never a fresh
+    /// `ConfigFile`), so unknown sections/keys and the key order of a hand-edited file survive
+    /// (research.md R7).
+    pub fn save_settings(&mut self) {
+        write_wire(&mut self.config_file, self.graphics.to_wire());
+        self.config_file.save(CONFIG_FILE_PATH);
     }
 
-    /// Typed write. TRANSITIONAL (US1): writes straight into `config_file`, so the still-dynamic
-    /// `apply_graphics_settings`/`save_settings` (which read `config_file`) observe the change.
-    /// Unused until `menu.rs`'s Apply handler calls it (Phase 3, T023) — allowed here for the
-    /// same reason as the re-exports above.
-    #[allow(dead_code)]
+    pub fn graphics(&self) -> GraphicsSettings {
+        self.graphics
+    }
+
     pub fn set_graphics(&mut self, graphics: GraphicsSettings) {
-        write_wire(&mut self.config_file, graphics.to_wire());
+        self.graphics = graphics;
     }
 
     /// Glue: pushes an `ApplyPlan` to the engine, including the typed `Light3D` shadow walk
@@ -185,20 +160,28 @@ fn disable_shadows_recursive(node: &Gd<Node>) {
 }
 
 /// Reads the 15 wire slots from `config_file`, engine-free from here on (`Variant` never
-/// crosses into `settings/graphics.rs`).
+/// crosses into `settings/graphics.rs`). A key that is PRESENT but whose Variant type is none
+/// of int/real/bool is not silently treated the same as an absent key: it warns here (once,
+/// naming the key) and is left `None`, so `GraphicsSettings::from_wire` still defaults it —
+/// same outcome as a malformed value, but the warning is specific to "unsupported type" rather
+/// than "out of range" (FR-009).
 fn read_wire(config_file: &Gd<ConfigFile>) -> [Option<WireValue>; 15] {
     let mut present = [None; 15];
     for (i, (section, key)) in WIRE_KEYS.into_iter().enumerate() {
         if config_file.has_section_key(section, key) {
-            present[i] = variant_to_wire(&config_file.get_value(section, key));
+            let value = config_file.get_value(section, key);
+            match variant_to_wire(&value) {
+                Some(wire) => present[i] = Some(wire),
+                None => godot_warn!(
+                    "Settings: 'user://settings.ini' has an unsupported value type for '{key}'; using the default instead."
+                ),
+            }
         }
     }
     present
 }
 
-/// Writes the 15 wire values into `config_file`, preserving each key's Variant type. Only
-/// caller is `set_graphics` (see its doc comment for why it's `#[allow(dead_code)]` for now).
-#[allow(dead_code)]
+/// Writes the 15 wire values into `config_file`, preserving each key's Variant type.
 fn write_wire(config_file: &mut Gd<ConfigFile>, wire: [WireValue; 15]) {
     for ((section, key), value) in WIRE_KEYS.into_iter().zip(wire) {
         config_file.set_value(section, key, &wire_to_variant(value));
