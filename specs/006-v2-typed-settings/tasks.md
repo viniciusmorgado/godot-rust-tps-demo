@@ -77,7 +77,7 @@ an Apply writes a file byte-identical to what a `v1` build would write for the s
 
 ### 🛑 USER VISUAL CHECKPOINT — STOP and wait
 
-- [ ] T018 [US1] **STOP.** Ask the user to confirm, in the running game (not headless): the game boots with the default graphics settings; the Settings menu shows those defaults; pressing Apply persists the choice across a full restart of the game (SC-007, "after US1"). **Do not start Phase 3 until the user confirms this checkpoint.**
+- [x] T018 [US1] **STOP.** Ask the user to confirm, in the running game (not headless): the game boots with the default graphics settings; the Settings menu shows those defaults; pressing Apply persists the choice across a full restart of the game (SC-007, "after US1"). **Do not start Phase 3 until the user confirms this checkpoint.**
 
 **Checkpoint**: User Story 1 is complete and independently verified — typed model, pure `plan()`,
 unit tests, parity, and user confirmation all in place; the 5 consumers are untouched and still
