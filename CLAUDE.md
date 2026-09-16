@@ -19,6 +19,9 @@ Referência intocada do original em GDScript: `../oxide_godot_origins/` (fora do
 - Rust estável (cargo/rustc 1.98). `godot = "0.5.5"` declarado em `[workspace.dependencies]`;
   membros herdam com `{ workspace = true }`. Não fixar feature `api-4-x` nem mudar a versão do crate:
   o template é gerado por ferramenta externa que busca sempre a última estável.
+- Feature `experimental-threads` do gdext habilitada desde o Marco D (`Cargo.toml`): sem ela o
+  codegen omite `ResourceLoader::load_threaded_request/get_status/get` (godot-codegen
+  `special_cases.rs:83-86`), que o menu usa para a barra de loading. Nenhuma outra feature.
 - `Cargo.lock` fica fora do git (decisão do template).
 
 ## Ciclo de trabalho
@@ -38,6 +41,10 @@ Referência intocada do original em GDScript: `../oxide_godot_origins/` (fora do
    - rodar uma cena: `/usr/bin/godot.x86_64 --headless --path . caminho/cena.tscn`.
    Erros pré-existentes do demo upstream no import (`Cannon_Charge already exists`,
    `doorsimple_d.png` ausente, `surfaces.is_empty()`) são conhecidos e não são regressão.
+   Em `main.tscn` headless pode aparecer, de forma intermitente (corrida entre o carregamento do
+   level em sub-thread e o renderizador dummy), o conjunto `Initializing already initialized RID`
+   / `Parameter "mem" is null.` / 3× `Parameter "m" is null.` — não é regressão se sumir numa
+   segunda execução (specs/004 research §E.2).
 
 ## Convenções de porte (v1)
 
