@@ -1,21 +1,17 @@
+use crate::settings::{GiQuality, GiType, ScaleFilter, Settings, SsaoQuality, SsilQuality};
 use godot::classes::display_server::VSyncMode;
-use godot::classes::rendering_server::{EnvironmentSsaoQuality, EnvironmentSsilQuality};
 use godot::classes::resource_loader::ThreadLoadStatus;
-use godot::classes::viewport::{Msaa, Scaling3DMode, ScreenSpaceAa};
+use godot::classes::viewport::{Msaa, ScreenSpaceAa};
 use godot::classes::window::Mode as WindowMode;
 use godot::classes::{
-    BaseButton, Button, ButtonGroup, ConfigFile, Control, DisplayServer, ENetMultiplayerPeer,
-    HBoxContainer, INode, LineEdit, MultiplayerPeer, Node, OfflineMultiplayerPeer, PackedScene,
-    ProgressBar, RenderingServer, ResourceLoader, SpinBox, Timer, VBoxContainer, WorldEnvironment,
+    BaseButton, Button, ButtonGroup, Control, DisplayServer, ENetMultiplayerPeer, HBoxContainer,
+    INode, LineEdit, MultiplayerPeer, Node, OfflineMultiplayerPeer, PackedScene, ProgressBar,
+    RenderingServer, ResourceLoader, SpinBox, Timer, VBoxContainer, WorldEnvironment,
 };
 use godot::global::is_equal_approx;
 use godot::prelude::*;
 
 const LEVEL_PATH: &str = "res://level/level.tscn";
-
-// Viewport.SCALING_3D_MODE_NEAREST was added in Godot 4.7; absent from the prebuilt 4.6 API of
-// gdext 0.5.5. Godot 4.7.2 = 5 (same technique as the Settings.GIType integers).
-const SCALING_3D_MODE_NEAREST: i64 = 5;
 
 #[derive(GodotClass)]
 #[class(init, base=Node)]
@@ -197,7 +193,11 @@ pub struct Menu {
     #[init(node = "UI/Loading/Progress")]
     loading_progress: OnReady<Gd<ProgressBar>>,
     #[init(node = "UI/Loading/DoneTimer")]
-    loading_done_timer: OnReady<Gd<Timer>>,}
+    loading_done_timer: OnReady<Gd<Timer>>,
+
+    #[init(val = OnReady::new(|| godot::tools::get_autoload_by_name::<Settings>("Settings")))]
+    settings: OnReady<Gd<Settings>>,
+}
 
 #[godot_api]
 impl INode for Menu {
@@ -205,10 +205,8 @@ impl INode for Menu {
         // Apply relevant settings directly.
         let window = self.base().get_window().unwrap();
         let environment = self.world_environment.get_environment().unwrap();
-        self.base().get_node_as::<Node>("/root/Settings").call(
-            "apply_graphics_settings",
-            &[window.to_variant(), environment.to_variant(), self.to_gd().to_variant()],
-        );
+        let scene_root: Gd<Node> = self.to_gd().upcast();
+        self.settings.bind_mut().apply_graphics_settings(window, environment, scene_root);
 
         if DisplayServer::singleton().get_name() == "headless" {
             self.base_mut().call_deferred("_on_host_pressed", &[]);
@@ -303,163 +301,116 @@ impl Menu {
         self.settings_menu.show();
         self.settings_action_cancel.grab_focus();
 
-        let config_file = self
-            .base()
-            .get_node_as::<Node>("/root/Settings")
-            .get("config_file")
-            .to::<Gd<ConfigFile>>();
+        let graphics = self.settings.bind().graphics();
 
-        let display_mode = config_file.get_value("video", "display_mode").to::<i64>();
-        if display_mode == WindowMode::WINDOWED.ord() as i64
-            || display_mode == WindowMode::MAXIMIZED.ord() as i64
-        {
-            self.display_mode_windowed.set_pressed(true);
-        } else if display_mode == WindowMode::FULLSCREEN.ord() as i64 {
-            self.display_mode_fullscreen.set_pressed(true);
-        } else {
-            self.display_mode_exclusive_fullscreen.set_pressed(true);
+        match graphics.display_mode {
+            WindowMode::WINDOWED | WindowMode::MAXIMIZED => self.display_mode_windowed.set_pressed(true),
+            WindowMode::FULLSCREEN => self.display_mode_fullscreen.set_pressed(true),
+            _ => self.display_mode_exclusive_fullscreen.set_pressed(true),
         }
 
-        let vsync = config_file.get_value("video", "vsync").to::<i64>();
-        if vsync == VSyncMode::DISABLED.ord() as i64 {
-            self.vsync_disabled.set_pressed(true);
-        } else if vsync == VSyncMode::ENABLED.ord() as i64 {
-            self.vsync_enabled.set_pressed(true);
-        } else if vsync == VSyncMode::ADAPTIVE.ord() as i64 {
-            self.vsync_adaptive.set_pressed(true);
-        } else {
-            self.vsync_mailbox.set_pressed(true);
+        match graphics.vsync {
+            VSyncMode::DISABLED => self.vsync_disabled.set_pressed(true),
+            VSyncMode::ENABLED => self.vsync_enabled.set_pressed(true),
+            VSyncMode::ADAPTIVE => self.vsync_adaptive.set_pressed(true),
+            _ => self.vsync_mailbox.set_pressed(true),
         }
 
-        let max_fps = config_file.get_value("video", "max_fps").to::<i64>();
-        if max_fps == 30 {
-            self.max_fps_30.set_pressed(true);
-        } else if max_fps == 40 {
-            self.max_fps_40.set_pressed(true);
-        } else if max_fps == 60 {
-            self.max_fps_60.set_pressed(true);
-        } else if max_fps == 72 {
-            self.max_fps_72.set_pressed(true);
-        } else if max_fps == 90 {
-            self.max_fps_90.set_pressed(true);
-        } else if max_fps == 120 {
-            self.max_fps_120.set_pressed(true);
-        } else if max_fps == 144 {
-            self.max_fps_144.set_pressed(true);
-        } else {
-            self.max_fps_unlimited.set_pressed(true);
+        match graphics.max_fps {
+            30 => self.max_fps_30.set_pressed(true),
+            40 => self.max_fps_40.set_pressed(true),
+            60 => self.max_fps_60.set_pressed(true),
+            72 => self.max_fps_72.set_pressed(true),
+            90 => self.max_fps_90.set_pressed(true),
+            120 => self.max_fps_120.set_pressed(true),
+            144 => self.max_fps_144.set_pressed(true),
+            _ => self.max_fps_unlimited.set_pressed(true),
         }
 
-        let resolution_scale = config_file.get_value("video", "resolution_scale").to::<f64>();
-        if is_equal_approx(resolution_scale, 1.0 / 3.0) {
+        if is_equal_approx(graphics.resolution_scale, 1.0 / 3.0) {
             self.resolution_scale_ultra_performance.set_pressed(true);
-        } else if is_equal_approx(resolution_scale, 1.0 / 2.0) {
+        } else if is_equal_approx(graphics.resolution_scale, 1.0 / 2.0) {
             self.resolution_scale_performance.set_pressed(true);
-        } else if is_equal_approx(resolution_scale, 1.0 / 1.7) {
+        } else if is_equal_approx(graphics.resolution_scale, 1.0 / 1.7) {
             self.resolution_scale_balanced.set_pressed(true);
-        } else if is_equal_approx(resolution_scale, 1.0 / 1.5) {
+        } else if is_equal_approx(graphics.resolution_scale, 1.0 / 1.5) {
             self.resolution_scale_quality.set_pressed(true);
-        } else if is_equal_approx(resolution_scale, 1.0 / 1.3) {
+        } else if is_equal_approx(graphics.resolution_scale, 1.0 / 1.3) {
             self.resolution_scale_ultra_quality.set_pressed(true);
         } else {
             self.resolution_scale_native.set_pressed(true);
         }
 
-        let scale_filter = config_file.get_value("video", "scale_filter").to::<i64>();
-        if scale_filter == SCALING_3D_MODE_NEAREST {
-            self.scale_filter_nearest.set_pressed(true);
-        } else if scale_filter == Scaling3DMode::BILINEAR.ord() as i64 {
-            self.scale_filter_bilinear.set_pressed(true);
-        } else if scale_filter == Scaling3DMode::FSR.ord() as i64 {
-            self.scale_filter_fsr1.set_pressed(true);
-        } else if scale_filter == Scaling3DMode::FSR2.ord() as i64 {
-            self.scale_filter_fsr2.set_pressed(true);
-        } else if scale_filter == Scaling3DMode::METALFX_SPATIAL.ord() as i64 {
-            self.scale_filter_metalfx_spatial.set_pressed(true);
-        } else if scale_filter == Scaling3DMode::METALFX_TEMPORAL.ord() as i64 || self.metalfx_supported {
-            self.scale_filter_metalfx_temporal.set_pressed(true);
-        } else {
-            self.scale_filter_fsr2.set_pressed(true);
+        match graphics.scale_filter {
+            ScaleFilter::Nearest => self.scale_filter_nearest.set_pressed(true),
+            ScaleFilter::Bilinear => self.scale_filter_bilinear.set_pressed(true),
+            ScaleFilter::Fsr1 => self.scale_filter_fsr1.set_pressed(true),
+            ScaleFilter::Fsr2 => self.scale_filter_fsr2.set_pressed(true),
+            ScaleFilter::MetalFxSpatial => self.scale_filter_metalfx_spatial.set_pressed(true),
+            ScaleFilter::MetalFxTemporal => self.scale_filter_metalfx_temporal.set_pressed(true),
         }
 
-        let gi_type = config_file.get_value("rendering", "gi_type").to::<i64>();
-        if gi_type == 2 {
-            self.gi_lightmapgi.set_pressed(true);
-        } else if gi_type == 1 {
-            self.gi_voxelgi.set_pressed(true);
-        } else if gi_type == 0 {
-            self.gi_sdfgi.set_pressed(true);
+        match graphics.gi_type {
+            GiType::LightmapGi => self.gi_lightmapgi.set_pressed(true),
+            GiType::VoxelGi => self.gi_voxelgi.set_pressed(true),
+            GiType::Sdfgi => self.gi_sdfgi.set_pressed(true),
         }
 
-        let gi_quality = config_file.get_value("rendering", "gi_quality").to::<i64>();
-        if gi_quality == 0 {
-            self.gi_disabled.set_pressed(true);
-        } else if gi_quality == 1 {
-            self.gi_low.set_pressed(true);
-        } else if gi_quality == 2 {
-            self.gi_high.set_pressed(true);
+        match graphics.gi_quality {
+            GiQuality::Disabled => self.gi_disabled.set_pressed(true),
+            GiQuality::Low => self.gi_low.set_pressed(true),
+            GiQuality::High => self.gi_high.set_pressed(true),
         }
 
-        if !config_file.get_value("rendering", "taa").to::<bool>() {
-            self.taa_disabled.set_pressed(true);
-        } else {
+        if graphics.taa {
             self.taa_enabled.set_pressed(true);
-        }
-
-        let msaa = config_file.get_value("rendering", "msaa").to::<i64>();
-        if msaa == Msaa::DISABLED.ord() as i64 {
-            self.msaa_disabled.set_pressed(true);
-        } else if msaa == Msaa::MSAA_2X.ord() as i64 {
-            self.msaa_2x.set_pressed(true);
-        } else if msaa == Msaa::MSAA_4X.ord() as i64 {
-            self.msaa_4x.set_pressed(true);
-        } else if msaa == Msaa::MSAA_8X.ord() as i64 {
-            self.msaa_8x.set_pressed(true);
-        }
-
-        let screen_space_aa = config_file.get_value("rendering", "screen_space_aa").to::<i64>();
-        if screen_space_aa == ScreenSpaceAa::DISABLED.ord() as i64 {
-            self.screen_space_aa_disabled.set_pressed(true);
-        } else if screen_space_aa == ScreenSpaceAa::FXAA.ord() as i64 {
-            self.screen_space_aa_fxaa.set_pressed(true);
-        } else if screen_space_aa == ScreenSpaceAa::SMAA.ord() as i64 {
-            self.screen_space_aa_smaa.set_pressed(true);
-        }
-
-        if !config_file.get_value("rendering", "shadow_mapping").to::<bool>() {
-            self.shadow_mapping_disabled.set_pressed(true);
         } else {
+            self.taa_disabled.set_pressed(true);
+        }
+
+        match graphics.msaa {
+            Msaa::DISABLED => self.msaa_disabled.set_pressed(true),
+            Msaa::MSAA_2X => self.msaa_2x.set_pressed(true),
+            Msaa::MSAA_4X => self.msaa_4x.set_pressed(true),
+            Msaa::MSAA_8X => self.msaa_8x.set_pressed(true),
+            _ => {}
+        }
+
+        match graphics.screen_space_aa {
+            ScreenSpaceAa::DISABLED => self.screen_space_aa_disabled.set_pressed(true),
+            ScreenSpaceAa::FXAA => self.screen_space_aa_fxaa.set_pressed(true),
+            ScreenSpaceAa::SMAA => self.screen_space_aa_smaa.set_pressed(true),
+            _ => {}
+        }
+
+        if graphics.shadow_mapping {
             self.shadow_mapping_enabled.set_pressed(true);
-        }
-
-        let ssao_quality = config_file.get_value("rendering", "ssao_quality").to::<i64>();
-        if ssao_quality == -1 {
-            self.ssao_disabled.set_pressed(true);
-        } else if ssao_quality == EnvironmentSsaoQuality::MEDIUM.ord() as i64 {
-            self.ssao_medium.set_pressed(true);
-        } else if ssao_quality == EnvironmentSsaoQuality::HIGH.ord() as i64 {
-            self.ssao_high.set_pressed(true);
-        }
-
-        let ssil_quality = config_file.get_value("rendering", "ssil_quality").to::<i64>();
-        if ssil_quality == -1 {
-            self.ssil_disabled.set_pressed(true);
-        } else if ssil_quality == EnvironmentSsilQuality::MEDIUM.ord() as i64 {
-            self.ssil_medium.set_pressed(true);
-        } else if ssil_quality == EnvironmentSsilQuality::HIGH.ord() as i64 {
-            self.ssil_high.set_pressed(true);
-        }
-
-        if !config_file.get_value("rendering", "bloom").to::<bool>() {
-            self.bloom_disabled.set_pressed(true);
         } else {
+            self.shadow_mapping_disabled.set_pressed(true);
+        }
+
+        match graphics.ssao_quality {
+            SsaoQuality::Disabled => self.ssao_disabled.set_pressed(true),
+            SsaoQuality::Medium => self.ssao_medium.set_pressed(true),
+            SsaoQuality::High => self.ssao_high.set_pressed(true),
+        }
+
+        match graphics.ssil_quality {
+            SsilQuality::Disabled => self.ssil_disabled.set_pressed(true),
+            SsilQuality::Medium => self.ssil_medium.set_pressed(true),
+            SsilQuality::High => self.ssil_high.set_pressed(true),
+        }
+
+        if graphics.bloom {
             self.bloom_enabled.set_pressed(true);
+        } else {
+            self.bloom_disabled.set_pressed(true);
         }
 
-        if !config_file.get_value("rendering", "volumetric_fog").to::<bool>() {
-            self.volumetric_fog_disabled.set_pressed(true);
-        } else {
+        if graphics.volumetric_fog {
             self.volumetric_fog_enabled.set_pressed(true);
+        } else {
+            self.volumetric_fog_disabled.set_pressed(true);
         }
     }
 
@@ -474,139 +425,138 @@ impl Menu {
         self.play_button.grab_focus();
         self.settings_menu.hide();
 
-        let mut settings = self.base().get_node_as::<Node>("/root/Settings");
-        let mut config_file = settings.get("config_file").to::<Gd<ConfigFile>>();
+        let mut graphics = self.settings.bind().graphics();
 
         if self.display_mode_windowed.is_pressed() {
-            config_file.set_value("video", "display_mode", &(WindowMode::WINDOWED.ord() as i64).to_variant());
+            graphics.display_mode = WindowMode::WINDOWED;
         } else if self.display_mode_fullscreen.is_pressed() {
-            config_file.set_value("video", "display_mode", &(WindowMode::FULLSCREEN.ord() as i64).to_variant());
+            graphics.display_mode = WindowMode::FULLSCREEN;
         } else if self.display_mode_exclusive_fullscreen.is_pressed() {
-            config_file.set_value("video", "display_mode", &(WindowMode::EXCLUSIVE_FULLSCREEN.ord() as i64).to_variant());
+            graphics.display_mode = WindowMode::EXCLUSIVE_FULLSCREEN;
         }
 
         if self.vsync_disabled.is_pressed() {
-            config_file.set_value("video", "vsync", &(VSyncMode::DISABLED.ord() as i64).to_variant());
+            graphics.vsync = VSyncMode::DISABLED;
         } else if self.vsync_enabled.is_pressed() {
-            config_file.set_value("video", "vsync", &(VSyncMode::ENABLED.ord() as i64).to_variant());
+            graphics.vsync = VSyncMode::ENABLED;
         } else if self.vsync_adaptive.is_pressed() {
-            config_file.set_value("video", "vsync", &(VSyncMode::ADAPTIVE.ord() as i64).to_variant());
+            graphics.vsync = VSyncMode::ADAPTIVE;
         } else if self.vsync_mailbox.is_pressed() {
-            config_file.set_value("video", "vsync", &(VSyncMode::MAILBOX.ord() as i64).to_variant());
+            graphics.vsync = VSyncMode::MAILBOX;
         }
 
         if self.max_fps_30.is_pressed() {
-            config_file.set_value("video", "max_fps", &30_i64.to_variant());
+            graphics.max_fps = 30;
         } else if self.max_fps_40.is_pressed() {
-            config_file.set_value("video", "max_fps", &40_i64.to_variant());
+            graphics.max_fps = 40;
         } else if self.max_fps_60.is_pressed() {
-            config_file.set_value("video", "max_fps", &60_i64.to_variant());
+            graphics.max_fps = 60;
         } else if self.max_fps_72.is_pressed() {
-            config_file.set_value("video", "max_fps", &72_i64.to_variant());
+            graphics.max_fps = 72;
         } else if self.max_fps_90.is_pressed() {
-            config_file.set_value("video", "max_fps", &90_i64.to_variant());
+            graphics.max_fps = 90;
         } else if self.max_fps_120.is_pressed() {
-            config_file.set_value("video", "max_fps", &120_i64.to_variant());
+            graphics.max_fps = 120;
         } else if self.max_fps_144.is_pressed() {
-            config_file.set_value("video", "max_fps", &144_i64.to_variant());
+            graphics.max_fps = 144;
         } else if self.max_fps_unlimited.is_pressed() {
-            config_file.set_value("video", "max_fps", &0_i64.to_variant());
+            graphics.max_fps = 0;
         }
 
         if self.resolution_scale_ultra_performance.is_pressed() {
-            config_file.set_value("video", "resolution_scale", &(1.0 / 3.0_f64).to_variant());
+            graphics.resolution_scale = 1.0 / 3.0;
         } else if self.resolution_scale_performance.is_pressed() {
-            config_file.set_value("video", "resolution_scale", &(1.0 / 2.0_f64).to_variant());
+            graphics.resolution_scale = 1.0 / 2.0;
         } else if self.resolution_scale_balanced.is_pressed() {
-            config_file.set_value("video", "resolution_scale", &(1.0 / 1.7_f64).to_variant());
+            graphics.resolution_scale = 1.0 / 1.7;
         } else if self.resolution_scale_quality.is_pressed() {
-            config_file.set_value("video", "resolution_scale", &(1.0 / 1.5_f64).to_variant());
+            graphics.resolution_scale = 1.0 / 1.5;
         } else if self.resolution_scale_ultra_quality.is_pressed() {
-            config_file.set_value("video", "resolution_scale", &(1.0 / 1.3_f64).to_variant());
+            graphics.resolution_scale = 1.0 / 1.3;
         } else if self.resolution_scale_native.is_pressed() {
-            config_file.set_value("video", "resolution_scale", &1.0_f64.to_variant());
+            graphics.resolution_scale = 1.0;
         }
 
         if self.scale_filter_nearest.is_pressed() {
-            config_file.set_value("video", "scale_filter", &SCALING_3D_MODE_NEAREST.to_variant());
+            graphics.scale_filter = ScaleFilter::Nearest;
         } else if self.scale_filter_bilinear.is_pressed() {
-            config_file.set_value("video", "scale_filter", &(Scaling3DMode::BILINEAR.ord() as i64).to_variant());
+            graphics.scale_filter = ScaleFilter::Bilinear;
         } else if self.scale_filter_fsr1.is_pressed() {
-            config_file.set_value("video", "scale_filter", &(Scaling3DMode::FSR.ord() as i64).to_variant());
+            graphics.scale_filter = ScaleFilter::Fsr1;
         } else if self.scale_filter_fsr2.is_pressed() {
-            config_file.set_value("video", "scale_filter", &(Scaling3DMode::FSR2.ord() as i64).to_variant());
+            graphics.scale_filter = ScaleFilter::Fsr2;
         } else if self.scale_filter_metalfx_spatial.is_pressed() {
-            config_file.set_value("video", "scale_filter", &(Scaling3DMode::METALFX_SPATIAL.ord() as i64).to_variant());
+            graphics.scale_filter = ScaleFilter::MetalFxSpatial;
         } else if self.scale_filter_metalfx_temporal.is_pressed() {
-            config_file.set_value("video", "scale_filter", &(Scaling3DMode::METALFX_TEMPORAL.ord() as i64).to_variant());
+            graphics.scale_filter = ScaleFilter::MetalFxTemporal;
         }
 
         if self.gi_lightmapgi.is_pressed() {
-            config_file.set_value("rendering", "gi_type", &2_i64.to_variant());
+            graphics.gi_type = GiType::LightmapGi;
         } else if self.gi_voxelgi.is_pressed() {
-            config_file.set_value("rendering", "gi_type", &1_i64.to_variant());
+            graphics.gi_type = GiType::VoxelGi;
         } else if self.gi_sdfgi.is_pressed() {
-            config_file.set_value("rendering", "gi_type", &0_i64.to_variant());
+            graphics.gi_type = GiType::Sdfgi;
         }
 
         if self.gi_low.is_pressed() {
-            config_file.set_value("rendering", "gi_quality", &1_i64.to_variant());
+            graphics.gi_quality = GiQuality::Low;
         } else if self.gi_high.is_pressed() {
-            config_file.set_value("rendering", "gi_quality", &2_i64.to_variant());
+            graphics.gi_quality = GiQuality::High;
         } else if self.gi_disabled.is_pressed() {
-            config_file.set_value("rendering", "gi_quality", &0_i64.to_variant());
+            graphics.gi_quality = GiQuality::Disabled;
         }
 
-        config_file.set_value("rendering", "taa", &self.taa_enabled.is_pressed().to_variant());
+        graphics.taa = self.taa_enabled.is_pressed();
 
         if self.msaa_disabled.is_pressed() {
-            config_file.set_value("rendering", "msaa", &(Msaa::DISABLED.ord() as i64).to_variant());
+            graphics.msaa = Msaa::DISABLED;
         } else if self.msaa_2x.is_pressed() {
-            config_file.set_value("rendering", "msaa", &(Msaa::MSAA_2X.ord() as i64).to_variant());
+            graphics.msaa = Msaa::MSAA_2X;
         } else if self.msaa_4x.is_pressed() {
-            config_file.set_value("rendering", "msaa", &(Msaa::MSAA_4X.ord() as i64).to_variant());
+            graphics.msaa = Msaa::MSAA_4X;
         } else if self.msaa_8x.is_pressed() {
-            config_file.set_value("rendering", "msaa", &(Msaa::MSAA_8X.ord() as i64).to_variant());
+            graphics.msaa = Msaa::MSAA_8X;
         }
 
         if self.screen_space_aa_disabled.is_pressed() {
-            config_file.set_value("rendering", "screen_space_aa", &(ScreenSpaceAa::DISABLED.ord() as i64).to_variant());
+            graphics.screen_space_aa = ScreenSpaceAa::DISABLED;
         } else if self.screen_space_aa_fxaa.is_pressed() {
-            config_file.set_value("rendering", "screen_space_aa", &(ScreenSpaceAa::FXAA.ord() as i64).to_variant());
+            graphics.screen_space_aa = ScreenSpaceAa::FXAA;
         } else if self.screen_space_aa_smaa.is_pressed() {
-            config_file.set_value("rendering", "screen_space_aa", &(ScreenSpaceAa::SMAA.ord() as i64).to_variant());
+            graphics.screen_space_aa = ScreenSpaceAa::SMAA;
         }
 
-        config_file.set_value("rendering", "shadow_mapping", &self.shadow_mapping_enabled.is_pressed().to_variant());
+        graphics.shadow_mapping = self.shadow_mapping_enabled.is_pressed();
 
         if self.ssao_disabled.is_pressed() {
-            config_file.set_value("rendering", "ssao_quality", &(-1_i64).to_variant());
+            graphics.ssao_quality = SsaoQuality::Disabled;
         } else if self.ssao_medium.is_pressed() {
-            config_file.set_value("rendering", "ssao_quality", &(EnvironmentSsaoQuality::MEDIUM.ord() as i64).to_variant());
+            graphics.ssao_quality = SsaoQuality::Medium;
         } else if self.ssao_high.is_pressed() {
-            config_file.set_value("rendering", "ssao_quality", &(EnvironmentSsaoQuality::HIGH.ord() as i64).to_variant());
+            graphics.ssao_quality = SsaoQuality::High;
         }
 
         if self.ssil_disabled.is_pressed() {
-            config_file.set_value("rendering", "ssil_quality", &(-1_i64).to_variant());
+            graphics.ssil_quality = SsilQuality::Disabled;
         } else if self.ssil_medium.is_pressed() {
-            config_file.set_value("rendering", "ssil_quality", &(EnvironmentSsilQuality::MEDIUM.ord() as i64).to_variant());
+            graphics.ssil_quality = SsilQuality::Medium;
         } else if self.ssil_high.is_pressed() {
-            config_file.set_value("rendering", "ssil_quality", &(EnvironmentSsilQuality::HIGH.ord() as i64).to_variant());
+            graphics.ssil_quality = SsilQuality::High;
         }
 
-        config_file.set_value("rendering", "bloom", &self.bloom_enabled.is_pressed().to_variant());
-        config_file.set_value("rendering", "volumetric_fog", &self.volumetric_fog_enabled.is_pressed().to_variant());
+        graphics.bloom = self.bloom_enabled.is_pressed();
+        graphics.volumetric_fog = self.volumetric_fog_enabled.is_pressed();
+
+        self.settings.bind_mut().set_graphics(graphics);
 
         // Apply relevant settings directly.
         let window = self.base().get_window().unwrap();
         let environment = self.world_environment.get_environment().unwrap();
-        settings.call(
-            "apply_graphics_settings",
-            &[window.to_variant(), environment.to_variant(), self.to_gd().to_variant()],
-        );
+        let scene_root: Gd<Node> = self.to_gd().upcast();
+        self.settings.bind_mut().apply_graphics_settings(window, environment, scene_root);
 
-        settings.call("save_settings", &[]);
+        self.settings.bind_mut().save_settings();
     }
 
     #[func]
