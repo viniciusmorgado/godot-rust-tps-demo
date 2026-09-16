@@ -102,12 +102,12 @@ impl Settings {
     }
 
     #[func]
-    fn save_settings(&mut self) {
+    pub fn save_settings(&mut self) {
         self.config_file.save(CONFIG_FILE_PATH);
     }
 
     #[func]
-    fn apply_graphics_settings(&mut self, window: Gd<Window>, environment: Gd<Environment>, scene_root: Gd<Node>) {
+    pub fn apply_graphics_settings(&mut self, window: Gd<Window>, environment: Gd<Environment>, scene_root: Gd<Node>) {
         let settings = self.graphics();
         let plan = plan(&settings);
         Self::apply(&plan, window, environment, scene_root);

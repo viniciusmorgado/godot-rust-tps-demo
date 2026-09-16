@@ -1,22 +1,15 @@
 use godot::classes::input::MouseMode;
 use godot::classes::rendering_server::{EnvironmentSdfgiRayCount, VoxelGiQuality};
 use godot::classes::{
-    ConfigFile, INode3D, Input, InputEvent, LightmapGi, LightmapGiData, Marker3D, Node, Node3D,
-    PackedScene, RenderingServer, WorldEnvironment,
+    INode3D, Input, InputEvent, LightmapGi, LightmapGiData, Marker3D, Node, Node3D, PackedScene,
+    RenderingServer, WorldEnvironment,
 };
 use godot::global::{randi, randomize};
 use godot::prelude::*;
 
 use crate::player::Player;
 use crate::red_robot::EnemyRobot;
-
-// Settings.GIType (settings.gd): SDFGI = 0, VOXEL_GI = 1, LIGHTMAP_GI = 2 (the `else` branch).
-const SDFGI: i64 = 0;
-const VOXEL_GI: i64 = 1;
-// Settings.GIQuality (settings.gd): DISABLED = 0, LOW = 1, HIGH = 2.
-const GI_DISABLED: i64 = 0;
-const GI_LOW: i64 = 1;
-const GI_HIGH: i64 = 2;
+use crate::settings::{GiQuality, GiType, Settings};
 
 #[derive(GodotClass)]
 #[class(init, base=Node3D)]
@@ -33,6 +26,9 @@ pub struct Level {
     player_spawn_points: OnReady<Gd<Node3D>>,
     #[init(node = "SpawnedNodes")]
     spawned_nodes: OnReady<Gd<Node3D>>,
+
+    #[init(val = OnReady::new(|| godot::tools::get_autoload_by_name::<Settings>("Settings")))]
+    settings: OnReady<Gd<Settings>>,
 }
 
 #[godot_api]
@@ -40,20 +36,14 @@ impl INode3D for Level {
     fn ready(&mut self) {
         let window = self.base().get_window().unwrap();
         let environment = self.world_environment.get_environment().unwrap();
-        let mut settings = self.base().get_node_as::<Node>("/root/Settings");
-        settings.call(
-            "apply_graphics_settings",
-            &[window.to_variant(), environment.to_variant(), self.to_gd().to_variant()],
-        );
+        let scene_root: Gd<Node> = self.to_gd().upcast();
+        self.settings.bind_mut().apply_graphics_settings(window, environment, scene_root);
 
-        let config_file = settings.get("config_file").to::<Gd<ConfigFile>>();
-        let gi_type = config_file.get_value("rendering", "gi_type").to::<i64>();
-        if gi_type == SDFGI {
-            self.setup_sdfgi();
-        } else if gi_type == VOXEL_GI {
-            self.setup_voxelgi();
-        } else {
-            self.setup_lightmapgi();
+        let gi_type = self.settings.bind().graphics().gi_type;
+        match gi_type {
+            GiType::Sdfgi => self.setup_sdfgi(),
+            GiType::VoxelGi => self.setup_voxelgi(),
+            GiType::LightmapGi => self.setup_lightmapgi(),
         }
 
         let multiplayer = self.base().get_multiplayer().unwrap();
@@ -111,21 +101,19 @@ impl Level {
             lightmap_gi.queue_free();
         }
 
-        let gi_quality = self
-            .base()
-            .get_node_as::<Node>("/root/Settings")
-            .get("config_file")
-            .to::<Gd<ConfigFile>>()
-            .get_value("rendering", "gi_quality")
-            .to::<i64>();
-        if gi_quality == GI_HIGH {
-            RenderingServer::singleton()
-                .environment_set_sdfgi_ray_count(EnvironmentSdfgiRayCount::COUNT_96);
-        } else if gi_quality == GI_LOW {
-            RenderingServer::singleton()
-                .environment_set_sdfgi_ray_count(EnvironmentSdfgiRayCount::COUNT_32);
-        } else {
-            self.world_environment.get_environment().unwrap().set_sdfgi_enabled(false);
+        let gi_quality = self.settings.bind().graphics().gi_quality;
+        match gi_quality {
+            GiQuality::High => {
+                RenderingServer::singleton()
+                    .environment_set_sdfgi_ray_count(EnvironmentSdfgiRayCount::COUNT_96);
+            }
+            GiQuality::Low => {
+                RenderingServer::singleton()
+                    .environment_set_sdfgi_ray_count(EnvironmentSdfgiRayCount::COUNT_32);
+            }
+            GiQuality::Disabled => {
+                self.world_environment.get_environment().unwrap().set_sdfgi_enabled(false);
+            }
         }
     }
 
@@ -139,19 +127,17 @@ impl Level {
             lightmap_gi.queue_free();
         }
 
-        let gi_quality = self
-            .base()
-            .get_node_as::<Node>("/root/Settings")
-            .get("config_file")
-            .to::<Gd<ConfigFile>>()
-            .get_value("rendering", "gi_quality")
-            .to::<i64>();
-        if gi_quality == GI_HIGH {
-            RenderingServer::singleton().voxel_gi_set_quality(VoxelGiQuality::HIGH);
-        } else if gi_quality == GI_LOW {
-            RenderingServer::singleton().voxel_gi_set_quality(VoxelGiQuality::LOW);
-        } else {
-            self.base().get_node_as::<Node3D>("VoxelGI").hide();
+        let gi_quality = self.settings.bind().graphics().gi_quality;
+        match gi_quality {
+            GiQuality::High => {
+                RenderingServer::singleton().voxel_gi_set_quality(VoxelGiQuality::HIGH);
+            }
+            GiQuality::Low => {
+                RenderingServer::singleton().voxel_gi_set_quality(VoxelGiQuality::LOW);
+            }
+            GiQuality::Disabled => {
+                self.base().get_node_as::<Node3D>("VoxelGI").hide();
+            }
         }
     }
 
@@ -168,14 +154,8 @@ impl Level {
             self.base_mut().add_child(&new_gi);
         }
 
-        let gi_quality = self
-            .base()
-            .get_node_as::<Node>("/root/Settings")
-            .get("config_file")
-            .to::<Gd<ConfigFile>>()
-            .get_value("rendering", "gi_quality")
-            .to::<i64>();
-        if gi_quality == GI_DISABLED {
+        let gi_quality = self.settings.bind().graphics().gi_quality;
+        if gi_quality == GiQuality::Disabled {
             self.lightmap_gi.as_mut().unwrap().hide();
             self.base().get_node_as::<Node3D>("ReflectionProbes").hide();
         }
