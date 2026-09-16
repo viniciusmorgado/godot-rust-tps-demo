@@ -59,3 +59,9 @@ loaded by `oxide-godot/extension.gdextension`.
   <https://github.com/godotengine/tps-demo?tab=License-1-ov-file> — a copy ships as
   [`oxide-godot/LICENSE.md`](oxide-godot/LICENSE.md) (assets and music under CC-BY 3.0 by their
   respective authors; original code under MIT by Juan Linietsky and the Godot Engine contributors).
+
+## Template
+
+The base project layout (`oxide-godot/` + `oxide_godot_core/` workspace, `extension.gdextension`,
+crate wiring) was generated with the [godust](https://crates.io/crates/godust) tooling; the port
+was built on top of that scaffold.
