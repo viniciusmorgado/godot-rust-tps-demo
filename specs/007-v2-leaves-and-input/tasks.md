@@ -14,9 +14,9 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ## Phase 1: Setup
 
-- [ ] T001 Add the `v1` worktree: `git worktree add ../oxide-godot-v1 v1`, then
+- [x] T001 Add the `v1` worktree: `git worktree add ../oxide-godot-v1 v1`, then
   `cd ../oxide-godot-v1/oxide_godot_core && cargo build`. Verification: worktree builds clean.
-- [ ] T002 On `v2` at `3357e18`, confirm the baseline gate: from `oxide_godot_core/`,
+- [x] T002 On `v2` at `3357e18`, confirm the baseline gate: from `oxide_godot_core/`,
   `cargo build && cargo clippy && cargo test`. Verification: zero warnings, **17 tests pass**
   (spec.md Context — this is the number SC-001's "≥ 29 total" is measured against).
 
@@ -30,7 +30,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 1 — `player_input/model.rs` (pure)
 
-- [ ] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/player_input.rs`, add `mod model;`
+- [x] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/player_input.rs`, add `mod model;`
   (private submodule declaration, matching `settings.rs`'s `mod graphics;`). Create
   `oxide_godot_core/oxide_godot_lib/src/player_input/model.rs` with `PlayerInputTuning` (10 `f32`
   fields per data-model.md: `camera_controller_speed=3.0`, `camera_mouse_speed=0.001`,
@@ -38,12 +38,12 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `aim_speed_scale=0.5`, `aim_mouse_scale=0.75`, `aim_hold_threshold=0.4`,
   `fall_fade_start_y=-17.0`, `fall_fade_span=15.0`, `fall_fade_recover_rate=4.0`) and its
   `impl Default` with exactly these v1 literals.
-- [ ] T004 [P] [US1] In the same file, add `AimState { Idle, Held { seconds: f32 }, Toggled {
+- [x] T004 [P] [US1] In the same file, add `AimState { Idle, Held { seconds: f32 }, Toggled {
   seconds: f32 } }` (`#[derive(Clone, Copy, Debug, PartialEq)]`, `is_aiming(self) -> bool`),
   `CameraCue { Shoot, Far }` (same derives), and `InputSnapshot` (`motion: Vector2,
   camera_move: Vector2, aim_just_pressed: bool, aim_pressed: bool, aim_just_released: bool,
   jump_just_pressed: bool, shoot_pressed: bool`, `#[derive(Clone, Copy, Debug)]`).
-- [ ] T005 [US1] Add `step_aim(state: AimState, snap: &InputSnapshot, dt: f32, tuning:
+- [x] T005 [US1] Add `step_aim(state: AimState, snap: &InputSnapshot, dt: f32, tuning:
   &PlayerInputTuning) -> (AimState, Option<CameraCue>)` — the LITERAL transcription of
   `player_input.rs:88-114` given verbatim in data-model.md (destructure `state` into
   `(was_aiming, toggled, seconds)`; early-release-becomes-toggle branch
@@ -51,7 +51,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `toggled || snap.aim_pressed` with `toggled_next` cleared on `aim_just_pressed`; `seconds_next
   = if aim_now { seconds + dt } else { 0.0 }`; map `(aim_now, toggled_next)` to the 3 `AimState`
   variants; cue from `(was_aiming, aim_now)` transition). Depends on T003, T004.
-- [ ] T006 [US1] In the same file, add: `scaled_look(raw: Vector2, aiming: bool, dt: f32, tuning:
+- [x] T006 [US1] In the same file, add: `scaled_look(raw: Vector2, aiming: bool, dt: f32, tuning:
   &PlayerInputTuning) -> Vector2` (`raw * dt * tuning.camera_controller_speed`, then
   `* tuning.aim_speed_scale` if `aiming` — reproduces `player_input.rs:83-87`);
   `scaled_mouse_look(raw: Vector2, aiming: bool, tuning: &PlayerInputTuning) -> Vector2`
@@ -66,7 +66,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   camera_x_rot: f32, tuning: &PlayerInputTuning) -> f64` (clamp then the up/down branch from
   `player_input.rs:184-199`: `camera_x_rot >= 0.0` → `(-camera_x_rot /
   tuning.camera_x_rot_max) as f64`, else `(camera_x_rot / tuning.camera_x_rot_min) as f64`).
-- [ ] T007 [US1] Add `#[cfg(test)] mod tests` to `player_input/model.rs` covering `step_aim`
+- [x] T007 [US1] Add `#[cfg(test)] mod tests` to `player_input/model.rs` covering `step_aim`
   (data-model.md "Consequences to pin"): (a) press-and-hold past 0.4s then release → `Idle`,
   cue `Some(Far)`; (b) press-and-release within ≤0.4s (a tap) → `Toggled`, `is_aiming() == true`;
   (c) press while `Toggled` → `Held` (no cue), then release with accumulated `seconds > 0.4` →
@@ -77,14 +77,14 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   aim_hold_threshold`); (f) `Toggled { seconds }` with no input this frame →
   `Toggled { seconds: seconds + dt }` (timer keeps counting); (g) `Idle` + `aim_just_pressed` →
   `Held { seconds: dt }`, cue `Some(Shoot)`.
-- [ ] T008 [US1] Add to the same `#[cfg(test)] mod tests`: `scaled_look` scaled by
+- [x] T008 [US1] Add to the same `#[cfg(test)] mod tests`: `scaled_look` scaled by
   `aim_speed_scale` (0.5) when `aiming == true`, unscaled when `false`; `scaled_mouse_look`
   scaled by `aim_mouse_scale` (0.75) when aiming; `clamp_pitch` clamps at both
   `camera_x_rot_min` and `camera_x_rot_max` (2 tests or 1 parameterized); `alpha_for_height`
   reaches `1.0` at `y = -32.0` (`fall_fade_start_y - fall_fade_span`) and decays by the recover
   factor when `y >= -17.0`; `aim_rotation` covers both the aim-up (`camera_x_rot >= 0`) and
   aim-down (`camera_x_rot < 0`) branches.
-- [ ] T009 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
+- [x] T009 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
   (zero warnings; all T007/T008 tests pass; total test count increases by the number of new
   tests). Commit: `player_input: extract AimState and pure rotation/aim/fade math into
   player_input/model.rs`.
