@@ -108,7 +108,7 @@ shadows off in the menu still turns them off in the level.
 
 ### 🛑 USER VISUAL CHECKPOINT — STOP and wait
 
-- [ ] T026 [US2] **STOP.** Ask the user to confirm, in the running game: everything from the US1 checkpoint still holds, PLUS each of SDFGI/VoxelGI/LightmapGI renders as before when selected, and turning shadows off in the Settings menu actually disables shadows in the level (SC-007, "after US2"). **Do not start Phase 4 until the user confirms this checkpoint.**
+- [x] T026 [US2] **STOP.** Ask the user to confirm, in the running game: everything from the US1 checkpoint still holds, PLUS each of SDFGI/VoxelGI/LightmapGI renders as before when selected, and turning shadows off in the Settings menu actually disables shadows in the level (SC-007, "after US2"). **Do not start Phase 4 until the user confirms this checkpoint.**
 
 **Checkpoint**: User Story 2 is complete — zero dynamic `Settings` access remains in the crate
 (backlog #1 closed), all 5 consumers are typed, parity holds, user confirmed.
