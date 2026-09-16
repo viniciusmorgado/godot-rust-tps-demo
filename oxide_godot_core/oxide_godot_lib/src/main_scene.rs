@@ -1,7 +1,7 @@
-use godot::classes::window::Mode as WindowMode;
+use crate::settings::Settings;
 use godot::classes::{
-    ConfigFile, DisplayServer, Engine, INode, MultiplayerPeer, Node, OfflineMultiplayerPeer,
-    PackedScene, ResourceLoader, SceneMultiplayer,
+    DisplayServer, Engine, INode, MultiplayerPeer, Node, OfflineMultiplayerPeer, PackedScene,
+    ResourceLoader, SceneMultiplayer,
 };
 use godot::global::randomize;
 use godot::prelude::*;
@@ -10,6 +10,9 @@ use godot::prelude::*;
 #[class(init, base=Node)]
 pub struct Main {
     base: Base<Node>,
+
+    #[init(val = OnReady::new(|| godot::tools::get_autoload_by_name::<Settings>("Settings")))]
+    settings: OnReady<Gd<Settings>>,
 }
 
 #[godot_api]
@@ -24,17 +27,8 @@ impl INode for Main {
             Engine::singleton().set_max_fps(60);
         }
         randomize();
-        let display_mode = self
-            .base()
-            .get_node_as::<Node>("/root/Settings")
-            .get("config_file")
-            .to::<Gd<ConfigFile>>()
-            .get_value("video", "display_mode")
-            .to::<i64>();
-        self.base()
-            .get_window()
-            .unwrap()
-            .set_mode(WindowMode::from_ord(display_mode as i32));
+        let display_mode = self.settings.bind().graphics().display_mode;
+        self.base().get_window().unwrap().set_mode(display_mode);
         self.go_to_main_menu();
     }
 }
