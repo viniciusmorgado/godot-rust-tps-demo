@@ -117,8 +117,12 @@ impl Settings {
 `#[var] config_file: Gd<ConfigFile>` stays a field; `#[func] load_settings`, `#[func]
 save_settings`, `#[func] apply_graphics_settings` stay exposed by name; `apply_graphics_settings`
 and `save_settings` internally do `config_file → wire array → GraphicsSettings::from_wire → plan
-→ apply` on every call (parse-at-boundary) instead of reading a stored `graphics` field. This
-shape is deleted in the last commit of US2, never present after this milestone closes.
+→ apply` on every call (parse-at-boundary) instead of reading a stored `graphics` field.
+`graphics()` and `set_graphics()` ALREADY EXIST with the signatures above, in transitional form
+(`graphics()` re-parses `config_file` at each call; `set_graphics()` writes `to_wire()` into
+`config_file` via `set_value`), so the US2 consumer commits compile one by one; `metalfx_supported`
+is a private field (no `#[var]`) in both shapes. This transitional shape is deleted in the last
+commit of US2, never present after this milestone closes.
 
 ## Consumer access pattern (all 5 consumers, from US2 onward)
 

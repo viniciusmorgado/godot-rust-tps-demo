@@ -200,8 +200,10 @@ autoload the same way `project.godot`'s `[autoload]` key does, rather than dupli
 `/root/...` path string in 5 places, and shares gdext's own cache instead of each consumer's
 `OnReady` doing a fresh tree lookup.
 
-**Read/write API** on `Settings` (final shape, after US2's last commit — see R7 for the
-transitional shape during US1):
+**Read/write API** on `Settings`. Both accessors EXIST from US1's commit on (so each consumer
+commit of US2 compiles and behaves on its own); only their bodies change in US2's last commit —
+transitional: `graphics()` parses `config_file` at each call, `set_graphics()` writes `to_wire()`
+into `config_file` via `set_value`; final: plain field copy / field write (see R7):
 - `fn graphics(&self) -> GraphicsSettings` (the model is `Copy`; consumers that only read take a
   cheap copy instead of holding a borrow across frames).
 - `fn set_graphics(&mut self, graphics: GraphicsSettings)` (used by `menu.rs`'s Apply handler,
@@ -226,6 +228,15 @@ re-deriving it:
 - `#[var] config_file` and `#[func]` on `load_settings`, `save_settings`, `apply_graphics_settings`
   ALL REMAIN on `Settings` exactly as today — the 5 consumers have not moved yet and still call
   them dynamically by name.
+- `pub fn graphics(&self) -> GraphicsSettings` and `pub fn set_graphics(&mut self, GraphicsSettings)`
+  are ADDED in this commit in transitional form: `graphics()` = `config_file` → `[Option<WireValue>;
+  15]` → `from_wire` (one `godot_warn!` per malformed name) at each call; `set_graphics()` =
+  `to_wire()` → 15 × `set_value` into `config_file`. This is what lets the US2 consumer commits
+  land one by one (the menu's `set_graphics` → `apply` → `save` sequence works because apply/save
+  still read `config_file`).
+- `metalfx_supported` loses its `#[var]` but stays as a PRIVATE field (computed once in `init`
+  from `RenderingServer`): `default_for`/`from_wire` need it on every transitional re-parse and in
+  the final `ready`.
 - `ready()` still calls `load_settings()`, which still merges defaults into `config_file` in
   memory (unchanged behavior) — the typed model is NOT yet the single source of truth.
 - `apply_graphics_settings` and `save_settings` internally do: read `config_file` → build a wire
