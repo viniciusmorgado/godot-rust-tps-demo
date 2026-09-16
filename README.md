@@ -30,6 +30,10 @@ the same code: v2 and v3 are two independent reference templates, and v1 is kept
 | **Intended use** | Historical reference, benchmark baseline, example of a raw port | Reference template for Godot + Rust projects without ECS | Reference template for Godot + Rust projects with ECS |
 | **Status** | **Complete** — 15/15 scripts ported, 0 `.gd` left, game playable end to end | Not started | Not started |
 
+> **Note:** for real projects, take examples only from **v2** and **v3**. v1 deliberately keeps
+> GDScript idioms, dynamic calls and upstream quirks so that behavior could be compared script by
+> script; it is a baseline, not a template.
+
 Rules for each phase are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 
 ## Layout
