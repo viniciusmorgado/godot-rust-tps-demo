@@ -27,9 +27,12 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
 ## Work cycle
 
 1. Edit Rust in `oxide_godot_core/oxide_godot_lib/src/`.
-2. `cd oxide_godot_core && cargo build` — mandatory after **every** Rust change; it is the debug
-   build that replaces `target/debug/liboxide_godot.so`, referenced by the `.gdextension`
-   (`reloadable = true`, an open editor hot-reloads it).
+2. From `oxide_godot_core/`, in this order, all three mandatory before every commit (constitution
+   1.4.0, Principle III):
+   - `cargo build` — the debug build that replaces `target/debug/liboxide_godot.so`, referenced
+     by the `.gdextension` (`reloadable = true`, an open editor hot-reloads it);
+   - `cargo clippy` — zero warnings;
+   - `cargo test` — the pure-logic unit tests (no Godot binary involved).
 3. Bind the Rust class to the node by editing the `.tscn` as text (equivalent to the editor's "Change Type"):
    - on the line `[node name="X" type="Base" ...]`, replace `type="Base"` with `type="RustClass"`;
    - remove that node's `script = ExtResource("N")` line;
@@ -61,6 +64,26 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
   `signal x` → `#[signal] fn x()`.
 - Direct translation, no refactoring/abstraction (Principle I of the constitution). Noticed
   improvements go to the v2 backlog, never into v1 code.
+
+## Port conventions (v2)
+
+- **Module layout (Principle III)**: `x.rs` is glue only — `impl I<Base> for X` (engine
+  lifecycle callbacks: `init`, `ready`, `process`, `input`, ...) and the `#[godot_api] impl X`
+  block exposed to the engine/scenes (`#[func]`, `#[signal]`, `#[rpc]`), both thin and
+  delegating. `x/<model>.rs` (e.g. `settings/graphics.rs`) is the pure model: plain `impl`/free
+  functions, no macro, with a `#[cfg(test)] mod tests` beside it. Pure code MAY use gdext's
+  engine enums (`WindowMode`, `Msaa`, `Scaling3DMode`, ...) and math builtins (`Vector3`,
+  `Transform3D`, ...) — both are FFI-free value types — but MUST NOT use `Gd<T>`, an engine
+  singleton, or `Variant`/`GString`/`StringName`.
+- **Engine API gaps**: isolate the workaround behind one typed value, with the comment
+  `// api-gap(godot-<version>): <symbol> — <reason>; replace when the binding ships it` at the
+  exact spot, and an entry in `docs/api-gaps.md` (symbol, introducing version, workaround,
+  location) in the same commit.
+- **Parity harness**: to check a v2 remodel's behavior against the v1 baseline, add a `v1`
+  worktree (`git worktree add ../oxide-godot-v1 v1`, built with its own `cargo build`) and run
+  the same scratch scene headless on both trees with a SEPARATE `XDG_DATA_HOME` per tree (both
+  checkouts share the project's `user://` directory otherwise and overwrite each other's
+  output), then diff the results.
 
 ## API notes (gdext 0.5.5)
 
