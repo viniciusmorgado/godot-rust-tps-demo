@@ -8,6 +8,7 @@ mod player_input;
 mod player;
 mod bullet;
 mod door;
+mod part;
 
 struct OxideGodot;
 

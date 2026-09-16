@@ -23,7 +23,6 @@
 [ext_resource type="AudioStream" uid="uid://h53v0p3a82ki" path="res://enemies/red_robot/audio/walk.wav" id="19"]
 [ext_resource type="AudioStream" uid="uid://iodygamtcovk" path="res://enemies/red_robot/audio/hit.wav" id="20_d1jht"]
 [ext_resource type="ArrayMesh" uid="uid://cna0fa1wdq56d" path="res://enemies/red_robot/parts/sparks_effect/SparkParticle_Sphere.mesh" id="22"]
-[ext_resource type="Script" uid="uid://c3vo80hyj6w6c" path="res://enemies/red_robot/parts/part.gd" id="24"]
 [ext_resource type="PackedScene" uid="uid://kl4f3mi24xdv" path="res://enemies/red_robot/laser/impact_effect/impact_effect.tscn" id="25_2mhnh"]
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_h6xi0"]
@@ -10830,7 +10829,7 @@ omni_shadow_mode = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 visible = false
 
-[node name="PartShield1" type="RigidBody3D" parent="Death" unique_id=24395049]
+[node name="PartShield1" type="Part" parent="Death" unique_id=24395049]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.37822, 1.11034, 1.09121)
 collision_layer = 3
 collision_mask = 3
@@ -10838,7 +10837,6 @@ mass = 2000.0
 physics_material_override = SubResource("56")
 freeze = true
 angular_damp = 0.3
-script = ExtResource("24")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Death/PartShield1" unique_id=226170807]
 replication_config = SubResource("SceneReplicationConfig_hqtbc")
@@ -10882,14 +10880,13 @@ transform = Transform3D(1, 0, 0, 0, 0.994888, 0.100984, 0, -0.100984, 0.994888, 
 shape = SubResource("60")
 disabled = true
 
-[node name="PartShield2" type="RigidBody3D" parent="Death" unique_id=1053416321]
+[node name="PartShield2" type="Part" parent="Death" unique_id=1053416321]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.75083, 1.02975, 0.162546)
 collision_layer = 3
 collision_mask = 3
 mass = 2000.0
 physics_material_override = SubResource("61")
 freeze = true
-script = ExtResource("24")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Death/PartShield2" unique_id=1118162873]
 replication_config = SubResource("SceneReplicationConfig_hqtbc")
@@ -10933,7 +10930,7 @@ transform = Transform3D(1, 0, 0, 0, 0.999275, -0.038063, 0, 0.038063, 0.999275, 
 shape = SubResource("63")
 disabled = true
 
-[node name="PartHead" type="RigidBody3D" parent="Death" unique_id=1250047684]
+[node name="PartHead" type="Part" parent="Death" unique_id=1250047684]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0374503, 1.02975, 0.162546)
 collision_layer = 3
 collision_mask = 3
@@ -10941,7 +10938,6 @@ mass = 6600.0
 physics_material_override = SubResource("64")
 freeze = true
 angular_damp = 0.3
-script = ExtResource("24")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Death/PartHead" unique_id=110510044]
 replication_config = SubResource("SceneReplicationConfig_hqtbc")
