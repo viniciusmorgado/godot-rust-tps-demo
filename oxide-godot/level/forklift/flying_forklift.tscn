@@ -2,7 +2,6 @@
 
 [ext_resource type="PackedScene" uid="uid://b3kcdt0p1pr74" path="res://level/forklift/flying_forklift.glb" id="1"]
 [ext_resource type="Texture2D" uid="uid://8lj2sib517fx" path="res://level/forklift/dot.png" id="2"]
-[ext_resource type="Script" uid="uid://dcqnfagy55nrx" path="res://level/forklift/flying_forklift.gd" id="3"]
 [ext_resource type="Texture2D" uid="uid://biye81cs18sdp" path="res://effects_shared/spotlight_projector.png" id="4_47076"]
 
 [sub_resource type="BoxShape3D" id="1"]
@@ -33,8 +32,7 @@ point_count = 3
 offsets = PackedFloat32Array(0, 0.1, 0.3, 1)
 colors = PackedColorArray(0.0431373, 0.458824, 1, 1, 0.42, 0.874333, 1, 0.858824, 0.945098, 0.627451, 1, 0.411765, 0.12549, 0.25098, 1, 0)
 
-[node name="FlyingForklift" type="CharacterBody3D" unique_id=590037938]
-script = ExtResource("3")
+[node name="FlyingForklift" type="FlyingForklift" unique_id=590037938]
 
 [node name="FlyingForkliftModel2" parent="." unique_id=660367620 instance=ExtResource("1")]
 
