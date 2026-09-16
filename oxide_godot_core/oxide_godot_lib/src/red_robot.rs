@@ -322,8 +322,7 @@ impl EnemyRobot {
 
     #[func]
     fn _on_area_body_entered(&mut self, body: Gd<Node3D>) {
-        if body.clone().try_cast::<Player>().is_ok() || body.get_name() == StringName::from("Target")
-        {
+        if body.clone().try_cast::<Player>().is_ok() || body.get_name() == "Target" {
             self.player = Some(body);
             self.state = State::Approach;
         }
@@ -388,17 +387,17 @@ impl EnemyRobot {
                     .and_then(|v| v.try_to::<Gd<Object>>().ok())
                     .map(|c| c.instance_id() == player.instance_id())
                     .unwrap_or(false);
-                if hit_player {
-                    if let Ok(player) = player.try_cast::<Player>() {
-                        self.base()
-                            .get_tree()
-                            .create_timer(0.1)
-                            .signals()
-                            .timeout()
-                            .connect_other(&*self, move |_this: &mut EnemyRobot| {
-                                player.clone().bind_mut().add_camera_shake_trauma(13.0);
-                            });
-                    }
+                if hit_player
+                    && let Ok(player) = player.try_cast::<Player>()
+                {
+                    self.base()
+                        .get_tree()
+                        .create_timer(0.1)
+                        .signals()
+                        .timeout()
+                        .connect_other(&*self, move |_this: &mut EnemyRobot| {
+                            player.clone().bind_mut().add_camera_shake_trauma(13.0);
+                        });
                 }
             }
         }

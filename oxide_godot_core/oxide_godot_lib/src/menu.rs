@@ -25,7 +25,7 @@ pub struct Menu {
     #[init(val = OfflineMultiplayerPeer::new_gd().upcast())]
     peer: Gd<MultiplayerPeer>,
 
-    #[init(val = RenderingServer::singleton().get_current_rendering_driver_name() == GString::from("metal"))]
+    #[init(val = RenderingServer::singleton().get_current_rendering_driver_name() == "metal")]
     metalfx_supported: bool,
 
     #[init(node = "WorldEnvironment")]
@@ -210,7 +210,7 @@ impl INode for Menu {
             &[window.to_variant(), environment.to_variant(), self.to_gd().to_variant()],
         );
 
-        if DisplayServer::singleton().get_name() == GString::from("headless") {
+        if DisplayServer::singleton().get_name() == "headless" {
             self.base_mut().call_deferred("_on_host_pressed", &[]);
         }
 
@@ -376,9 +376,7 @@ impl Menu {
             self.scale_filter_fsr2.set_pressed(true);
         } else if scale_filter == Scaling3DMode::METALFX_SPATIAL.ord() as i64 {
             self.scale_filter_metalfx_spatial.set_pressed(true);
-        } else if scale_filter == Scaling3DMode::METALFX_TEMPORAL.ord() as i64 {
-            self.scale_filter_metalfx_temporal.set_pressed(true);
-        } else if self.metalfx_supported {
+        } else if scale_filter == Scaling3DMode::METALFX_TEMPORAL.ord() as i64 || self.metalfx_supported {
             self.scale_filter_metalfx_temporal.set_pressed(true);
         } else {
             self.scale_filter_fsr2.set_pressed(true);

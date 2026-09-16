@@ -20,7 +20,7 @@ impl INode for Main {
             .unwrap()
             .cast::<SceneMultiplayer>()
             .set_server_relay_enabled(false);
-        if DisplayServer::singleton().get_name() == GString::from("headless") {
+        if DisplayServer::singleton().get_name() == "headless" {
             Engine::singleton().set_max_fps(60);
         }
         randomize();

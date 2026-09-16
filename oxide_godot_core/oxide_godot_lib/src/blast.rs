@@ -27,11 +27,11 @@ impl INode3D for Blast {
     }
 
     fn process(&mut self, _delta: f64) {
-        if let Some(camera) = &self.camera {
-            if camera.is_instance_valid() {
-                let origin = camera.get_global_transform().origin;
-                self.light_rays.look_at(origin);
-            }
+        if let Some(camera) = &self.camera
+            && camera.is_instance_valid()
+        {
+            let origin = camera.get_global_transform().origin;
+            self.light_rays.look_at(origin);
         }
     }
 }

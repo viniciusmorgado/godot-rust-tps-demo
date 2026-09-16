@@ -47,10 +47,10 @@ impl ICharacterBody3D for Bullet {
         if let Some(col) = col {
             let collider: Option<Gd<Node3D>> =
                 col.get_collider().and_then(|c| c.try_cast::<Node3D>().ok());
-            if let Some(mut collider) = collider {
-                if collider.has_method("hit") {
-                    collider.rpc("hit", &[]);
-                }
+            if let Some(mut collider) = collider
+                && collider.has_method("hit")
+            {
+                collider.rpc("hit", &[]);
             }
             self.collision_shape.set_disabled(true);
             self.base_mut().rpc("explode", &[]);

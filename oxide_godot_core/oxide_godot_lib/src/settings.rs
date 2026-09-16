@@ -28,7 +28,7 @@ pub struct Settings {
 impl INode for Settings {
     fn init(base: Base<Node>) -> Self {
         let metalfx_supported =
-            RenderingServer::singleton().get_current_rendering_driver_name() == GString::from("metal");
+            RenderingServer::singleton().get_current_rendering_driver_name() == "metal";
         let defaults = vdict! {
             "video" => &vdict! {
                 "display_mode" => WindowMode::EXCLUSIVE_FULLSCREEN.ord() as i64,
