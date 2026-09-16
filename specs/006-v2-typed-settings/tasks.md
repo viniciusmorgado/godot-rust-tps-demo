@@ -104,7 +104,7 @@ shadows off in the menu still turns them off in the level.
 
 ### Parity checkpoint (US2)
 
-- [ ] T025 [US2] Re-run the parity harness (quickstart.md §4, same `XDG_DATA_HOME` split) on both trees. **Verify**: `case_a_boot` and `case_b_options` still byte-identical (now genuinely exercising both branches' full menu-button → Apply path, since `v2`'s `#[var] config_file` is gone); `case_c_malformed` still shows the one documented deviation on `v2` only (same PASS condition as T017: warning line naming `gi_type` + effective `VoxelGi`).
+- [x] T025 [US2] Re-run the parity harness (quickstart.md §4, same `XDG_DATA_HOME` split) on both trees. **Verify**: `case_a_boot` and `case_b_options` still byte-identical (now genuinely exercising both branches' full menu-button → Apply path, since `v2`'s `#[var] config_file` is gone); `case_c_malformed` still shows the one documented deviation on `v2` only (same PASS condition as T017: warning line naming `gi_type` + effective `VoxelGi`).
 
 ### 🛑 USER VISUAL CHECKPOINT — STOP and wait
 
