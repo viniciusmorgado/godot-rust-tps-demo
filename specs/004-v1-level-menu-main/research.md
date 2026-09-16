@@ -226,7 +226,7 @@ limpo).
 - **Inteiros dos enums do engine** — usar `.ord()` (`obj/traits.rs:199`, `EngineEnum::ord() -> i32`)
   dos enums gdext, convertido `as i64` para comparar/gravar: `window::Mode::{WINDOWED, MAXIMIZED, FULLSCREEN, EXCLUSIVE_FULLSCREEN}`
   (`window.rs:2342+`), `display_server::VSyncMode::{DISABLED, ENABLED, ADAPTIVE, MAILBOX}`,
-  `viewport::Scaling3DMode::{NEAREST, BILINEAR, FSR, FSR2, METALFX_SPATIAL, METALFX_TEMPORAL}`,
+  `viewport::Scaling3DMode::{BILINEAR, FSR, FSR2, METALFX_SPATIAL, METALFX_TEMPORAL}` — **`NEAREST` NÃO existe na API prebuilt 4.6** (foi adicionado no Godot 4.7; `viewport.rs` só tem BILINEAR=0, FSR=1, FSR2=2, METALFX_SPATIAL=3, METALFX_TEMPORAL=4, MAX=5): usar a constante local `const SCALING_3D_MODE_NEAREST: i64 = 5;` (valor do runtime 4.7.2, conferido em headless pelo /speckit-analyze) para ler e gravar o ramo Nearest — mesma técnica dos inteiros de GIType,
   `viewport::Msaa::{DISABLED, MSAA_2X, MSAA_4X, MSAA_8X}`, `viewport::ScreenSpaceAa::{DISABLED, FXAA, SMAA}`,
   `rendering_server::EnvironmentSsaoQuality::{MEDIUM, HIGH}`, `EnvironmentSsilQuality::{MEDIUM, HIGH}`.
   **Confirmado (§E.1)**: os inteiros do Godot batem com os `.ord()` (`MODE_WINDOWED=0, MAXIMIZED=2,

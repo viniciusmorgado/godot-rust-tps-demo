@@ -98,7 +98,7 @@ Quit ──▶ get_tree().quit()
 | `video/vsync` | int | `DisplayServer.VSYNC_DISABLED` 0, `ENABLED` 1, `ADAPTIVE` 2, `MAILBOX` 3 |
 | `video/max_fps` | int | 30, 40, 60, 72, 90, 120, 144, 0 (ilimitado) |
 | `video/resolution_scale` | float | 1/3, 1/2, 1/1,7, 1/1,5, 1/1,3, 1,0 (leitura por `is_equal_approx`) |
-| `video/scale_filter` | int | `Viewport.SCALING_3D_MODE_NEAREST` 0, `BILINEAR` 1, `FSR` 2*, `FSR2` 2*, `METALFX_SPATIAL`, `METALFX_TEMPORAL` (*valores conforme o engine; usar `.ord()`) |
+| `video/scale_filter` | int | `BILINEAR` 0, `FSR` 1, `FSR2` 2, `METALFX_SPATIAL` 3, `METALFX_TEMPORAL` 4 (via `.ord()`), `NEAREST` 5 (constante local — ausente da API prebuilt 4.6; Godot 4.7.2) |
 | `rendering/gi_type` | int | 2 LightmapGI, 1 VoxelGI, 0 SDFGI |
 | `rendering/gi_quality` | int | 0 Disabled, 1 Low, 2 High |
 | `rendering/taa`, `shadow_mapping`, `bloom`, `volumetric_fog` | bool | botão "Enabled" pressionado |
