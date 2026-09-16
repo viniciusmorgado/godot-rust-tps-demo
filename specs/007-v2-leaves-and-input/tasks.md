@@ -91,7 +91,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 2 — `player_input.rs` glue + `player.rs:138`
 
-- [ ] T010 [US1] In `oxide_godot_core/oxide_godot_lib/src/player_input.rs`, change the 6 node
+- [x] T010 [US1] In `oxide_godot_core/oxide_godot_lib/src/player_input.rs`, change the 6 node
   fields from `Option<Gd<T>>` to `#[export] field: OnEditor<Gd<T>>`, same names/types otherwise
   (`camera_animation: OnEditor<Gd<AnimationPlayer>>`, `crosshair: OnEditor<Gd<TextureRect>>`,
   `camera_base: OnEditor<Gd<Node3D>>`, `camera_rot: OnEditor<Gd<Node3D>>`, `camera_camera:
@@ -100,17 +100,17 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `prev_alpha: f32` field if the fade needs one carried across frames beyond what `color_rect`'s
   own `modulate.a` already holds (read it back from `color_rect.get_modulate().a` instead of a
   redundant field, if that is simpler — implementer's call, no behavior difference).
-- [ ] T011 [US1] Add `parent: OnReady<Gd<CharacterBody3D>>` and `parent_rid: OnReady<Rid>`, both
+- [x] T011 [US1] Add `parent: OnReady<Gd<CharacterBody3D>>` and `parent_rid: OnReady<Rid>`, both
   via `#[init(val = OnReady::from_base_fn(|base| ...))]`: `parent` casts `base.get_parent()
   .unwrap()` to `CharacterBody3D` (confirmed valid: `InputSynchronizer`'s parent in
   `player.tscn:339` is the `Player` node, registered `#[class(base=CharacterBody3D)]` at
   `player.rs:26`); `parent_rid` reads `.get_rid()` off that same cast handle. This replaces the
   two per-frame `self.base().get_parent().unwrap().cast::<Node3D>()` sites at
   `player_input.rs:135-137` and `:155-157` (SC-002).
-- [ ] T012 [US1] Remove `#[export]` from `jumping` (keep the field, name, type `bool`, and
+- [x] T012 [US1] Remove `#[export]` from `jumping` (keep the field, name, type `bool`, and
   `pub(crate)` visibility — FR-002); leave `aiming`, `shoot_target`, `motion`, `shooting`
   exactly as `#[export] pub(crate)` (FR-001, `SceneReplicationConfig` unedited).
-- [ ] T013 [US1] Rewrite `process(&mut self, delta: f64)`: build one `InputSnapshot` from
+- [x] T013 [US1] Rewrite `process(&mut self, delta: f64)`: build one `InputSnapshot` from
   `Input::singleton()` (8 strength reads + `is_action_just_pressed/is_action_pressed/
   is_action_just_released("aim")`, `is_action_just_pressed("jump")`, `is_action_pressed
   ("shoot")`); write `self.motion` from the snapshot; call `model::scaled_look` then
@@ -127,20 +127,20 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `model::alpha_for_height(self.parent.get_global_transform().origin.y, prev_alpha, delta as
   f32, &tuning)` and write it to `color_rect`'s modulate alpha, same as
   `player_input.rs:150-167`.
-- [ ] T014 [US1] Rewrite `input(&mut self, input_event: Gd<InputEvent>)`: on
+- [x] T014 [US1] Rewrite `input(&mut self, input_event: Gd<InputEvent>)`: on
   `InputEventMouseMotion`, call `model::scaled_mouse_look(mouse_motion.get_screen_relative(),
   self.aiming, &tuning)` then apply through the same rotation-write path `process` uses
   (`rotate_camera`, taking the pre-scaled delta) — same observable result as
   `player_input.rs:170-178`.
-- [ ] T015 [US1] `get_aim_rotation(&self) -> f64` becomes a thin wrapper: read
+- [x] T015 [US1] `get_aim_rotation(&self) -> f64` becomes a thin wrapper: read
   `self.camera_rot.get_rotation().x` once, call `model::aim_rotation(x, &tuning)`. Keep its
   `#[func] pub(crate)` attribute and exact name (`player.rs` calls it) — FR-006/data-model
   cross-reference table.
-- [ ] T016 [US1] In `oxide_godot_core/oxide_godot_lib/src/player.rs`, at the line reading
+- [x] T016 [US1] In `oxide_godot_core/oxide_godot_lib/src/player.rs`, at the line reading
   `self.player_input.bind().camera_camera.clone().unwrap()` (currently line 138), remove
   `.unwrap()` — `OnEditor<Gd<Camera3D>>` derefs to `Gd<Camera3D>`, which is `Clone`. This is the
   ONLY edit to `player.rs` in this milestone (FR-003, data-model cross-reference table).
-- [ ] T017 [US1] Gates: `cargo build && cargo clippy && cargo test`. Headless:
+- [x] T017 [US1] Gates: `cargo build && cargo clippy && cargo test`. Headless:
   `/usr/bin/godot.x86_64 --headless --path oxide-godot/oxide-godot --import` then
   `--headless --path oxide-godot/oxide-godot main.tscn` (auto-hosts and spawns a player — no new
   errors vs. the documented baseline). Grep (SC-002):

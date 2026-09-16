@@ -1,34 +1,32 @@
 use godot::classes::input::MouseMode;
 use godot::classes::{
-    AnimationPlayer, Camera3D, ColorRect, IMultiplayerSynchronizer, Input, InputEvent,
-    InputEventMouseMotion, MultiplayerSynchronizer, Node3D, PhysicsRayQueryParameters3D,
-    TextureRect,
+    AnimationPlayer, Camera3D, CharacterBody3D, ColorRect, IMultiplayerSynchronizer, Input,
+    InputEvent, InputEventMouseMotion, MultiplayerSynchronizer, Node3D,
+    PhysicsRayQueryParameters3D, TextureRect,
 };
 use godot::prelude::*;
 
 mod model;
 
-const CAMERA_CONTROLLER_ROTATION_SPEED: f32 = 3.0;
-const CAMERA_MOUSE_ROTATION_SPEED: f32 = 0.001;
-// A minimum angle lower than or equal to -90 breaks movement if the player is looking upward.
-const CAMERA_X_ROT_MIN: f32 = (-89.9_f32).to_radians();
-const CAMERA_X_ROT_MAX: f32 = 70.0_f32.to_radians();
-
-// Release aiming if the mouse/gamepad button was held for longer than 0.4 seconds.
-// This works well for trackpads and is more accessible by not making long presses a requirement.
-// If the aiming button was held for less than 0.4 seconds, keep aiming until the aiming button is pressed again.
-const AIM_HOLD_THRESHOLD: f32 = 0.4;
+use model::{
+    AimState, CameraCue, InputSnapshot, PlayerInputTuning, aim_rotation, alpha_for_height,
+    clamp_pitch, scaled_look, scaled_mouse_look, step_aim,
+};
 
 #[derive(GodotClass)]
 #[class(init, base=MultiplayerSynchronizer)]
 pub struct PlayerInputSynchronizer {
     base: Base<MultiplayerSynchronizer>,
 
-    // If `true`, the aim button was toggled checked by a short press (instead of being held down).
-    toggled_aim: bool,
+    #[init(val = AimState::Idle)]
+    aim_state: AimState,
 
-    // The duration the aiming button was held for (in seconds).
-    aiming_timer: f32,
+    // The parent `CharacterBody3D` (this node's own parent in `player.tscn`) and its physics
+    // RID, resolved once before `ready()` instead of looked up per frame.
+    #[init(val = OnReady::from_base_fn(|base| base.get_parent().unwrap().cast::<CharacterBody3D>()))]
+    parent: OnReady<Gd<CharacterBody3D>>,
+    #[init(val = OnReady::from_base_fn(|base| base.get_parent().unwrap().cast::<CharacterBody3D>().get_rid()))]
+    parent_rid: OnReady<Rid>,
 
     // Synchronized controls
     #[export]
@@ -39,23 +37,22 @@ pub struct PlayerInputSynchronizer {
     pub(crate) motion: Vector2,
     #[export]
     pub(crate) shooting: bool,
-    // This is handled via RPC for now
-    #[export]
+    // This is handled via RPC for now; not replicated or stored by any scene (backlog #9).
     pub(crate) jumping: bool,
 
     // Camera and effects
     #[export]
-    camera_animation: Option<Gd<AnimationPlayer>>,
+    camera_animation: OnEditor<Gd<AnimationPlayer>>,
     #[export]
-    crosshair: Option<Gd<TextureRect>>,
+    crosshair: OnEditor<Gd<TextureRect>>,
     #[export]
-    camera_base: Option<Gd<Node3D>>,
+    camera_base: OnEditor<Gd<Node3D>>,
     #[export]
-    camera_rot: Option<Gd<Node3D>>,
+    camera_rot: OnEditor<Gd<Node3D>>,
     #[export]
-    pub(crate) camera_camera: Option<Gd<Camera3D>>,
+    pub(crate) camera_camera: OnEditor<Gd<Camera3D>>,
     #[export]
-    color_rect: Option<Gd<ColorRect>>,
+    color_rect: OnEditor<Gd<ColorRect>>,
 }
 
 #[godot_api]
@@ -63,80 +60,72 @@ impl IMultiplayerSynchronizer for PlayerInputSynchronizer {
     fn ready(&mut self) {
         let unique_id = self.base().get_multiplayer().unwrap().get_unique_id();
         if self.base().get_multiplayer_authority() == unique_id {
-            self.camera_camera.as_mut().unwrap().make_current();
+            self.camera_camera.make_current();
             Input::singleton().set_mouse_mode(MouseMode::CAPTURED);
         } else {
             self.base_mut().set_process(false);
             self.base_mut().set_process_input(false);
-            self.color_rect.as_mut().unwrap().hide();
+            self.color_rect.hide();
         }
     }
 
     fn process(&mut self, delta: f64) {
+        let dt = delta as f32;
+        let tuning = PlayerInputTuning::default();
         let input = Input::singleton();
-        self.motion = Vector2::new(
-            input.get_action_strength("move_right") - input.get_action_strength("move_left"),
-            input.get_action_strength("move_back") - input.get_action_strength("move_forward"),
-        );
-        let camera_move = Vector2::new(
-            input.get_action_strength("view_right") - input.get_action_strength("view_left"),
-            input.get_action_strength("view_up") - input.get_action_strength("view_down"),
-        );
-        let mut camera_speed_this_frame: f32 = delta as f32 * CAMERA_CONTROLLER_ROTATION_SPEED;
-        if self.aiming {
-            camera_speed_this_frame *= 0.5;
-        }
-        self.rotate_camera(camera_move * camera_speed_this_frame);
-        let current_aim: bool;
+        let snapshot = InputSnapshot {
+            motion: Vector2::new(
+                input.get_action_strength("move_right") - input.get_action_strength("move_left"),
+                input.get_action_strength("move_back") - input.get_action_strength("move_forward"),
+            ),
+            camera_move: Vector2::new(
+                input.get_action_strength("view_right") - input.get_action_strength("view_left"),
+                input.get_action_strength("view_up") - input.get_action_strength("view_down"),
+            ),
+            aim_just_pressed: input.is_action_just_pressed("aim"),
+            aim_pressed: input.is_action_pressed("aim"),
+            aim_just_released: input.is_action_just_released("aim"),
+            jump_just_pressed: input.is_action_just_pressed("jump"),
+            shoot_pressed: input.is_action_pressed("shoot"),
+        };
 
-        // Keep aiming if the mouse wasn't held for long enough.
-        if input.is_action_just_released("aim") && self.aiming_timer <= AIM_HOLD_THRESHOLD {
-            current_aim = true;
-            self.toggled_aim = true;
-        } else {
-            current_aim = self.toggled_aim || input.is_action_pressed("aim");
-            if input.is_action_just_pressed("aim") {
-                self.toggled_aim = false;
+        self.motion = snapshot.motion;
+
+        let camera_move = scaled_look(snapshot.camera_move, self.aiming, dt, &tuning);
+        self.rotate_camera(camera_move, &tuning);
+
+        let (next_state, cue) = step_aim(self.aim_state, &snapshot, dt, &tuning);
+        self.aim_state = next_state;
+        self.aiming = self.aim_state.is_aiming();
+        if let Some(cue) = cue {
+            match cue {
+                CameraCue::Shoot => {
+                    self.camera_animation.play_ex().name("shoot").done();
+                }
+                CameraCue::Far => {
+                    self.camera_animation.play_ex().name("far").done();
+                }
             }
         }
 
-        if current_aim {
-            self.aiming_timer += delta as f32;
-        } else {
-            self.aiming_timer = 0.0;
-        }
-
-        if self.aiming != current_aim {
-            self.aiming = current_aim;
-            if self.aiming {
-                self.camera_animation.as_mut().unwrap().play_ex().name("shoot").done();
-            } else {
-                self.camera_animation.as_mut().unwrap().play_ex().name("far").done();
-            }
-        }
-
-        if input.is_action_just_pressed("jump") {
+        if snapshot.jump_just_pressed {
             self.base_mut().rpc("jump", &[]);
         }
 
-        self.shooting = input.is_action_pressed("shoot");
+        self.shooting = snapshot.shoot_pressed;
         if self.shooting {
-            let crosshair = self.crosshair.as_ref().unwrap();
-            let ch_pos = crosshair.get_position() + crosshair.get_size() * 0.5;
-            let camera_camera = self.camera_camera.as_ref().unwrap();
-            let ray_from = camera_camera.project_ray_origin(ch_pos);
-            let ray_dir = camera_camera.project_ray_normal(ch_pos);
+            let ch_pos = self.crosshair.get_position() + self.crosshair.get_size() * 0.5;
+            let ray_from = self.camera_camera.project_ray_origin(ch_pos);
+            let ray_dir = self.camera_camera.project_ray_normal(ch_pos);
 
-            let params = PhysicsRayQueryParameters3D::create_ex(ray_from, ray_from + ray_dir * 1000.0)
-                .collision_mask(0b11)
-                .exclude(&array![Rid::Invalid])
-                .done()
-                .unwrap();
+            let params =
+                PhysicsRayQueryParameters3D::create_ex(ray_from, ray_from + ray_dir * 1000.0)
+                    .collision_mask(0b11)
+                    .exclude(&array![*self.parent_rid])
+                    .done()
+                    .unwrap();
             let col = self
-                .base()
-                .get_parent()
-                .unwrap()
-                .cast::<Node3D>()
+                .parent
                 .get_world_3d()
                 .unwrap()
                 .get_direct_space_state()
@@ -152,30 +141,17 @@ impl IMultiplayerSynchronizer for PlayerInputSynchronizer {
         // Fade out to black if falling out of the map. -17 is lower than
         // the lowest valid position checked the map (which is a bit under -16).
         // At 15 units below -17 (so -32), the screen turns fully black.
-        let player_transform: Transform3D = self
-            .base()
-            .get_parent()
-            .unwrap()
-            .cast::<Node3D>()
-            .get_global_transform();
-        let color_rect = self.color_rect.as_mut().unwrap();
-        let mut modulate = color_rect.get_modulate();
-        if player_transform.origin.y < -17.0 {
-            modulate.a = ((-17.0 - player_transform.origin.y) / 15.0).min(1.0);
-        } else {
-            // Fade out the black ColorRect progressively after being teleported back.
-            modulate.a *= 1.0 - delta as f32 * 4.0;
-        }
-        color_rect.set_modulate(modulate);
+        let player_y = self.parent.get_global_transform().origin.y;
+        let mut modulate = self.color_rect.get_modulate();
+        modulate.a = alpha_for_height(player_y, modulate.a, dt, &tuning);
+        self.color_rect.set_modulate(modulate);
     }
 
     fn input(&mut self, input_event: Gd<InputEvent>) {
         if let Ok(mouse_motion) = input_event.try_cast::<InputEventMouseMotion>() {
-            let mut camera_speed_this_frame: f32 = CAMERA_MOUSE_ROTATION_SPEED;
-            if self.aiming {
-                camera_speed_this_frame *= 0.75;
-            }
-            self.rotate_camera(mouse_motion.get_screen_relative() * camera_speed_this_frame);
+            let tuning = PlayerInputTuning::default();
+            let mv = scaled_mouse_look(mouse_motion.get_screen_relative(), self.aiming, &tuning);
+            self.rotate_camera(mv, &tuning);
         }
     }
 }
@@ -184,36 +160,18 @@ impl IMultiplayerSynchronizer for PlayerInputSynchronizer {
 impl PlayerInputSynchronizer {
     #[func]
     pub(crate) fn get_aim_rotation(&self) -> f64 {
-        let camera_x_rot: f32 = self
-            .camera_rot
-            .as_ref()
-            .unwrap()
-            .get_rotation()
-            .x
-            .clamp(CAMERA_X_ROT_MIN, CAMERA_X_ROT_MAX);
-        // Change aim according to camera rotation.
-        if camera_x_rot >= 0.0 {
-            // Aim up.
-            (-camera_x_rot / CAMERA_X_ROT_MAX) as f64
-        } else {
-            // Aim down.
-            (camera_x_rot / CAMERA_X_ROT_MIN) as f64
-        }
+        let tuning = PlayerInputTuning::default();
+        aim_rotation(self.camera_rot.get_rotation().x, &tuning)
     }
 
     #[func]
     pub(crate) fn get_camera_base_quaternion(&self) -> Quaternion {
-        self.camera_base
-            .as_ref()
-            .unwrap()
-            .get_global_transform()
-            .basis
-            .get_quaternion()
+        self.camera_base.get_global_transform().basis.get_quaternion()
     }
 
     #[func]
     pub(crate) fn get_camera_rotation_basis(&self) -> Basis {
-        self.camera_rot.as_ref().unwrap().get_global_transform().basis
+        self.camera_rot.get_global_transform().basis
     }
 
     #[rpc(authority, call_local, unreliable)]
@@ -223,14 +181,12 @@ impl PlayerInputSynchronizer {
 }
 
 impl PlayerInputSynchronizer {
-    fn rotate_camera(&mut self, mv: Vector2) {
-        let camera_base = self.camera_base.as_mut().unwrap();
-        camera_base.rotate_y(-mv.x);
+    fn rotate_camera(&mut self, mv: Vector2, tuning: &PlayerInputTuning) {
+        self.camera_base.rotate_y(-mv.x);
         // After relative transforms, camera needs to be renormalized.
-        camera_base.orthonormalize();
-        let camera_rot = self.camera_rot.as_mut().unwrap();
-        let mut rotation = camera_rot.get_rotation();
-        rotation.x = (rotation.x + mv.y).clamp(CAMERA_X_ROT_MIN, CAMERA_X_ROT_MAX);
-        camera_rot.set_rotation(rotation);
+        self.camera_base.orthonormalize();
+        let mut rotation = self.camera_rot.get_rotation();
+        rotation.x = clamp_pitch(rotation.x, mv.y, tuning);
+        self.camera_rot.set_rotation(rotation);
     }
 }

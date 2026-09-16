@@ -1,8 +1,3 @@
-// Temporary: this module is not wired into `player_input.rs`'s glue until commit 2 of this
-// milestone (`specs/007-v2-leaves-and-input`), so nothing outside `#[cfg(test)]` calls these
-// items yet. Removed in that commit.
-#![allow(dead_code)]
-
 use godot::prelude::*;
 
 /// Tuning constants for `PlayerInputSynchronizer`'s camera rotation, aim hold/toggle threshold
