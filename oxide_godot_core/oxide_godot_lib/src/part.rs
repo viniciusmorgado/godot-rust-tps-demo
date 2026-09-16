@@ -33,15 +33,17 @@ impl IRigidBody3D for Part {
     fn ready(&mut self) {
         self.base_mut().set_process(false);
         if !Os::singleton().has_feature("dedicated_server") {
-            let mesh_inst = self
+            let mut mesh_inst = self
                 .base()
                 .get_node_as::<Node>("Model")
                 .get_child(0)
                 .unwrap()
                 .cast::<MeshInstance3D>();
-            let mut mesh = mesh_inst.get_mesh().unwrap();
+            let mesh = mesh_inst.get_mesh().unwrap();
             let mut mat: Gd<Material> = mesh.surface_get_material(0).unwrap().duplicate_resource();
-            mesh.surface_set_material(0, &mat);
+            // upstream bug fix: part.gd instalava a cópia do material no recurso Mesh compartilhado pelos dois escudos
+            // (surface_set_material), então o último escudo a entrar "vencia" e o fade do outro nunca era renderizado; override por instância.
+            mesh_inst.set_surface_override_material(0, &mat);
             let next_pass: Gd<Material> = mat.get_next_pass().unwrap().duplicate_resource();
             mat.set_next_pass(&next_pass);
             self._mat = Some(mat);
