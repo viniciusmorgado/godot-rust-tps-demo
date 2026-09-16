@@ -155,7 +155,7 @@ impl Settings {
 
         if self.config_file.get_value("rendering", "ssao_quality").to::<i64>() == -1 {
             environment.set_ssao_enabled(false);
-        // upstream bug fix: settings.gd usava if em vez de elif — "SSAO: Disabled" (-1) era religado pelo else
+        // upstream bug fix: settings.gd used `if` instead of `elif` — "SSAO: Disabled" (-1) was re-enabled by the else
         } else if self.config_file.get_value("rendering", "ssao_quality").to::<i64>()
             == EnvironmentSsaoQuality::MEDIUM.ord() as i64
         {

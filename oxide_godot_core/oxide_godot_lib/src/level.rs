@@ -10,7 +10,7 @@ use godot::prelude::*;
 use crate::player::Player;
 use crate::red_robot::EnemyRobot;
 
-// Settings.GIType (settings.gd): SDFGI = 0, VOXEL_GI = 1, LIGHTMAP_GI = 2 (ramo `else`).
+// Settings.GIType (settings.gd): SDFGI = 0, VOXEL_GI = 1, LIGHTMAP_GI = 2 (the `else` branch).
 const SDFGI: i64 = 0;
 const VOXEL_GI: i64 = 1;
 // Settings.GIQuality (settings.gd): DISABLED = 0, LOW = 1, HIGH = 2.

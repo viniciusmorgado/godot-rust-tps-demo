@@ -13,8 +13,8 @@ use godot::prelude::*;
 
 const LEVEL_PATH: &str = "res://level/level.tscn";
 
-// Viewport.SCALING_3D_MODE_NEAREST foi adicionado no Godot 4.7; ausente da API prebuilt 4.6 do
-// gdext 0.5.5. Godot 4.7.2 = 5 (mesma técnica dos inteiros de Settings.GIType).
+// Viewport.SCALING_3D_MODE_NEAREST was added in Godot 4.7; absent from the prebuilt 4.6 API of
+// gdext 0.5.5. Godot 4.7.2 = 5 (same technique as the Settings.GIType integers).
 const SCALING_3D_MODE_NEAREST: i64 = 5;
 
 #[derive(GodotClass)]

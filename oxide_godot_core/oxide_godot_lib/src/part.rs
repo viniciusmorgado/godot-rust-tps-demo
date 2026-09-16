@@ -41,8 +41,8 @@ impl IRigidBody3D for Part {
                 .cast::<MeshInstance3D>();
             let mesh = mesh_inst.get_mesh().unwrap();
             let mut mat: Gd<Material> = mesh.surface_get_material(0).unwrap().duplicate_resource();
-            // upstream bug fix: part.gd instalava a cópia do material no recurso Mesh compartilhado pelos dois escudos
-            // (surface_set_material), então o último escudo a entrar "vencia" e o fade do outro nunca era renderizado; override por instância.
+            // upstream bug fix: part.gd installed the duplicated material on the Mesh resource shared by both shields
+            // (surface_set_material), so the last shield to enter "won" and the other one's fade was never rendered; per-instance override.
             mesh_inst.set_surface_override_material(0, &mat);
             let next_pass: Gd<Material> = mat.get_next_pass().unwrap().duplicate_resource();
             mat.set_next_pass(&next_pass);

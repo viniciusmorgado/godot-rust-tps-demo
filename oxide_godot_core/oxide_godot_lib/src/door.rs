@@ -10,8 +10,8 @@ pub struct Door {
 
     open: bool,
 
-    // upstream bug fix: door.gd referenciava "DoorModel/AnimationPlayer" (node inexistente);
-    // o node da cena é "DoorModel2" — a porta nunca abria e o Godot imprimia "Node not found".
+    // upstream bug fix: door.gd referenced "DoorModel/AnimationPlayer" (a node that does not exist);
+    // the scene node is "DoorModel2" — the door never opened and Godot printed "Node not found".
     #[init(node = "DoorModel2/AnimationPlayer")]
     animation_player: OnReady<Gd<AnimationPlayer>>,
 }
