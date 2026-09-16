@@ -1,4 +1,5 @@
-use godot::classes::{CharacterBody3D, ConfigFile, ICharacterBody3D, Node, Node3D, SpotLight3D};
+use crate::settings::Settings;
+use godot::classes::{CharacterBody3D, ICharacterBody3D, Node3D, SpotLight3D};
 use godot::global::{randf, randomize};
 use godot::prelude::*;
 
@@ -9,17 +10,15 @@ pub struct FlyingForklift {
 
     #[init(node = "SpotLight3D")]
     spot_light: OnReady<Gd<SpotLight3D>>,
+
+    #[init(val = OnReady::new(|| godot::tools::get_autoload_by_name::<Settings>("Settings")))]
+    settings: OnReady<Gd<Settings>>,
 }
 
 #[godot_api]
 impl ICharacterBody3D for FlyingForklift {
     fn ready(&mut self) {
-        let config_file = self
-            .base()
-            .get_node_as::<Node>("/root/Settings")
-            .get("config_file")
-            .to::<Gd<ConfigFile>>();
-        if !config_file.get_value("rendering", "shadow_mapping").to::<bool>() {
+        if !self.settings.bind().graphics().shadow_mapping {
             self.spot_light.set_shadow(false);
         }
 
