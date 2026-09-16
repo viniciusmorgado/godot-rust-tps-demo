@@ -10,7 +10,7 @@ Caminhos relativos à raiz do repositório.
   `experimental-threads` (não editar `Cargo.toml`).
 - **Nenhum editor Godot aberto** durante validação headless (`pgrep -a godot` vazio) — avisar o
   usuário antes; nunca matar o processo dele.
-- Árvore limpa na `main` (`git status --short` vazio); HEAD em `6f4d9ba` ou posterior sem `Port `.
+- Árvore limpa na `main` (`git status --short` vazio); HEAD em `619575d` ou posterior sem `Port `.
 - `INI="$HOME/.local/share/godot/app_userdata/Third-Person Shooter Demo/settings.ini"` — caminho
   real de `user://settings.ini` (`config/name` do `project.godot`). **Antes de tudo**:
   `cp "$INI" <scratch>/settings.ini.baseline` (gravado pelo `settings.gd` original; md5 em
@@ -92,8 +92,7 @@ Rodar de `oxide-godot/oxide-godot/` com `timeout 30 /usr/bin/godot.x86_64 --head
   `environment.ssao_enabled` → `false`; com MEDIUM/HIGH → `true`. Restaurar o valor no fim (o
   probe não salva).
 - **Padrões (com o `.ini` movido de lado e restaurado — conferir md5 depois)**: probe compara
-  `config_file` após `load_settings` com `load("res://menu/settings.gd").new().DEFAULTS` — **só
-  possível antes do `git rm`** (ou usando a cópia em `../oxide_godot_origins/menu/settings.gd`:
+  `config_file` após `load_settings` com a tabela seção/chave/tipo/padrão de `data-model.md` (já conferida programaticamente contra o `DEFAULTS` do original em research §E.3b — o `.gd` não existe mais nesse ponto).
   `load("res://…")` não alcança; copiar temporariamente para o scratch não resolve `res://` —
   então rodar este probe **antes do passo 6 do ciclo**, ou aceitar o resultado já medido em
   research §E.3b, 15/15).
@@ -115,7 +114,7 @@ Arquivos: `src/settings.rs` (novo), `src/lib.rs`, `oxide-godot/menu/settings.tsc
 `oxide-godot/project.godot`, deleções de `menu/settings.gd` + `.uid`, `docs/upstream-bugs.md`,
 `docs/v2-backlog.md`. Nada mais (nenhum `.rs` existente além de `lib.rs`; `CLAUDE.md` intocado).
 
-Assunto: `Port settings.gd → Settings (Node) autoload via menu/settings.tscn; project.godot: autoload script→cena (upstream bug fix: SSAO Disabled)`
+Assunto: `Port settings.gd → Settings (Node, autoload); menu/settings.tscn nova; project.godot: Settings="*res://menu/settings.tscn"`
 
 Corpo: vínculo do autoload por cena mínima (classe nativa não pode ser autoload direta; única
 edição do `project.godot` na v1); `#[var] config_file`/`metalfx_supported`; `DEFAULTS` como
@@ -129,9 +128,9 @@ projeto**; consumidores intocados (backlog 1).
 
 ```bash
 find oxide-godot -name '*.gd' -not -path '*/addons/*'; find oxide-godot -name '*.gd.uid' -not -path '*/addons/*'   # ambos vazios
-git log --oneline 6f4d9ba..HEAD | grep -c '^[0-9a-f]* Port '                 # 1
-git diff --stat 6f4d9ba -- '*.rs'                                            # só lib.rs (+1) e settings.rs (novo)
-git diff --stat 6f4d9ba -- oxide-godot/project.godot                         # 1 +-  (1 insertion, 1 deletion)
+git log --oneline 619575d..HEAD | grep -c '^[0-9a-f]* Port '                 # 1
+git diff --stat 619575d -- '*.rs'                                            # só lib.rs (+1) e settings.rs (novo)
+git diff --stat 619575d -- oxide-godot/project.godot                         # 1 +-  (1 insertion, 1 deletion)
 grep -n '^Settings=' oxide-godot/project.godot                               # res://menu/settings.tscn
 ls oxide_godot_core/oxide_godot_lib/src/ | wc -l                             # 16
 grep -c '^| [0-9]' docs/upstream-bugs.md; grep -c '^| [0-9]' docs/v2-backlog.md   # 3; 25
