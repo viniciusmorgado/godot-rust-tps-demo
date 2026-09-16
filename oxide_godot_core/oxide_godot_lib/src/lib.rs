@@ -9,6 +9,7 @@ mod player;
 mod bullet;
 mod door;
 mod part;
+mod red_robot;
 
 struct OxideGodot;
 

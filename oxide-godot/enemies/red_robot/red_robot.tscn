@@ -1,6 +1,5 @@
 [gd_scene format=3 uid="uid://byi6b08jpb2iw"]
 
-[ext_resource type="Script" uid="uid://bf14mo0lrrvjl" path="res://enemies/red_robot/red_robot.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://cmy0u0gubi0bw" path="res://enemies/red_robot/model/red_robot.glb" id="2_g6060"]
 [ext_resource type="ArrayMesh" uid="uid://b5a08lep8yhf1" path="res://enemies/red_robot/laser/circle.mesh" id="3_53w75"]
 [ext_resource type="Material" uid="uid://cfq45e1sfaycm" path="res://enemies/red_robot/laser/LaserMaterial.tres" id="4_6f0x2"]
@@ -10580,10 +10579,9 @@ rings = 4
 streams_count = 1
 stream_0/stream = ExtResource("20_d1jht")
 
-[node name="RedRobot" type="CharacterBody3D" unique_id=56261083]
+[node name="RedRobot" type="EnemyRobot" unique_id=56261083]
 collision_layer = 3
 collision_mask = 3
-script = ExtResource("1")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1768116397]
 replication_config = SubResource("SceneReplicationConfig_h6xi0")

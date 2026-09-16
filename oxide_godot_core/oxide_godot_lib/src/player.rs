@@ -134,7 +134,7 @@ impl Player {
     }
 
     #[rpc(authority, call_local, unreliable)]
-    fn add_camera_shake_trauma(&mut self, amount: f64) {
+    pub(crate) fn add_camera_shake_trauma(&mut self, amount: f64) {
         let camera = self.player_input.bind().camera_camera.clone().unwrap();
         camera.cast::<CameraNoiseShake>().bind_mut().add_trauma(amount);
     }
