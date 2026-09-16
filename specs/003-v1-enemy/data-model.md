@@ -80,7 +80,7 @@ Enum `State` (`#[godot(via = i64)]`): `Idle = 0`, `Approach = 1`, `Aim = 2`, `Sh
 Constantes (`f32`): `PLAYER_AIM_TOLERANCE_DEGREES` = 15° em rad, `SHOOT_WAIT` 6,0, `AIM_TIME` 1,0,
 `AIM_PREPARE_TIME` 0,5, `BLEND_AIM_SPEED` 0,05.
 
-### Referências de cena (14 `OnReady`, research D8)
+### Referências de cena (15 `OnReady`, research D8)
 
 `animation_tree`, `shoot_animation`, `model`, `ray_from`, `ray_mesh`, `laser_raycast`,
 `collision_shape`, `explosion_sound`, `hit_sound`, `death`, `death_shield1`/`2`/`death_head`

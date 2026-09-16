@@ -336,7 +336,7 @@ xform_inv (base com escala): v*t = transposed*(v−origin) = (-4.664, -2.577, 10
 
 ### 2. `red_robot.gd` → `src/red_robot.rs` — `RedRobot: CharacterBody3D`
 
-- Enum `State`, consts (D7–D8), 6 exports, 4 internos, 14 `OnReady` (D8).
+- Enum `State`, consts (D7–D8), 6 exports, 4 internos, 15 `OnReady` (D8).
 - `ICharacterBody3D`: `ready`, `physics_process` (D14, D11).
 - `#[godot_api] impl RedRobot` único: `#[signal] exploded`, `#[func] resume_approach`,
   `#[rpc] hit`, `#[rpc] play_shoot`, `#[func] shoot_check`, `#[func] _on_area_body_entered`,
