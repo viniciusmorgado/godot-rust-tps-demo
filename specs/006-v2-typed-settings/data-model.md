@@ -104,8 +104,13 @@ the full commit-by-commit breakdown:
 - `#[var] config_file: Gd<ConfigFile>` — KEPT.
 - `#[func] load_settings`, `#[func] save_settings`, `#[func] apply_graphics_settings` — KEPT,
   their bodies re-parse `GraphicsSettings` from `config_file` at the boundary.
-- `metalfx_supported` field and `GI_TYPE_*`/`GI_QUALITY_*` `#[constant]`s — REMOVED in US1 (no
-  scene/script references them, confirmed by grep, R8).
+- `#[var]` exposure of `metalfx_supported` and the `GI_TYPE_*`/`GI_QUALITY_*` `#[constant]`s —
+  REMOVED in US1 (no scene/script references them, confirmed by grep, R8). The
+  `metalfx_supported` field itself stays, private: `default_for`/`from_wire` need it.
+- `fn graphics(&self) -> GraphicsSettings` / `fn set_graphics(&mut self, GraphicsSettings)` —
+  PRESENT already in US1, in transitional form (read = parse from `config_file` at each call;
+  write = `to_wire()` into `config_file` via `set_value`), so the consumer commits of US2 compile
+  and behave one by one before the last commit turns both into plain field access.
 
 **Final shape (from US2's last commit on)**:
 - `graphics: GraphicsSettings` — the single parsed-once model, no longer wrapped in `#[var]`.
