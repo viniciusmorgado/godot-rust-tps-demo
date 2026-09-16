@@ -22,7 +22,7 @@ buses/default_bus_layout="uid://vtdn63d3ksc2"
 
 [autoload]
 
-Settings="*res://menu/settings.gd"
+Settings="*res://menu/settings.tscn"
 
 [display]
 

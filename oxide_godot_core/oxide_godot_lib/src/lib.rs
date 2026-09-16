@@ -14,6 +14,7 @@ mod flying_forklift;
 mod level;
 mod menu;
 mod main_scene;
+mod settings;
 
 struct OxideGodot;
 
