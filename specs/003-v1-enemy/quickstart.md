@@ -1,158 +1,158 @@
-# Quickstart: validação de cada port (Marco C)
+# Quickstart: validation of each port (Milestone C)
 
-Guia de execução/validação — o que rodar, na ordem, e o que esperar. Detalhes de código em
-[research.md](research.md); nomes a conferir em [contracts/](contracts/). Caminhos relativos à
-raiz do repositório (`oxide-godot/`, onde está este `specs/`).
+Execution/validation guide — what to run, in order, and what to expect. Code details in
+[research.md](research.md); names to check in [contracts/](contracts/). Paths relative to the
+repository root (`oxide-godot/`, where this `specs/` lives).
 
-## Pré-requisitos
+## Prerequisites
 
-- `/usr/bin/godot.x86_64` = Godot 4.7.2 stable (não há `godot` no PATH).
-- `cargo`/`rustc` 1.98.x; crate `godot` 0.5.5 já resolvido (não editar `Cargo.toml`).
-- **Nenhum editor Godot aberto** no projeto durante validação headless (`pgrep -a godot` vazio).
-  Avisar o usuário antes de começar; nunca matar o processo dele.
-- Árvore limpa na `main` (`git status --short` vazio) antes de cada port.
+- `/usr/bin/godot.x86_64` = Godot 4.7.2 stable (there is no `godot` on PATH).
+- `cargo`/`rustc` 1.98.x; crate `godot` 0.5.5 already resolved (do not edit `Cargo.toml`).
+- **No Godot editor open** on the project during headless validation (`pgrep -a godot` empty).
+  Warn the user before starting; never kill their process.
+- Clean tree on `main` (`git status --short` empty) before each port.
 
-## Baseline (medida em 2026-09-15, commit `4bb8f7f`, antes de qualquer port deste marco)
+## Baseline (measured on 2026-09-15, commit `4bb8f7f`, before any port of this milestone)
 
 - `cargo build`: **0 warnings**.
-- Import headless: linha 1 = `Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.official, safeguards strict)`;
-  **0 linhas `ERROR`** em `.godot/` já importado. Os 3 erros do upstream catalogados no
-  `CLAUDE.md` só aparecem em import limpo e não contam como regressão.
-- `enemies/red_robot/red_robot.tscn`: exit **124**, **0 linhas `ERROR`/`SCRIPT ERROR`**, 1 `WARNING`
-  benigno (`HDR output requested…`). O robô isolado fica IDLE (sem jogador) e cai com a
-  gravidade; as 3 peças rodam `ready` (duplicação de materiais).
-- `level/level.tscn`: exit 124, 0 `ERROR`, 2 `WARNING` benignos (`HDR output…`,
+- Headless import: line 1 = `Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.official, safeguards strict)`;
+  **0 `ERROR` lines** with `.godot/` already imported. The 3 upstream errors catalogued in
+  `CLAUDE.md` only appear on a clean import and do not count as regression.
+- `enemies/red_robot/red_robot.tscn`: exit **124**, **0 `ERROR`/`SCRIPT ERROR` lines**, 1 benign
+  `WARNING` (`HDR output requested…`). The isolated robot stays IDLE (no player) and falls with
+  gravity; the 3 parts run `ready` (material duplication).
+- `level/level.tscn`: exit 124, 0 `ERROR`, 2 benign `WARNING`s (`HDR output…`,
   `[Physics interpolation] Interpolated Camera3D…`).
-- `docs/upstream-bugs.md`: 1 entrada na baseline; passa a 2 na Phase 3b (correção conservadora da peça, FR-028–FR-032); `docs/v2-backlog.md`: 14 itens.
+- `docs/upstream-bugs.md`: 1 entry at the baseline; becomes 2 in Phase 3b (conservative fix of the part, FR-028–FR-032); `docs/v2-backlog.md`: 14 items.
 
-Qualquer linha `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
-`Nonexistent`, `panicked` que não esteja nesta baseline é regressão do port.
+Any `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
+`Nonexistent`, `panicked` line that is not in this baseline is a regression of the port.
 
-## Ciclo por script (repetir 2 vezes, na ordem 1 → 2)
+## Cycle per script (repeat 2 times, in order 1 → 2)
 
 ### 1. Build
 
 ```bash
 cd oxide_godot_core && cargo build 2>&1 | tail -20
-cargo build 2>&1 | grep -c '^warning'      # esperado: 0 (atenção: Resource::duplicate() está deprecado — usar duplicate_resource(), research D3)
+cargo build 2>&1 | grep -c '^warning'      # expected: 0 (caution: Resource::duplicate() is deprecated — use duplicate_resource(), research D3)
 ```
 
-### 2. Import headless (extensão carregou?)
+### 2. Headless import (did the extension load?)
 
 ```bash
 cd oxide-godot && /usr/bin/godot.x86_64 --headless --import --path . 2>&1 | tee /tmp/import.log
-grep -n 'Initialize godot-rust' /tmp/import.log        # deve existir (linha 1)
-grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # esperado: vazio (ou só os 3 do upstream)
+grep -n 'Initialize godot-rust' /tmp/import.log        # must exist (line 1)
+grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # expected: empty (or only the 3 from upstream)
 ```
 
-### 3. Execução headless da(s) cena(s) afetada(s)
+### 3. Headless run of the affected scene(s)
 
 ```bash
-cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <cena>.tscn 2>&1 | tee /tmp/run.log
-grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked' /tmp/run.log   # esperado: vazio
-grep -c '^WARNING' /tmp/run.log                                                                         # esperado: só os benignos da baseline
+cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <scene>.tscn 2>&1 | tee /tmp/run.log
+grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked' /tmp/run.log   # expected: empty
+grep -c '^WARNING' /tmp/run.log                                                                         # expected: only the benign ones from the baseline
 ```
 
-| Port | `<cena>` a rodar | O que exercita |
+| Port | `<scene>` to run | What it exercises |
 |---|---|---|
-| 1 `part.gd` | `enemies/red_robot/red_robot.tscn` **e** `level/level.tscn` | As 3 peças instanciam a classe Rust: `ready` (`set_process(false)`, `get_node("Model").get_child(0)`, duplicação do material e do `next_pass`). `explode()` não é exercitado sem morte (o robô ainda é GDScript; `red_robot.gd:96-98` resolve o nome no editor/jogo) |
-| 2 `red_robot.gd` | `enemies/red_robot/red_robot.tscn` **e** `level/level.tscn` | Robô isolado: `ready` (14 `OnReady`, `AnimationTree` ativo, `animate(0)`), `physics_process` sem jogador (IDLE, gravidade, `move_and_slide`). Level: `level.gd` instancia, atribui `transform`, conecta `exploded` por nome, `add_child`; robôs spawnam e ficam IDLE (o Player headless nasce parado e, se a área de detecção o alcançar, APPROACH/AIM rodam também) |
+| 1 `part.gd` | `enemies/red_robot/red_robot.tscn` **and** `level/level.tscn` | The 3 parts instantiate the Rust class: `ready` (`set_process(false)`, `get_node("Model").get_child(0)`, duplication of the material and of the `next_pass`). `explode()` is not exercised without a death (the robot is still GDScript; `red_robot.gd:96-98` resolves the name in the editor/game) |
+| 2 `red_robot.gd` | `enemies/red_robot/red_robot.tscn` **and** `level/level.tscn` | Isolated robot: `ready` (14 `OnReady`, `AnimationTree` active, `animate(0)`), `physics_process` without a player (IDLE, gravity, `move_and_slide`). Level: `level.gd` instantiates, assigns `transform`, connects `exploded` by name, `add_child`; robots spawn and stay IDLE (the headless Player spawns standing still and, if the detection area reaches it, APPROACH/AIM run too) |
 
-Exit 124 (timeout) é o esperado; a validação é a ausência de linhas novas no `grep`.
+Exit 124 (timeout) is the expected one; the validation is the absence of new lines in the `grep`.
 
-### 4. Verificações mecânicas do ciclo (Princípio II)
+### 4. Mechanical checks of the cycle (Principle II)
 
 ```bash
-# o script e o uid sumiram, e nenhuma cena ainda aponta para eles
-ls oxide-godot/<caminho>/<script>.gd oxide-godot/<caminho>/<script>.gd.uid   # esperado: No such file
-grep -rn '<uid do .gd>' oxide-godot/ | grep -v '/.godot/'                     # esperado: vazio (o cache em .godot/ é regenerado pelo import)
-grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # esperado: vazio
+# the script and the uid are gone, and no scene still points to them
+ls oxide-godot/<path>/<script>.gd oxide-godot/<path>/<script>.gd.uid   # expected: No such file
+grep -rn '<uid of the .gd>' oxide-godot/ | grep -v '/.godot/'                     # expected: empty (the cache in .godot/ is regenerated by the import)
+grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # expected: empty
 
-# o(s) node(s) trocou(aram) de tipo e não tem(êm) mais script
+# the node(s) changed type and no longer have a script
 grep -c 'type="Part"' oxide-godot/enemies/red_robot/red_robot.tscn            # port 1: 3
 grep -c 'ExtResource("24")' oxide-godot/enemies/red_robot/red_robot.tscn      # port 1: 0
 grep -c 'type="EnemyRobot"' oxide-godot/enemies/red_robot/red_robot.tscn        # port 2: 1
 grep -c 'ExtResource("1")' oxide-godot/enemies/red_robot/red_robot.tscn       # port 2: 0
 
-# os 5 .gd fora do marco não mudaram
-git diff --stat HEAD -- 'oxide-godot/**/*.gd'   # esperado: só a deleção do script deste port
+# the 5 .gd outside the milestone did not change
+git diff --stat HEAD -- 'oxide-godot/**/*.gd'   # expected: only the deletion of this port's script
 ```
 
-Uids, ids e linhas por port: tabela "Edição das cenas" do [plan.md](plan.md). `red_robot.tscn` tem
-11.053 linhas: a edição é por `sed` em linhas conferidas com `grep -n` imediatamente antes.
+Uids, ids and lines per port: table "Scene edits" of [plan.md](plan.md). `red_robot.tscn` has
+11,053 lines: the edit is via `sed` on lines checked with `grep -n` immediately before.
 
-### 5. Conferência de nomes (todos os ports)
+### 5. Name check (all ports)
 
-Rodar a seção "Verificação antes do commit" do contrato do port
-([contracts/part.md](contracts/part.md), [contracts/red-robot.md](contracts/red-robot.md)); cada
-nome encontrado deve existir na classe Rust com o mesmo nome.
+Run the "Verification before the commit" section of the port's contract
+([contracts/part.md](contracts/part.md), [contracts/red-robot.md](contracts/red-robot.md)); each
+name found must exist in the Rust class with the same name.
 
-No port 2, conferir também que `player.rs` só mudou em visibilidade:
+In port 2, also check that `player.rs` only changed in visibility:
 
 ```bash
 git diff HEAD -- oxide_godot_core/oxide_godot_lib/src/player.rs | grep '^[-+]' | grep -v '^[-+][-+]'
-# esperado: exatamente 2 linhas — "-    fn add_camera_shake_trauma(" e "+    pub(crate) fn add_camera_shake_trauma("
+# expected: exactly 2 lines — "-    fn add_camera_shake_trauma(" and "+    pub(crate) fn add_camera_shake_trauma("
 ```
 
-E que `part.rs` **não** mudou no port 2 (`git diff --stat HEAD -- .../part.rs` vazio — o
-`pub(crate)` de `explode` já entrou no port 1).
+And that `part.rs` did **not** change in port 2 (`git diff --stat HEAD -- .../part.rs` empty — the
+`pub(crate)` of `explode` already went in with port 1).
 
-### 6. Validação visual (usuário, no editor/jogo)
+### 6. Visual validation (user, in the editor/game)
 
-Abrir o projeto no editor, rodar (F5), entrar no level e conferir o item do port na tabela
-"Validação visual por script" do [plan.md](plan.md), comparando com `../oxide_godot_origins/`.
-Ao abrir `red_robot.tscn` no editor: (port 1) os 3 nodes `PartShield1/2`, `PartHead` com tipo
-`Part`, sem script, `freeze` marcado e `MultiplayerSynchronizer` filho com `public_visibility`
-desmarcado; (port 2) raiz `RedRobot`, sem script, `MultiplayerSynchronizer` com a
-`replication_config`, conexões da `PlayerDetectionArea` no painel de sinais.
+Open the project in the editor, run (F5), enter the level and check the port's item in the table
+"Visual validation per script" of [plan.md](plan.md), comparing with `../oxide_godot_origins/`.
+When opening `red_robot.tscn` in the editor: (port 1) the 3 nodes `PartShield1/2`, `PartHead` with type
+`Part`, no script, `freeze` checked and child `MultiplayerSynchronizer` with `public_visibility`
+unchecked; (port 2) root `RedRobot`, no script, `MultiplayerSynchronizer` with the
+`replication_config`, connections of the `PlayerDetectionArea` in the signals panel.
 
-### 7. Backlog v2
+### 7. v2 backlog
 
-Adicionar em `docs/v2-backlog.md` os candidatos de research.md §"Backlog v2 candidato"
-atribuídos a **este** script (port 1: item 15; port 2: itens 16–18), **antes** do commit.
-Numeração continua de 15.
+Add to `docs/v2-backlog.md` the candidates from research.md §"Candidate v2 backlog"
+assigned to **this** script (port 1: item 15; port 2: items 16–18), **before** the commit.
+Numbering continues from 15.
 
 ### 8. Commit
 
-Um commit por script, na `main`, incluindo: módulo Rust novo + `lib.rs` (+ no port 2,
-`player.rs` só visibilidade), `red_robot.tscn` editada, `.gd` + `.gd.uid` apagados,
-`docs/v2-backlog.md`. Autor: the repository author. Mensagem:
+One commit per script, on `main`, including: new Rust module + `lib.rs` (+ in port 2,
+`player.rs` visibility only), edited `red_robot.tscn`, `.gd` + `.gd.uid` deleted,
+`docs/v2-backlog.md`. Message:
 
 ```
 Port part.gd → Part (RigidBody3D); red_robot.tscn: nodes Death/PartShield1, Death/PartShield2, Death/PartHead type="RigidBody3D"→"Part"
 
-- <notas: decisões de tradução, quirks preservados>
-- backlog v2: item 15
+- <notes: translation decisions, quirks preserved>
+- v2 backlog: item 15
 ```
 
 ```
 Port red_robot.gd → EnemyRobot (CharacterBody3D); red_robot.tscn: node EnemyRobot type="CharacterBody3D"→"EnemyRobot"
 
-- <notas>
-- player.rs: só visibilidade pub(crate) em add_camera_shake_trauma (acesso tipado do robô, FR-018); nenhuma lógica movida
-- backlog v2: itens 16, 17, 18
+- <notes>
+- player.rs: pub(crate) visibility only on add_camera_shake_trauma (typed access from the robot, FR-018); no logic moved
+- v2 backlog: items 16, 17, 18
 ```
 
-`docs/upstream-bugs.md` **não** muda (nenhuma correção prevista). Se um defeito objetivo for
-encontrado, parar e reportar — a cláusula exige declaração na spec antes do commit.
+`docs/upstream-bugs.md` does **not** change (no fix planned). If an objective defect is
+found, stop and report — the clause requires a declaration in the spec before the commit.
 
-## Verificação final do marco (após o 2º commit)
+## Final verification of the milestone (after the 2nd commit)
 
 ```bash
-find oxide-godot -name '*.gd' -not -path '*/addons/*' | wc -l          # esperado: 5
-find oxide-godot -name '*.gd.uid' -not -path '*/addons/*' | wc -l      # esperado: 5
-git diff --stat 4bb8f7f -- 'oxide-godot/**/*.gd'                       # esperado: só 2 deleções (part.gd, red_robot.gd)
-git log --oneline 4bb8f7f..HEAD | grep -c '^[0-9a-f]* Port '           # esperado: 2
-ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 10 módulos (… player, bullet, door, part, red_robot)
-grep -c '^| [12] ' docs/upstream-bugs.md                               # 2 (porta + peça)
-git diff --stat 4bb8f7f -- CLAUDE.md docs/upstream-bugs.md             # esperado: vazio
+find oxide-godot -name '*.gd' -not -path '*/addons/*' | wc -l          # expected: 5
+find oxide-godot -name '*.gd.uid' -not -path '*/addons/*' | wc -l      # expected: 5
+git diff --stat 4bb8f7f -- 'oxide-godot/**/*.gd'                       # expected: only 2 deletions (part.gd, red_robot.gd)
+git log --oneline 4bb8f7f..HEAD | grep -c '^[0-9a-f]* Port '           # expected: 2
+ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 10 modules (… player, bullet, door, part, red_robot)
+grep -c '^| [12] ' docs/upstream-bugs.md                               # 2 (door + part)
+git diff --stat 4bb8f7f -- CLAUDE.md docs/upstream-bugs.md             # expected: empty
 grep -c '^| [0-9]' docs/v2-backlog.md                                  # 18
-# FR-018: nenhuma API customizada de GDScript
-grep -nE '\.call\(|\.call_deferred\(|get_script' oxide_godot_core/oxide_godot_lib/src/part.rs oxide_godot_core/oxide_godot_lib/src/red_robot.rs   # vazio
-grep -nE '\.get\("' oxide_godot_core/oxide_godot_lib/src/red_robot.rs   # só "parameters/aim/blend_position", "position", "collider"
-grep -nE '\.set\("' oxide_godot_core/oxide_godot_lib/src/red_robot.rs   # só "parameters/…" (+ o set(&param, …) do hit)
+# FR-018: no custom GDScript API
+grep -nE '\.call\(|\.call_deferred\(|get_script' oxide_godot_core/oxide_godot_lib/src/part.rs oxide_godot_core/oxide_godot_lib/src/red_robot.rs   # empty
+grep -nE '\.get\("' oxide_godot_core/oxide_godot_lib/src/red_robot.rs   # only "parameters/aim/blend_position", "position", "collider"
+grep -nE '\.set\("' oxide_godot_core/oxide_godot_lib/src/red_robot.rs   # only "parameters/…" (+ the set(&param, …) of hit)
 ```
 
-E, no jogo (SC-002): robôs patrulham/viram, miram com laser clipado, atiram (impacto + tremor
-13,0 ao acertar), reagem a tiros (animação + som), morrem no 5º tiro (peças voam, faíscas, som,
-fade + puff entre 3 e 6,5 s), respawn 15 s depois — idênticos ao original.
+And, in the game (SC-002): robots patrol/turn, aim with laser clipped, shoot (impact + shake
+13.0 on hit), react to shots (animation + sound), die on the 5th shot (parts fly, sparks, sound,
+fade + puff between 3 and 6.5 s), respawn 15 s later — identical to the original.

@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Marco E — autoload Settings (v1 raw port)
+# Specification Quality Checklist: Milestone E — Settings autoload (v1 raw port)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-16
@@ -31,11 +31,11 @@
 
 ## Notes
 
-- Convenção do projeto (Marcos A–D): por ser um port linha a linha regido pela constituição, a spec
-  cita o script original por linha (`settings.gd:NN`) e os sítios de acesso dos consumidores — é o
-  contrato de comportamento, não detalhe de implementação. Assinaturas da API de destino, nome do
-  módulo e a decisão sobre expor os enums ficam para o plan.
-- Dois pontos do input do comando foram ajustados ao comportamento **real** de `settings.gd`
-  (Princípio I): (1) o SSAO é `if`/`if`/`else` (não `if`/`elif`/`else`) — com −1 o SSAO termina
-  ligado em qualidade média; (2) `load_settings` não grava o arquivo — `user://settings.ini` só
-  nasce no primeiro `save_settings` (Apply). Ambos registrados em Edge Cases/FR-003/FR-007.
+- Project convention (Milestones A–D): since this is a line-by-line port governed by the constitution, the spec
+  cites the original script by line (`settings.gd:NN`) and the consumers' access sites — it is the
+  behavior contract, not an implementation detail. Target API signatures, module name
+  and the decision about exposing the enums are left to the plan.
+- Two points of the command input were adjusted to the **actual** behavior of `settings.gd`
+  (Principle I): (1) SSAO is `if`/`if`/`else` (not `if`/`elif`/`else`) — with −1 SSAO ends up
+  enabled at medium quality; (2) `load_settings` does not write the file — `user://settings.ini` is only
+  born on the first `save_settings` (Apply). Both recorded in Edge Cases/FR-003/FR-007.

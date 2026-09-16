@@ -1,4 +1,4 @@
-# Feature Specification: Marco A — folhas e input do jogador (v1 raw port)
+# Feature Specification: Milestone A — leaves and player input (v1 raw port)
 
 **Feature Branch**: `001-v1-leaves-and-input`
 
@@ -6,223 +6,223 @@
 
 **Status**: Draft
 
-**Fase**: v1 — Raw Port (Princípio I da constituição). Nenhuma abstração, refatoração ou otimização é permitida nesta feature; melhorias percebidas vão para `docs/v2-backlog.md`.
+**Phase**: v1 — Raw Port (Principle I of the constitution). No abstraction, refactoring or optimization is allowed in this feature; improvements noticed go to `docs/v2-backlog.md`.
 
-**Input**: User description: "Marco A do porte — portar para Rust os 5 scripts folha e o input do jogador do Godot TPS Demo, mantendo o jogo jogável e com comportamento idêntico ao original a cada script portado. Insumo: docs/port-order.md, itens 1 a 5 da ordem de migração."
+**Input**: User description: "Milestone A of the port — port to Rust the 5 leaf scripts and the player input of the Godot TPS Demo, keeping the game playable and with behavior identical to the original at each ported script. Input: docs/port-order.md, items 1 to 5 of the migration order."
 
-## Contexto
+## Context
 
-O projeto é a migração do Godot TPS Demo (15 scripts) para código nativo, script por script, mantendo o jogo jogável ao final de cada passo. `docs/port-order.md` define a ordem de baixo para cima; este marco cobre os itens 1 a 5 — os scripts que não dependem de nenhum outro e que podem ser trocados individualmente enquanto os 10 restantes continuam no original. Cada um dos cinco é entregue como um passo independente, verificável sozinho, com o jogo jogável antes e depois.
+The project is the migration of the Godot TPS Demo (15 scripts) to native code, script by script, keeping the game playable at the end of each step. `docs/port-order.md` defines the bottom-up order; this milestone covers items 1 to 5 — the scripts that depend on no other and that can be swapped individually while the 10 remaining ones stay in the original. Each of the five is delivered as an independent step, verifiable on its own, with the game playable before and after.
 
-Os cinco scripts, na ordem de entrega:
+The five scripts, in delivery order:
 
-| # | Script original | Node/cena afetada | Linhas |
+| # | Original script | Affected node/scene | Lines |
 |---|---|---|---|
-| 1 | `level/debug.gd` | `Debug` (Label) em `level/level.tscn` | 15 |
-| 2 | `enemies/red_robot/parts/part_disappear_effect/part_disappear.gd` | raiz de `part_disappear.tscn` (CPUParticles3D) | 9 |
-| 3 | `enemies/red_robot/laser/impact_effect/blast.gd` | raiz de `impact_effect.tscn` (Node3D) | 15 |
-| 4 | `player/camera_noise_shake_effect.gd` | `Camera3D` em `player/player.tscn` | 61 |
-| 5 | `player/player_input.gd` (`class_name PlayerInputSynchronizer`) | `InputSynchronizer` (MultiplayerSynchronizer) em `player/player.tscn` | 142 |
+| 1 | `level/debug.gd` | `Debug` (Label) in `level/level.tscn` | 15 |
+| 2 | `enemies/red_robot/parts/part_disappear_effect/part_disappear.gd` | root of `part_disappear.tscn` (CPUParticles3D) | 9 |
+| 3 | `enemies/red_robot/laser/impact_effect/blast.gd` | root of `impact_effect.tscn` (Node3D) | 15 |
+| 4 | `player/camera_noise_shake_effect.gd` | `Camera3D` in `player/player.tscn` | 61 |
+| 5 | `player/player_input.gd` (`class_name PlayerInputSynchronizer`) | `InputSynchronizer` (MultiplayerSynchronizer) in `player/player.tscn` | 142 |
 
-Referência de comportamento: o projeto original intocado em `../oxide_godot_origins/`.
+Behavior reference: the untouched original project in `../oxide_godot_origins/`.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Overlay de debug (F3) portado (Priority: P1)
+### User Story 1 - Debug overlay (F3) ported (Priority: P1)
 
-O jogador está dentro do level e pressiona F3: um painel de texto aparece (ou desaparece, se já estava visível) mostrando FPS, estado do VSync, memória estática em MiB, se a sessão está online e — só quando online — o ID multiplayer. Os valores mudam a cada frame. Tudo exatamente como no original, mas sem o script original no projeto.
+The player is inside the level and presses F3: a text panel appears (or disappears, if it was already visible) showing FPS, VSync state, static memory in MiB, whether the session is online and — only when online — the multiplayer ID. The values change every frame. All exactly as in the original, but without the original script in the project.
 
-**Why this priority**: É o menor script, sem dependências e sem estado, e introduz a mecânica básica que todos os outros passos reutilizam (processamento por frame, leitura de input, troca de tipo de node numa cena existente, remoção do script). Serve de prova do ciclo de porte completo com risco mínimo.
+**Why this priority**: It is the smallest script, with no dependencies and no state, and introduces the basic mechanics that all the other steps reuse (per-frame processing, input reading, node type swap in an existing scene, script removal). It serves as proof of the complete port cycle with minimal risk.
 
-**Independent Test**: Abrir o jogo, entrar no level, pressionar F3 repetidas vezes e comparar o painel com o do original lado a lado. Validação headless: import do projeto confirmando a extensão carregada e execução de `level/level.tscn` sem erros novos.
+**Independent Test**: Open the game, enter the level, press F3 repeatedly and compare the panel with the original's side by side. Headless validation: project import confirming the extension loaded and run of `level/level.tscn` with no new errors.
 
 **Acceptance Scenarios**:
 
-1. **Given** o jogador está no level com o overlay no estado inicial da cena, **When** pressiona F3, **Then** a visibilidade do overlay inverte; pressionando de novo, volta ao estado anterior.
-2. **Given** o overlay está visível, **When** um frame se passa, **Then** o texto mostra, em linhas separadas: `FPS: <n>`, `VSync: Enabled|Disabled`, `Memory: <x.xx> MiB` (duas casas decimais) e `Online: Yes|No`.
-3. **Given** a sessão está offline (single-player), **When** o overlay é exibido, **Then** mostra `Online: No` e não mostra a linha de ID multiplayer.
-4. **Given** a sessão está online, **When** o overlay é exibido, **Then** mostra `Online: Yes` seguido de `Multiplayer ID: <id>`.
-5. **Given** o overlay está oculto, **When** frames se passam, **Then** o texto continua sendo atualizado (como no original), de modo que ao reaparecer já mostra valores atuais.
+1. **Given** the player is in the level with the overlay in the scene's initial state, **When** F3 is pressed, **Then** the overlay's visibility inverts; pressing again, it returns to the previous state.
+2. **Given** the overlay is visible, **When** a frame passes, **Then** the text shows, on separate lines: `FPS: <n>`, `VSync: Enabled|Disabled`, `Memory: <x.xx> MiB` (two decimal places) and `Online: Yes|No`.
+3. **Given** the session is offline (single-player), **When** the overlay is displayed, **Then** it shows `Online: No` and does not show the multiplayer ID line.
+4. **Given** the session is online, **When** the overlay is displayed, **Then** it shows `Online: Yes` followed by `Multiplayer ID: <id>`.
+5. **Given** the overlay is hidden, **When** frames pass, **Then** the text keeps being updated (as in the original), so that when it reappears it already shows current values.
 
 ---
 
-### User Story 2 - Efeito de desaparecimento de peça portado (Priority: P2)
+### User Story 2 - Part disappear effect ported (Priority: P2)
 
-Quando um robô é destruído, suas peças caem e, ao sumirem, cada uma dispara um efeito de partículas: uma explosão de "mini blasts" imediata, seguida de um sopro de fumaça que começa 0,2 s depois, e o efeito se remove sozinho da cena passado 2× a própria duração de vida das partículas.
+When a robot is destroyed, its parts fall and, when they disappear, each one fires a particle effect: an immediate burst of "mini blasts", followed by a puff of smoke that starts 0.2 s later, and the effect removes itself from the scene after 2× the particles' own lifetime.
 
-**Why this priority**: Nove linhas, sem dependências, e introduz o primeiro comportamento baseado em tempo (esperas encadeadas) e auto-remoção da cena — capacidade necessária para os passos 3 e 4.
+**Why this priority**: Nine lines, no dependencies, and introduces the first time-based behavior (chained waits) and self-removal from the scene — a capability needed for steps 3 and 4.
 
-**Independent Test**: Destruir um robô no level e observar cada peça sumir com o puff, comparando com o original. Validação headless: execução de `part_disappear.tscn` sem erros novos.
+**Independent Test**: Destroy a robot in the level and watch each part disappear with the puff, comparing with the original. Headless validation: run of `part_disappear.tscn` with no new errors.
 
 **Acceptance Scenarios**:
 
-1. **Given** o efeito é instanciado e entra na cena, **When** o primeiro frame roda, **Then** o filho `MiniBlasts` começa a emitir imediatamente e o emissor principal ainda não emite.
-2. **Given** o efeito está na cena há 0,2 s, **When** esse instante é atingido, **Then** o emissor principal começa a emitir.
-3. **Given** o emissor principal tem `lifetime` L, **When** transcorrem 0,2 s + 2×L desde a entrada na cena, **Then** o node do efeito é removido da cena.
-4. **Given** o efeito está em andamento, **When** observado ao lado do original nas mesmas condições, **Then** os tempos e a aparência são indistinguíveis.
+1. **Given** the effect is instantiated and enters the scene, **When** the first frame runs, **Then** the child `MiniBlasts` starts emitting immediately and the main emitter does not emit yet.
+2. **Given** the effect has been in the scene for 0.2 s, **When** that instant is reached, **Then** the main emitter starts emitting.
+3. **Given** the main emitter has `lifetime` L, **When** 0.2 s + 2×L elapse since entering the scene, **Then** the effect node is removed from the scene.
+4. **Given** the effect is in progress, **When** observed next to the original under the same conditions, **Then** the timings and appearance are indistinguishable.
 
 ---
 
-### User Story 3 - Impacto do laser portado (Priority: P3)
+### User Story 3 - Laser impact ported (Priority: P3)
 
-Quando o laser do robô atinge algo, aparece um efeito de impacto animado: a cada frame, os "raios de luz" do efeito se orientam para a câmera ativa (se ela ainda existir), e o efeito se remove da cena assim que sua animação termina.
+When the robot's laser hits something, an animated impact effect appears: every frame, the effect's "light rays" orient toward the active camera (if it still exists), and the effect removes itself from the scene as soon as its animation ends.
 
-**Why this priority**: Quinze linhas, sem dependências. Introduz a resposta a um sinal (fim de animação), referência a nodes filhos e consulta à câmera ativa — capacidades usadas pelos passos 4 e 5.
+**Why this priority**: Fifteen lines, no dependencies. Introduces the response to a signal (end of animation), references to child nodes and querying the active camera — capabilities used by steps 4 and 5.
 
-**Independent Test**: Deixar o robô atirar no jogador ou numa parede e observar o impacto orientado para a câmera e sumindo ao fim da animação, comparando com o original. Validação headless: execução de `impact_effect.tscn` sem erros novos.
+**Independent Test**: Let the robot shoot at the player or at a wall and watch the impact oriented toward the camera and disappearing at the end of the animation, comparing with the original. Headless validation: run of `impact_effect.tscn` with no new errors.
 
 **Acceptance Scenarios**:
 
-1. **Given** existe uma câmera ativa quando o efeito entra na cena, **When** cada frame roda, **Then** o filho `LightRays` fica orientado para a posição global da câmera.
-2. **Given** a câmera capturada na entrada foi destruída, **When** frames seguintes rodam, **Then** o efeito continua sem orientar os raios e sem produzir erros.
-3. **Given** o efeito está na cena, **When** a animação do `AnimationPlayer` termina, **Then** o node do efeito é removido da cena.
-4. **Given** não há câmera ativa no momento em que o efeito entra na cena, **When** o efeito roda, **Then** ele anima e some normalmente, sem orientar os raios e sem erros.
+1. **Given** there is an active camera when the effect enters the scene, **When** each frame runs, **Then** the child `LightRays` stays oriented toward the camera's global position.
+2. **Given** the camera captured on entry has been destroyed, **When** subsequent frames run, **Then** the effect continues without orienting the rays and without producing errors.
+3. **Given** the effect is in the scene, **When** the `AnimationPlayer`'s animation ends, **Then** the effect node is removed from the scene.
+4. **Given** there is no active camera at the moment the effect enters the scene, **When** the effect runs, **Then** it animates and disappears normally, without orienting the rays and without errors.
 
 ---
 
-### User Story 4 - Tremor de câmera portado (Priority: P4)
+### User Story 4 - Camera shake ported (Priority: P4)
 
-Ao atirar, ao ser atingido pela bala de outro jogador ou ao ser acertado pelo laser do robô, a câmera do jogador treme: um "trauma" se acumula (limitado a 1,2), decai a 1,5 por segundo, e enquanto houver trauma a câmera recebe uma rotação de guinada/arfagem/rolagem por ruído proporcional ao quadrado do trauma, somada à sua rotação inicial. O restante do jogo (ainda no original) continua chamando `add_trauma(...)` com 0,35 ao atirar, 0,75 ao ser atingido (RPC `hit`, disparado por `bullet.gd` — só alcançável em multiplayer, pois as balas do próprio jogador têm exceção de colisão com ele) e 13,0 quando o laser do robô acerta o jogador, sem nenhuma alteração.
+When shooting, when hit by another player's bullet or when hit by the robot's laser, the player's camera shakes: a "trauma" accumulates (capped at 1.2), decays at 1.5 per second, and while there is trauma the camera receives a yaw/pitch/roll rotation from noise proportional to the square of the trauma, added to its initial rotation. The rest of the game (still in the original) keeps calling `add_trauma(...)` with 0.35 when shooting, 0.75 when hit (RPC `hit`, triggered by `bullet.gd` — only reachable in multiplayer, since the player's own bullets have a collision exception with them) and 13.0 when the robot's laser hits the player, without any change.
 
-**Why this priority**: Primeiro script cuja API é chamada por código que permanece no original (`player.gd`, `red_robot.gd`). Comprova que a interface pública (nome de método) sobrevive à troca de tipo do node. Também introduz estado interno persistente e geração de ruído.
+**Why this priority**: First script whose API is called by code that remains in the original (`player.gd`, `red_robot.gd`). It proves that the public interface (method name) survives the node type swap. It also introduces persistent internal state and noise generation.
 
-**Independent Test**: Atirar e ser acertado pelo laser do robô no level (o nível 0,75 é verificado por leitura de código — exige multiplayer); a câmera deve tremer com a mesma intensidade e duração que no original e voltar exatamente à rotação inicial ao final. Validação headless: execução de `player/player.tscn` sem erros novos.
+**Independent Test**: Shoot and get hit by the robot's laser in the level (the 0.75 level is verified by code reading — requires multiplayer); the camera must shake with the same intensity and duration as in the original and return exactly to the initial rotation at the end. Headless validation: run of `player/player.tscn` with no new errors.
 
 **Acceptance Scenarios**:
 
-1. **Given** trauma = 0, **When** `add_trauma(0.35)` é chamado, **Then** trauma = 0,35 e a câmera começa a tremer no frame seguinte.
-2. **Given** trauma = 1,0, **When** `add_trauma(13.0)` é chamado, **Then** trauma = 1,2 (teto), não mais.
-3. **Given** trauma > 0, **When** um frame de duração `delta` roda, **Then** trauma diminui 1,5×`delta` (sem ficar negativo) e a rotação da câmera = rotação inicial + (arfagem, guinada, rolagem) onde cada componente = limite × trauma² × ruído em [-1, 1], com limites 0,05 (guinada), 0,05 (arfagem) e 0,1 (rolagem).
-4. **Given** trauma acaba de chegar a 0 num frame, **When** esse frame termina, **Then** a rotação da câmera é exatamente a rotação inicial (ruído × 0) e nos frames seguintes a câmera não é mais alterada.
-5. **Given** o script `player.gd` e o `red_robot.gd` continuam no original, **When** o jogador atira, é atingido pela bala de outro jogador (multiplayer) ou é acertado pelo laser do robô, **Then** as chamadas existentes a `add_camera_shake_trauma`/`add_trauma` funcionam sem qualquer edição nesses scripts.
-6. **Given** duas execuções do jogo, **When** o tremor acontece, **Then** o padrão de ruído pode diferir entre execuções (semente aleatória, como no original), mas a intensidade e duração são as mesmas.
+1. **Given** trauma = 0, **When** `add_trauma(0.35)` is called, **Then** trauma = 0.35 and the camera starts shaking on the next frame.
+2. **Given** trauma = 1.0, **When** `add_trauma(13.0)` is called, **Then** trauma = 1.2 (cap), no more.
+3. **Given** trauma > 0, **When** a frame of duration `delta` runs, **Then** trauma decreases by 1.5×`delta` (without going negative) and the camera rotation = initial rotation + (pitch, yaw, roll) where each component = limit × trauma² × noise in [-1, 1], with limits 0.05 (yaw), 0.05 (pitch) and 0.1 (roll).
+4. **Given** trauma has just reached 0 in a frame, **When** that frame ends, **Then** the camera rotation is exactly the initial rotation (noise × 0) and on the following frames the camera is no longer changed.
+5. **Given** the script `player.gd` and `red_robot.gd` remain in the original, **When** the player shoots, is hit by another player's bullet (multiplayer) or is hit by the robot's laser, **Then** the existing calls to `add_camera_shake_trauma`/`add_trauma` work without any edit to those scripts.
+6. **Given** two runs of the game, **When** the shake happens, **Then** the noise pattern may differ between runs (random seed, as in the original), but the intensity and duration are the same.
 
 ---
 
-### User Story 5 - Sincronizador de input do jogador portado (Priority: P5)
+### User Story 5 - Player input synchronizer ported (Priority: P5)
 
-Todo o input do jogador — mover, olhar (analógico e mouse), mirar (toggle por toque curto ou hold), pular, atirar com alvo por raycast — e o fade para preto ao cair do mapa passam a ser produzidos pelo node portado. O `player.gd`, que continua no original, lê as mesmas propriedades (`aiming`, `shoot_target`, `motion`, `shooting`, `jumping`) e chama os mesmos métodos (`get_aim_rotation()`, `get_camera_base_quaternion()`, `get_camera_rotation_basis()`) sem nenhuma alteração. As quatro primeiras propriedades continuam sendo replicadas pela configuração de sincronização já existente na cena.
+All player input — move, look (analog stick and mouse), aim (toggle by short tap or hold), jump, shoot with raycast target — and the fade to black when falling off the map are now produced by the ported node. `player.gd`, which remains in the original, reads the same properties (`aiming`, `shoot_target`, `motion`, `shooting`, `jumping`) and calls the same methods (`get_aim_rotation()`, `get_camera_base_quaternion()`, `get_camera_rotation_basis()`) without any change. The first four properties keep being replicated by the synchronization configuration already existing in the scene.
 
-**Why this priority**: É o maior e mais rico dos cinco scripts (RPC, propriedades replicadas, referências a nodes preenchidas pela cena, raycast, input contínuo e por evento) e depende de todas as capacidades provadas nos passos anteriores. Ao mesmo tempo é o de maior valor: ele é a metade da experiência de jogo, e é pré-requisito direto do Marco B (`player.gd`).
+**Why this priority**: It is the largest and richest of the five scripts (RPC, replicated properties, node references filled in by the scene, raycast, continuous and event-based input) and depends on all the capabilities proven in the previous steps. At the same time it is the most valuable: it is half of the gameplay experience, and it is a direct prerequisite of Milestone B (`player.gd`).
 
-**Independent Test**: Entrar no level em single-player e exercitar cada input, comparando com o original: velocidade de giro da câmera com analógico e mouse (e as reduções ao mirar), limite de pitch, toggle e hold de mira com as animações "shoot"/"far", pulo, tiro acertando o ponto sob o crosshair, queda pelo buraco do mapa com fade para preto e retorno com fade-out. Validação headless: execução de `player/player.tscn` sem erros novos.
+**Independent Test**: Enter the level in single-player and exercise each input, comparing with the original: camera turn speed with analog stick and mouse (and the reductions while aiming), pitch limit, aim toggle and hold with the "shoot"/"far" animations, jump, shot hitting the point under the crosshair, falling through the hole in the map with fade to black and return with fade-out. Headless validation: run of `player/player.tscn` with no new errors.
 
 **Acceptance Scenarios**:
 
-1. **Given** o node é a autoridade multiplayer (caso single-player), **When** ele entra na cena, **Then** sua câmera se torna a câmera ativa e o mouse é capturado.
-2. **Given** o node NÃO é a autoridade multiplayer, **When** ele entra na cena, **Then** ele para de processar frames e input, e o retângulo de fade fica oculto.
-3. **Given** o jogador segura `move_right`, **When** um frame roda, **Then** `motion` = (1, 0); com `move_forward`, `motion` = (0, -1); combinações e intensidades analógicas produzem o vetor correspondente (direita−esquerda, trás−frente).
-4. **Given** o jogador desloca o analógico de visão com intensidade 1 por 1 s sem mirar, **When** os frames rodam, **Then** a câmera gira 3,0 rad em guinada; mirando, 1,5 rad.
-5. **Given** o mouse se move N pixels, **When** o evento é recebido, **Then** a câmera gira 0,001×N rad sem mirar e 0,00075×N rad mirando.
-6. **Given** a câmera está olhando para cima ou para baixo, **When** o jogador continua girando verticalmente, **Then** o pitch é limitado ao intervalo [-89,9°, 70°].
-7. **Given** o jogador não está mirando, **When** pressiona e solta `aim` em menos de 0,4 s, **Then** a mira fica ligada (toggle) e a animação de câmera "shoot" toca; ao pressionar `aim` de novo, a mira desliga e "far" toca.
-8. **Given** o jogador não está mirando, **When** segura `aim` por mais de 0,4 s e solta, **Then** a mira fica ligada enquanto segura e desliga ao soltar ("shoot" ao ligar, "far" ao desligar).
-9. **Given** o jogador pressiona `jump`, **When** o frame roda, **Then** um RPC local `jump` é disparado e `jumping` passa a `true` (o `player.gd` original o consome e reseta, sem alteração).
-10. **Given** o jogador segura `shoot`, **When** o frame roda, **Then** `shooting` = true e `shoot_target` = ponto de colisão do raio lançado do centro do crosshair (alcance 1000, máscara de camadas 0b11, sem exclusão efetiva — quirk do original, ver FR-017); se nada é atingido, `shoot_target` = origem + direção × 1000.
-11. **Given** o jogador cai e sua altura fica abaixo de −17, **When** o frame roda, **Then** a opacidade do retângulo preto = min((−17 − y)/15, 1) — totalmente preto em y ≤ −32.
-12. **Given** o jogador foi teleportado de volta (y ≥ −17) com o retângulo ainda opaco, **When** frames rodam, **Then** a opacidade é multiplicada por (1 − 4×`delta`) a cada frame até desaparecer gradualmente.
-13. **Given** `player.gd` continua no original, **When** ele lê `aiming`, `shoot_target`, `motion`, `shooting`, `jumping` e chama `get_aim_rotation()`, `get_camera_base_quaternion()`, `get_camera_rotation_basis()`, **Then** tudo funciona sem nenhuma edição em `player.gd`.
-14. **Given** a cena `player.tscn` preenche `camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect` via `node_paths`, **When** a cena é carregada, **Then** todas as seis referências estão preenchidas no node portado (mesmos nomes e tipos compatíveis).
-15. **Given** `get_aim_rotation()` é chamado, **When** o pitch da câmera é ≥ 0, **Then** retorna −pitch/70°; quando < 0, retorna pitch/(−89,9°) — ou seja, valor em [−1, 1] normalizado pelos limites.
+1. **Given** the node is the multiplayer authority (single-player case), **When** it enters the scene, **Then** its camera becomes the active camera and the mouse is captured.
+2. **Given** the node is NOT the multiplayer authority, **When** it enters the scene, **Then** it stops processing frames and input, and the fade rectangle is hidden.
+3. **Given** the player holds `move_right`, **When** a frame runs, **Then** `motion` = (1, 0); with `move_forward`, `motion` = (0, -1); combinations and analog intensities produce the corresponding vector (right−left, back−forward).
+4. **Given** the player deflects the look stick with intensity 1 for 1 s without aiming, **When** the frames run, **Then** the camera turns 3.0 rad in yaw; while aiming, 1.5 rad.
+5. **Given** the mouse moves N pixels, **When** the event is received, **Then** the camera turns 0.001×N rad without aiming and 0.00075×N rad while aiming.
+6. **Given** the camera is looking up or down, **When** the player keeps turning vertically, **Then** the pitch is limited to the range [-89.9°, 70°].
+7. **Given** the player is not aiming, **When** `aim` is pressed and released in less than 0.4 s, **Then** aim stays on (toggle) and the "shoot" camera animation plays; when `aim` is pressed again, aim turns off and "far" plays.
+8. **Given** the player is not aiming, **When** `aim` is held for more than 0.4 s and released, **Then** aim stays on while holding and turns off on release ("shoot" when turning on, "far" when turning off).
+9. **Given** the player presses `jump`, **When** the frame runs, **Then** a local RPC `jump` is fired and `jumping` becomes `true` (the original `player.gd` consumes and resets it, without change).
+10. **Given** the player holds `shoot`, **When** the frame runs, **Then** `shooting` = true and `shoot_target` = collision point of the ray cast from the center of the crosshair (range 1000, layer mask 0b11, no effective exclusion — quirk of the original, see FR-017); if nothing is hit, `shoot_target` = origin + direction × 1000.
+11. **Given** the player falls and their height goes below −17, **When** the frame runs, **Then** the opacity of the black rectangle = min((−17 − y)/15, 1) — fully black at y ≤ −32.
+12. **Given** the player has been teleported back (y ≥ −17) with the rectangle still opaque, **When** frames run, **Then** the opacity is multiplied by (1 − 4×`delta`) every frame until it gradually disappears.
+13. **Given** `player.gd` remains in the original, **When** it reads `aiming`, `shoot_target`, `motion`, `shooting`, `jumping` and calls `get_aim_rotation()`, `get_camera_base_quaternion()`, `get_camera_rotation_basis()`, **Then** everything works without any edit to `player.gd`.
+14. **Given** the scene `player.tscn` fills in `camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect` via `node_paths`, **When** the scene is loaded, **Then** all six references are filled in on the ported node (same names and compatible types).
+15. **Given** `get_aim_rotation()` is called, **When** the camera pitch is ≥ 0, **Then** it returns −pitch/70°; when < 0, it returns pitch/(−89.9°) — that is, a value in [−1, 1] normalized by the limits.
 
 ---
 
 ### Edge Cases
 
-- **Overlay oculto**: o texto do overlay continua sendo recalculado a cada frame mesmo invisível (comportamento do original; não otimizar).
-- **F3 fora do level**: a ação `toggle_debug` só tem efeito quando o node `Debug` existe na cena atual (menu não tem overlay).
-- **Efeito de peça removido antes dos timers**: se a cena for descarregada antes de 0,2 s ou de 2×lifetime, o efeito não deve produzir erros novos além dos que o original produziria.
-- **Câmera destruída durante o impacto** (ex.: jogador trocado de cena): os raios param de se orientar sem erros.
-- **Trauma acumulado acima do teto**: qualquer soma acima de 1,2 é truncada em 1,2.
-- **Rotação inicial da câmera**: é capturada quando a câmera entra na cena; se outras animações moverem a câmera depois, o tremor continua somando à rotação inicial capturada (quirk do original, preservado).
-- **Peer não-autoridade**: nenhum input é processado, nenhum evento de mouse é tratado, e o fade permanece oculto.
-- **Mira: pressionar `aim` enquanto já em toggle**: desliga o toggle (o toque que desliga não religa).
-- **Mira: toque exatamente em 0,4 s**: conta como toque curto (≤ 0,4 s liga o toggle).
-- **Raycast sem colisão**: alvo vira o ponto a 1000 unidades na direção do olhar.
-- **Raycast atingindo o próprio jogador**: a lista de exclusão do original resolve para um RID inválido (nenhuma exclusão efetiva), e o corpo do jogador está na máscara 0b11; se o raio atingir o próprio corpo, `shoot_target` é esse ponto — comportamento do original, preservado (não corrigir).
-- **Pitch nos limites**: continuar girando além de −89,9° ou 70° não altera o pitch.
-- **Fade sem queda**: com y ≥ −17 e opacidade já 0, a multiplicação por (1 − 4×delta) mantém 0.
+- **Hidden overlay**: the overlay text keeps being recomputed every frame even while invisible (behavior of the original; do not optimize).
+- **F3 outside the level**: the `toggle_debug` action only has an effect when the `Debug` node exists in the current scene (the menu has no overlay).
+- **Part effect removed before the timers**: if the scene is unloaded before 0.2 s or before 2×lifetime, the effect must not produce new errors beyond those the original would produce.
+- **Camera destroyed during the impact** (e.g. player switched scene): the rays stop orienting without errors.
+- **Trauma accumulated above the cap**: any sum above 1.2 is truncated to 1.2.
+- **Camera initial rotation**: it is captured when the camera enters the scene; if other animations move the camera afterwards, the shake keeps adding to the captured initial rotation (quirk of the original, preserved).
+- **Non-authority peer**: no input is processed, no mouse event is handled, and the fade remains hidden.
+- **Aim: pressing `aim` while already toggled**: turns the toggle off (the tap that turns it off does not turn it back on).
+- **Aim: tap of exactly 0.4 s**: counts as a short tap (≤ 0.4 s turns the toggle on).
+- **Raycast without collision**: the target becomes the point 1000 units away in the look direction.
+- **Raycast hitting the player themselves**: the original's exclusion list resolves to an invalid RID (no effective exclusion), and the player's body is in mask 0b11; if the ray hits the player's own body, `shoot_target` is that point — behavior of the original, preserved (do not fix).
+- **Pitch at the limits**: continuing to turn beyond −89.9° or 70° does not change the pitch.
+- **Fade without falling**: with y ≥ −17 and opacity already 0, the multiplication by (1 − 4×delta) keeps 0.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-**Comportamento — overlay de debug (US1)**
+**Behavior — debug overlay (US1)**
 
-- **FR-001**: O overlay de debug MUST alternar visibilidade ao pressionar a ação `toggle_debug` (F3), uma vez por pressionamento.
-- **FR-002**: O overlay MUST atualizar, a cada frame, um texto com FPS, VSync (`Enabled`/`Disabled`), memória estática em MiB com duas casas decimais e estado online (`Yes`/`No`), acrescentando o ID multiplayer somente quando online. "Online" significa que o peer multiplayer atual não é o peer offline padrão.
+- **FR-001**: The debug overlay MUST toggle visibility when the `toggle_debug` action (F3) is pressed, once per press.
+- **FR-002**: The overlay MUST update, every frame, a text with FPS, VSync (`Enabled`/`Disabled`), static memory in MiB with two decimal places and online state (`Yes`/`No`), appending the multiplayer ID only when online. "Online" means the current multiplayer peer is not the default offline peer.
 
-**Comportamento — efeito de desaparecimento de peça (US2)**
+**Behavior — part disappear effect (US2)**
 
-- **FR-003**: Ao entrar na cena, o efeito MUST ligar imediatamente a emissão do filho `MiniBlasts`.
-- **FR-004**: O efeito MUST ligar sua própria emissão 0,2 s após entrar na cena.
-- **FR-005**: O efeito MUST se remover da cena 2× o próprio `lifetime` após ligar a própria emissão.
+- **FR-003**: On entering the scene, the effect MUST immediately turn on the emission of the child `MiniBlasts`.
+- **FR-004**: The effect MUST turn on its own emission 0.2 s after entering the scene.
+- **FR-005**: The effect MUST remove itself from the scene 2× its own `lifetime` after turning on its own emission.
 
-**Comportamento — impacto do laser (US3)**
+**Behavior — laser impact (US3)**
 
-- **FR-006**: Ao entrar na cena, o efeito MUST capturar a câmera ativa daquele momento e, a cada frame, orientar o filho `LightRays` para a posição global dessa câmera enquanto ela existir.
-- **FR-007**: O efeito MUST se remover da cena quando a animação do filho `AnimationPlayer` terminar.
+- **FR-006**: On entering the scene, the effect MUST capture the active camera of that moment and, every frame, orient the child `LightRays` toward that camera's global position while it exists.
+- **FR-007**: The effect MUST remove itself from the scene when the child `AnimationPlayer`'s animation ends.
 
-**Comportamento — tremor de câmera (US4)**
+**Behavior — camera shake (US4)**
 
-- **FR-008**: A câmera MUST expor o método `add_trauma(amount)`, que acumula trauma limitado a 1,2.
-- **FR-009**: Enquanto trauma > 0, a cada frame a câmera MUST reduzir o trauma em 1,5 × delta (sem ficar negativo) e então aplicar rotação = rotação inicial + (pitch, yaw, roll), com pitch = 0,05 × trauma² × ruído, yaw = 0,05 × trauma² × ruído, roll = 0,1 × trauma² × ruído, cada ruído em [−1, 1] obtido de um gerador de ruído 1D com sementes distintas (seed, seed+1, seed+2) e posição temporal acumulada a 5000 × delta por frame.
-- **FR-010**: A semente do ruído MUST ser aleatória por instância, e a rotação inicial MUST ser capturada quando a câmera entra na cena.
+- **FR-008**: The camera MUST expose the method `add_trauma(amount)`, which accumulates trauma capped at 1.2.
+- **FR-009**: While trauma > 0, every frame the camera MUST reduce the trauma by 1.5 × delta (without going negative) and then apply rotation = initial rotation + (pitch, yaw, roll), with pitch = 0.05 × trauma² × noise, yaw = 0.05 × trauma² × noise, roll = 0.1 × trauma² × noise, each noise in [−1, 1] obtained from a 1D noise generator with distinct seeds (seed, seed+1, seed+2) and a time position accumulated at 5000 × delta per frame.
+- **FR-010**: The noise seed MUST be random per instance, and the initial rotation MUST be captured when the camera enters the scene.
 
-**Comportamento — sincronizador de input (US5)**
+**Behavior — input synchronizer (US5)**
 
-- **FR-011**: Ao entrar na cena, se o node for a autoridade multiplayer, MUST tornar `camera_camera` a câmera ativa e capturar o mouse; caso contrário MUST desligar seu processamento por frame e de input e ocultar `color_rect`.
-- **FR-012**: A cada frame MUST calcular `motion` = (força(`move_right`) − força(`move_left`), força(`move_back`) − força(`move_forward`)).
-- **FR-013**: A cada frame MUST girar a câmera pelo analógico de visão (`view_right`−`view_left`, `view_up`−`view_down`) a 3,0 rad/s, reduzido à metade ao mirar; e, por evento de movimento do mouse, a 0,001 rad/pixel, reduzido a 0,75× ao mirar.
-- **FR-014**: Girar a câmera MUST aplicar guinada em `camera_base` (rotação em Y por −move.x, seguida de reortonormalização) e arfagem em `camera_rot` (rotação X somada a move.y e limitada a [−89,9°, 70°]).
-- **FR-015**: A mira MUST seguir a lógica de toggle/hold: soltar `aim` após ≤ 0,4 s pressionado liga o toggle; pressionar `aim` desliga o toggle; a mira está ativa se o toggle está ligado ou `aim` está pressionado; o contador de tempo pressionado acumula enquanto a mira está ativa e zera quando não está. Ao mudar de estado, MUST tocar a animação "shoot" (ligou) ou "far" (desligou) em `camera_animation`.
-- **FR-016**: Ao pressionar `jump`, MUST disparar o RPC `jump` (modo `call_local`), cujo efeito é `jumping = true`.
-- **FR-017**: A cada frame `shooting` MUST refletir se `shoot` está pressionado; quando pressionado, `shoot_target` MUST ser o ponto de colisão de um raio lançado do centro de `crosshair` através de `camera_camera`, com alcance 1000, máscara de colisão 0b11 e lista de exclusão contendo apenas o RID do próprio sincronizador — que, por não ser um corpo físico, resolve para um RID inválido (`RID(0)`, verificado no Godot 4.7.2); o efeito prático é **nenhuma exclusão**, e esse comportamento MUST ser preservado (NÃO excluir o corpo do jogador: seria correção de bug, proibida na v1 pelo Princípio I). Sem colisão, `shoot_target` = origem + direção × 1000.
-- **FR-018**: A cada frame, se a altura global do pai (jogador) for < −17, a opacidade de `color_rect` MUST ser min((−17 − y)/15, 1); senão MUST ser multiplicada por (1 − 4 × delta).
-- **FR-019**: O node MUST expor `get_aim_rotation()` (pitch limitado normalizado: ≥ 0 → −pitch/70°; < 0 → pitch/(−89,9°)), `get_camera_base_quaternion()` (quaternion de rotação da base global de `camera_base`) e `get_camera_rotation_basis()` (base global de `camera_rot`).
-- **FR-020**: O node MUST expor com os nomes originais as propriedades `aiming`, `shoot_target`, `motion`, `shooting`, `jumping` e as referências `camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect`, de modo que a configuração de replicação e os `node_paths` já existentes em `player.tscn` continuem válidos sem edição.
+- **FR-011**: On entering the scene, if the node is the multiplayer authority, it MUST make `camera_camera` the active camera and capture the mouse; otherwise it MUST turn off its per-frame and input processing and hide `color_rect`.
+- **FR-012**: Every frame it MUST compute `motion` = (strength(`move_right`) − strength(`move_left`), strength(`move_back`) − strength(`move_forward`)).
+- **FR-013**: Every frame it MUST turn the camera by the look stick (`view_right`−`view_left`, `view_up`−`view_down`) at 3.0 rad/s, halved while aiming; and, per mouse motion event, at 0.001 rad/pixel, reduced to 0.75× while aiming.
+- **FR-014**: Turning the camera MUST apply yaw on `camera_base` (rotation in Y by −move.x, followed by re-orthonormalization) and pitch on `camera_rot` (X rotation plus move.y and limited to [−89.9°, 70°]).
+- **FR-015**: Aiming MUST follow the toggle/hold logic: releasing `aim` after ≤ 0.4 s pressed turns the toggle on; pressing `aim` turns the toggle off; aim is active if the toggle is on or `aim` is pressed; the pressed-time counter accumulates while aim is active and resets to zero when it is not. On state change, it MUST play the "shoot" (turned on) or "far" (turned off) animation on `camera_animation`.
+- **FR-016**: On pressing `jump`, it MUST fire the RPC `jump` (`call_local` mode), whose effect is `jumping = true`.
+- **FR-017**: Every frame `shooting` MUST reflect whether `shoot` is pressed; when pressed, `shoot_target` MUST be the collision point of a ray cast from the center of `crosshair` through `camera_camera`, with range 1000, collision mask 0b11 and an exclusion list containing only the RID of the synchronizer itself — which, not being a physics body, resolves to an invalid RID (`RID(0)`, verified in Godot 4.7.2); the practical effect is **no exclusion**, and this behavior MUST be preserved (do NOT exclude the player's body: that would be a bug fix, forbidden in v1 by Principle I). Without collision, `shoot_target` = origin + direction × 1000.
+- **FR-018**: Every frame, if the global height of the parent (player) is < −17, the opacity of `color_rect` MUST be min((−17 − y)/15, 1); otherwise it MUST be multiplied by (1 − 4 × delta).
+- **FR-019**: The node MUST expose `get_aim_rotation()` (limited pitch, normalized: ≥ 0 → −pitch/70°; < 0 → pitch/(−89.9°)), `get_camera_base_quaternion()` (rotation quaternion of the global basis of `camera_base`) and `get_camera_rotation_basis()` (global basis of `camera_rot`).
+- **FR-020**: The node MUST expose under the original names the properties `aiming`, `shoot_target`, `motion`, `shooting`, `jumping` and the references `camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect`, so that the replication configuration and the `node_paths` already existing in `player.tscn` remain valid without editing.
 
-**Ciclo de porte — comuns aos cinco (Princípio II)**
+**Port cycle — common to the five (Principle II)**
 
-- **FR-021**: Cada script MUST virar exatamente uma classe registrada pela extensão nativa, com a mesma classe base do script original (Label, CPUParticles3D, Node3D, Camera3D, MultiplayerSynchronizer). O item 5 MUST manter o nome de classe `PlayerInputSynchronizer`.
-- **FR-022**: O vínculo à cena MUST ser feito trocando o `type` do node na `.tscn` e removendo a linha `script` e o `ext_resource` do `.gd` órfão; nenhum `.gd` pode permanecer attached como ponte.
-- **FR-023**: O `.gd` e o `.gd.uid` correspondentes MUST ser apagados no mesmo commit em que o node passa a usar a classe portada.
-- **FR-024**: Nomes de métodos expostos e de propriedades exportadas/replicadas MUST ser idênticos aos do GDScript (verificados contra a `.tscn` afetada antes de concluir cada port).
-- **FR-025**: Cada alteração de código MUST ser seguida de build de debug bem-sucedido sem warnings novos, antes de validar ou commitar.
-- **FR-026**: Cada port MUST ser validado em modo headless: (a) import do projeto confirmando o carregamento da extensão e (b) execução da cena afetada sem erros novos além dos três catalogados no `CLAUDE.md` (`Cannon_Charge already exists`, `doorsimple_d.png` ausente, `surfaces.is_empty()`).
-- **FR-027**: Cada port MUST ser um commit próprio cuja mensagem informa o script portado e a(s) cena(s) com tipo de node trocado.
-- **FR-028**: Toda melhoria percebida durante o port MUST ser registrada em `docs/v2-backlog.md` (origem + motivação) no mesmo commit, e NUNCA aplicada no código.
-- **FR-029**: Os 10 scripts fora deste marco (`player.gd`, `bullet.gd`, `door.gd`, `part.gd`, `red_robot.gd`, `flying_forklift.gd`, `level.gd`, `menu.gd`, `main.gd`, `settings.gd`) MUST permanecer byte a byte intactos.
-- **FR-030**: A entrega MUST seguir a ordem 1 → 5; ao final de cada passo o jogo MUST estar jogável de ponta a ponta (menu → level → jogar).
+- **FR-021**: Each script MUST become exactly one class registered by the native extension, with the same base class as the original script (Label, CPUParticles3D, Node3D, Camera3D, MultiplayerSynchronizer). Item 5 MUST keep the class name `PlayerInputSynchronizer`.
+- **FR-022**: The binding to the scene MUST be done by swapping the node's `type` in the `.tscn` and removing the `script` line and the `ext_resource` of the orphaned `.gd`; no `.gd` may remain attached as a bridge.
+- **FR-023**: The corresponding `.gd` and `.gd.uid` MUST be deleted in the same commit in which the node starts using the ported class.
+- **FR-024**: Names of exposed methods and of exported/replicated properties MUST be identical to those of the GDScript (checked against the affected `.tscn` before concluding each port).
+- **FR-025**: Each code change MUST be followed by a successful debug build with no new warnings, before validating or committing.
+- **FR-026**: Each port MUST be validated in headless mode: (a) project import confirming the extension loaded and (b) run of the affected scene with no new errors beyond the three catalogued in `CLAUDE.md` (`Cannon_Charge already exists`, missing `doorsimple_d.png`, `surfaces.is_empty()`).
+- **FR-027**: Each port MUST be its own commit whose message states the ported script and the scene(s) with the node type swapped.
+- **FR-028**: Every improvement noticed during the port MUST be recorded in `docs/v2-backlog.md` (origin + motivation) in the same commit, and NEVER applied in the code.
+- **FR-029**: The 10 scripts outside this milestone (`player.gd`, `bullet.gd`, `door.gd`, `part.gd`, `red_robot.gd`, `flying_forklift.gd`, `level.gd`, `menu.gd`, `main.gd`, `settings.gd`) MUST remain byte-for-byte intact.
+- **FR-030**: Delivery MUST follow the order 1 → 5; at the end of each step the game MUST be playable end to end (menu → level → play).
 
 ### Key Entities
 
-- **Contrato do sincronizador de input**: estado observável lido pelo jogador original — `motion` (vetor 2D), `aiming` (bool), `shooting` (bool), `shoot_target` (ponto 3D), `jumping` (bool, consumido pelo jogador após o pulo). Os quatro primeiros são replicados pela configuração de sincronização da cena; `jumping` é propagado por RPC. Métodos: `get_aim_rotation()`, `get_camera_base_quaternion()`, `get_camera_rotation_basis()`, `jump` (RPC).
-- **Referências de cena do sincronizador**: `camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect` — preenchidas pela cena, nunca buscadas por caminho no código.
-- **Trauma da câmera**: escalar em [0, 1,2], alimentado por `add_trauma(amount)`, decaído a 1,5/s; a intensidade do tremor é trauma².
-- **Overlay de debug**: texto multilinha recalculado por frame; visibilidade alternada por `toggle_debug`.
+- **Input synchronizer contract**: observable state read by the original player — `motion` (2D vector), `aiming` (bool), `shooting` (bool), `shoot_target` (3D point), `jumping` (bool, consumed by the player after the jump). The first four are replicated by the scene's synchronization configuration; `jumping` is propagated by RPC. Methods: `get_aim_rotation()`, `get_camera_base_quaternion()`, `get_camera_rotation_basis()`, `jump` (RPC).
+- **Synchronizer scene references**: `camera_animation`, `crosshair`, `camera_base`, `camera_rot`, `camera_camera`, `color_rect` — filled in by the scene, never looked up by path in code.
+- **Camera trauma**: scalar in [0, 1.2], fed by `add_trauma(amount)`, decayed at 1.5/s; the shake intensity is trauma².
+- **Debug overlay**: multiline text recomputed per frame; visibility toggled by `toggle_debug`.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: Ao final do marco, o projeto contém exatamente 10 arquivos `.gd` (os 5 deste marco não existem mais, nem seus `.gd.uid`), e os 10 restantes são idênticos ao estado anterior ao marco.
-- **SC-002**: O jogo abre pelo menu, entra no level e, numa sessão single-player, mover, olhar (analógico e mouse), mirar (toggle e hold), pular, atirar, tremor de câmera, F3, impacto do laser e desaparecimento das peças do robô são indistinguíveis do original em `../oxide_godot_origins/` numa comparação lado a lado feita pelo usuário.
-- **SC-003**: Para cada um dos 5 ports, a validação headless (import + execução da cena afetada) reporta zero erros novos além dos 3 catalogados no `CLAUDE.md`, e o import mostra a linha de carregamento da extensão.
-- **SC-004**: Após cada um dos 5 commits, o jogo é jogável de ponta a ponta — nenhum estado intermediário quebra o menu, o level ou o jogador.
-- **SC-005**: O histórico do marco contém exatamente 5 commits de port (um por script), cada um nomeando o script portado e a cena alterada; nenhum commit toca os 10 scripts fora de escopo.
-- **SC-006**: O build de debug termina sem nenhum warning novo em relação ao estado anterior ao marco, em todos os 5 commits.
-- **SC-007**: Nenhuma linha de código portado introduz abstração, refatoração ou otimização; toda melhoria percebida aparece como entrada em `docs/v2-backlog.md` no commit em que foi percebida (revisão de conformidade com o Princípio I).
-- **SC-008**: `player.gd`, `red_robot.gd` e as cenas `player.tscn`/`level.tscn` continuam encontrando todos os métodos e propriedades pelos nomes originais — nenhum aviso de método/propriedade inexistente aparece nos logs headless ou no editor.
+- **SC-001**: At the end of the milestone, the project contains exactly 10 `.gd` files (the 5 of this milestone no longer exist, nor their `.gd.uid`), and the 10 remaining ones are identical to the state before the milestone.
+- **SC-002**: The game opens through the menu, enters the level and, in a single-player session, moving, looking (analog stick and mouse), aiming (toggle and hold), jumping, shooting, camera shake, F3, laser impact and the robot's parts disappearing are indistinguishable from the original in `../oxide_godot_origins/` in a side-by-side comparison done by the user.
+- **SC-003**: For each of the 5 ports, the headless validation (import + run of the affected scene) reports zero new errors beyond the 3 catalogued in `CLAUDE.md`, and the import shows the extension loading line.
+- **SC-004**: After each of the 5 commits, the game is playable end to end — no intermediate state breaks the menu, the level or the player.
+- **SC-005**: The milestone's history contains exactly 5 port commits (one per script), each naming the ported script and the changed scene; no commit touches the 10 out-of-scope scripts.
+- **SC-006**: The debug build finishes with no new warning relative to the state before the milestone, in all 5 commits.
+- **SC-007**: No line of ported code introduces abstraction, refactoring or optimization; every improvement noticed appears as an entry in `docs/v2-backlog.md` in the commit in which it was noticed (conformance review against Principle I).
+- **SC-008**: `player.gd`, `red_robot.gd` and the scenes `player.tscn`/`level.tscn` keep finding all methods and properties by their original names — no warning of a nonexistent method/property appears in the headless logs or in the editor.
 
 ## Assumptions
 
-- A fase é a v1 (raw port); as restrições do Princípio I se aplicam integralmente. Tradução direta, "Rust com cara de GDScript" é o resultado esperado.
-- A validação funcional (SC-002) é visual, feita pelo usuário no editor/jogo comparando com `../oxide_godot_origins/`; a validação automatizada é exclusivamente a headless (SC-003).
-- A validação é single-player/offline: o peer local é a autoridade multiplayer, logo o ramo "não-autoridade" do sincronizador (FR-011) é verificado por leitura de código e pelo headless, não por sessão com dois peers. Testes multiplayer reais com dois peers estão fora de escopo.
-- Fora de escopo: `player.gd`, `bullet.gd`, `door.gd` e todos os scripts dos marcos B, C e D; acesso tipado ao autoload `Settings` (nenhum dos 5 scripts o usa); qualquer melhoria de comportamento, mesmo trivial.
-- Os comportamentos "não-idiomáticos" do original são preservados propositalmente: texto do overlay recalculado enquanto oculto; rotação inicial da câmera capturada uma única vez; `jumping` exportado mas não replicado (propagado por RPC); raycast refeito a cada frame enquanto atira; lista de exclusão do raycast sem efeito prático (RID inválido do sincronizador).
-- A ordem 1 → 5 é a de entrega; cada passo é independente, mas os passos 4 e 5 tocam a mesma cena (`player.tscn`) e por isso são commits separados sobre a mesma cena.
-- A semente do ruído do tremor é aleatória por instância (como no original); o critério de comparação é intensidade/duração, não o padrão exato do ruído.
-- Os três erros pré-existentes do demo upstream catalogados no `CLAUDE.md` são a baseline; qualquer outro erro no headless conta como regressão.
-- `docs/port-order.md` e `docs/v2-backlog.md` já existem e são a fonte da ordem e o destino das melhorias, respectivamente.
+- The phase is v1 (raw port); the constraints of Principle I apply in full. Direct translation, "Rust that looks like GDScript" is the expected result.
+- Functional validation (SC-002) is visual, done by the user in the editor/game comparing with `../oxide_godot_origins/`; automated validation is exclusively the headless one (SC-003).
+- Validation is single-player/offline: the local peer is the multiplayer authority, so the "non-authority" branch of the synchronizer (FR-011) is verified by code reading and by headless, not by a session with two peers. Real multiplayer tests with two peers are out of scope.
+- Out of scope: `player.gd`, `bullet.gd`, `door.gd` and all scripts of Milestones B, C and D; typed access to the `Settings` autoload (none of the 5 scripts uses it); any behavior improvement, even trivial.
+- The "non-idiomatic" behaviors of the original are preserved on purpose: overlay text recomputed while hidden; camera initial rotation captured a single time; `jumping` exported but not replicated (propagated by RPC); raycast redone every frame while shooting; raycast exclusion list with no practical effect (invalid RID of the synchronizer).
+- The order 1 → 5 is the delivery order; each step is independent, but steps 4 and 5 touch the same scene (`player.tscn`) and are therefore separate commits on the same scene.
+- The shake noise seed is random per instance (as in the original); the comparison criterion is intensity/duration, not the exact noise pattern.
+- The three pre-existing errors of the upstream demo catalogued in `CLAUDE.md` are the baseline; any other error in headless counts as a regression.
+- `docs/port-order.md` and `docs/v2-backlog.md` already exist and are the source of the order and the destination of the improvements, respectively.

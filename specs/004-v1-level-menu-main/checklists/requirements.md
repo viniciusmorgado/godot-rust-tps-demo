@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Marco D — empilhadeira, level, menu e main (v1 raw port)
+# Specification Quality Checklist: Milestone D — forklift, level, menu and main (v1 raw port)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-15

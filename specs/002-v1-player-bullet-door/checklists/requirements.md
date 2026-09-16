@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Marco B — jogador, bala e porta (v1 raw port)
+# Specification Quality Checklist: Milestone B — player, bullet and door (v1 raw port)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-15
@@ -32,7 +32,7 @@
 ## Notes
 
 - Validation run 1 (2026-09-15): all items pass after one wording pass (non-quoted "Rust"
-  mentions replaced by "classe nativa"/"código portado"; FR blocks reordered so FR-001…FR-035 read
+  mentions replaced by "native class"/"ported code"; FR blocks reordered so FR-001…FR-035 read
   monotonically).
 - **On "no implementation details"**: same rationale as `specs/001`: behavior requirements
   (FR-001–FR-020) describe only observable game behavior with the original's numbers; the

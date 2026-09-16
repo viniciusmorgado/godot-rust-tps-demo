@@ -1,41 +1,41 @@
-# Contrato: `Menu` (port 3)
+# Contract: `Menu` (port 3)
 
-Superfície consumida por `menu.tscn` (10 conexões, 85 caminhos de node) e por `main.gd`/`Main`
-(sinal `replace_main_scene`). Nomes e caminhos são contrato: copiar do original, nunca traduzir.
+Surface consumed by `menu.tscn` (10 connections, 85 node paths) and by `main.gd`/`Main`
+(signal `replace_main_scene`). Names and paths are contract: copy from the original, never translate.
 
-- Classe registrada: `Menu` (nome livre; conferido sem colisão no engine e nos `.gd`).
-- Base: `Node`. Node na cena: raiz de `menu/menu.tscn` (l.103).
+- Registered class: `Menu` (free name; checked for no collision in the engine and in the `.gd` files).
+- Base: `Node`. Node in the scene: root of `menu/menu.tscn` (l.103).
 
-## Sinal
+## Signal
 
-| Assinatura Godot | Rust | Consumidor |
+| Godot signature | Rust | Consumer |
 |---|---|---|
-| `signal replace_main_scene` — declarado sem parâmetro, **emitido com 1** (`menu.gd:163`) | `#[signal] fn replace_main_scene(scene: Gd<PackedScene>);` — parâmetro declarado (spec Edge Cases) | `main.gd:32-33` — `has_signal` + `connect(replace_main_scene)`, método de 1 argumento |
+| `signal replace_main_scene` — declared without a parameter, **emitted with 1** (`menu.gd:163`) | `#[signal] fn replace_main_scene(scene: Gd<PackedScene>);` — parameter declared (spec Edge Cases) | `main.gd:32-33` — `has_signal` + `connect(replace_main_scene)`, 1-argument method |
 
-## Handlers (`#[func]`) — 10 conexões em `menu.tscn:836-845`
+## Handlers (`#[func]`) — 10 connections in `menu.tscn:836-845`
 
-| Método | Conectado a | Efeito |
+| Method | Connected to | Effect |
 |---|---|---|
-| `_on_play_pressed` | `UI/Main/Play.pressed` (l.836); chamado por Host/Connect | Main oculto, Loading visível, `load_threaded_request` do level |
-| `_on_play_online_pressed` | `UI/Main/PlayOnline.pressed` (l.837) | Online visível, Main oculto |
-| `_on_settings_pressed` | `UI/Main/Settings.pressed` (l.838) | Settings visível; botões refletem `config_file` |
+| `_on_play_pressed` | `UI/Main/Play.pressed` (l.836); called by Host/Connect | Main hidden, Loading visible, `load_threaded_request` of the level |
+| `_on_play_online_pressed` | `UI/Main/PlayOnline.pressed` (l.837) | Online visible, Main hidden |
+| `_on_settings_pressed` | `UI/Main/Settings.pressed` (l.838) | Settings visible; buttons reflect `config_file` |
 | `_on_quit_pressed` | `UI/Main/Quit.pressed` (l.839) | `get_tree().quit()` |
-| `_on_host_pressed` | `UI/Online/Host.pressed` (l.840); `call_deferred` em headless | ENet server → Play |
+| `_on_host_pressed` | `UI/Online/Host.pressed` (l.840); `call_deferred` in headless | ENet server → Play |
 | `_on_connect_pressed` | `UI/Online/Connect.pressed` (l.841) | ENet client → Play |
-| `_on_cancel_pressed` | `UI/Online/Back.pressed` (l.842) **e** `UI/Settings/Actions/Cancel.pressed` (l.844) | Main visível, Settings e Online ocultos |
-| `_on_apply_pressed` | `UI/Settings/Actions/Apply.pressed` (l.843) | grava `config_file`, `apply_graphics_settings`, `save_settings` |
-| `_on_loading_done_timer_timeout` | `UI/Loading/DoneTimer.timeout` (l.845; 0,5 s one-shot) | `multiplayer_peer = peer`; emite `replace_main_scene` |
+| `_on_cancel_pressed` | `UI/Online/Back.pressed` (l.842) **and** `UI/Settings/Actions/Cancel.pressed` (l.844) | Main visible, Settings and Online hidden |
+| `_on_apply_pressed` | `UI/Settings/Actions/Apply.pressed` (l.843) | writes `config_file`, `apply_graphics_settings`, `save_settings` |
+| `_on_loading_done_timer_timeout` | `UI/Loading/DoneTimer.timeout` (l.845; 0.5 s one-shot) | `multiplayer_peer = peer`; emits `replace_main_scene` |
 
-Interno (privado, sem `#[func]`): `_make_button_group(common_parent)`.
+Internal (private, no `#[func]`): `_make_button_group(common_parent)`.
 
-## Estado
+## State
 
-`peer: Gd<MultiplayerPeer>` (inicial `OfflineMultiplayerPeer`), `metalfx_supported: bool`,
-`LEVEL_PATH = "res://level/level.tscn"`. Nenhuma propriedade exportada/replicada.
+`peer: Gd<MultiplayerPeer>` (initially `OfflineMultiplayerPeer`), `metalfx_supported: bool`,
+`LEVEL_PATH = "res://level/level.tscn"`. No exported/replicated property.
 
-## Referências de cena (85 `@onready`, `menu.gd:11-104`) — `#[init(node = "<caminho>")] OnReady<Gd<T>>`
+## Scene references (85 `@onready`, `menu.gd:11-104`) — `#[init(node = "<path>")] OnReady<Gd<T>>`
 
-| Campo | Tipo | Caminho (a partir do `Menu`) |
+| Field | Type | Path (from the `Menu`) |
 |---|---|---|
 | `world_environment` | `WorldEnvironment` | `WorldEnvironment` |
 | `ui` | `Control` | `UI` |
@@ -122,23 +122,23 @@ Interno (privado, sem `#[func]`): `_make_button_group(common_parent)`.
 | `loading` | `HBoxContainer` | `UI/Loading` |
 | `loading_progress` | `ProgressBar` | `UI/Loading/Progress` |
 | `loading_done_timer` | `Timer` | `UI/Loading/DoneTimer` |
-Caminhos derivados mecanicamente do original (`$X` e `pai.get_node(^"Y")` → `X/Y`). Os campos
-`ui`, `settings_button`, `quit_button`, `settings_actions`, `settings_action_apply` e os 15
-`*_menu` não são lidos fora de `ready`/`_make_button_group` — mantidos por fidelidade.
+Paths derived mechanically from the original (`$X` and `parent.get_node(^"Y")` → `X/Y`). The fields
+`ui`, `settings_button`, `quit_button`, `settings_actions`, `settings_action_apply` and the 15
+`*_menu` are not read outside `ready`/`_make_button_group` — kept for fidelity.
 
-## Chamadas dinâmicas (exceção `Settings`)
+## Dynamic calls (`Settings` exception)
 
-`get_node("/root/Settings")` → `.get("config_file")` (leituras/gravações via `ConfigFile`
-tipado), `.call("apply_graphics_settings", [window, environment, self])`, `.call("save_settings")`.
-Nenhuma outra chamada dinâmica além de `call_deferred("_on_host_pressed")` no próprio node.
+`get_node("/root/Settings")` → `.get("config_file")` (reads/writes via typed
+`ConfigFile`), `.call("apply_graphics_settings", [window, environment, self])`, `.call("save_settings")`.
+No other dynamic call besides `call_deferred("_on_host_pressed")` on the node itself.
 
-## Verificação antes do commit
+## Verification before the commit
 
 ```bash
 cd oxide-godot
 grep -c '^\[connection' menu/menu.tscn                                            # 10
-grep -o 'method="[^"]*"' menu/menu.tscn | sort -u                                 # 9 nomes — todos #[func] em menu.rs
-grep -n 'replace_main_scene' main/main.gd                                         # l.20, 32, 33 (até o port 4)
+grep -o 'method="[^"]*"' menu/menu.tscn | sort -u                                 # 9 names — all #[func] in menu.rs
+grep -n 'replace_main_scene' main/main.gd                                         # l.20, 32, 33 (until port 4)
 grep -c '#\[init(node = ' ../oxide_godot_core/oxide_godot_lib/src/menu.rs         # 85
 grep -c 'type="Menu"' menu/menu.tscn                                              # 1
 grep -c 'ExtResource("1")' menu/menu.tscn                                         # 0

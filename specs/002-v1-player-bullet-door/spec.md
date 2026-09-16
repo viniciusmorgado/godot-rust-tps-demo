@@ -1,196 +1,196 @@
-# Feature Specification: Marco B — jogador, bala e porta (v1 raw port)
+# Feature Specification: Milestone B — player, bullet and door (v1 raw port)
 
-**Feature Branch**: `002-v1-player-bullet-door` (trabalho na `main`, como no Marco A)
+**Feature Branch**: `002-v1-player-bullet-door` (work on `main`, as in Milestone A)
 
 **Created**: 2026-09-15
 
 **Status**: Draft
 
-**Fase**: v1 — Raw Port (Princípio I da constituição v1.3.0). Nenhuma abstração, refatoração ou otimização; melhorias percebidas vão para `docs/v2-backlog.md`. Esta feature usa, pela primeira vez, a cláusula de **correção conservadora de bugs do upstream** (uma única correção, na porta — ver US3 e FR-030–FR-035).
+**Phase**: v1 — Raw Port (Principle I of constitution v1.3.0). No abstraction, refactoring or optimization; noticed improvements go to `docs/v2-backlog.md`. This feature uses, for the first time, the **conservative upstream bug fix** clause (a single fix, in the door — see US3 and FR-030–FR-035).
 
-**Input**: User description: "Portar para Rust o jogador, a bala e a porta do Godot TPS Demo, mantendo o jogo jogável e idêntico ao original a cada script — com uma única correção conservadora de bug do upstream (porta). Marco B de docs/port-order.md (itens 6, 7, 8)."
+**Input**: User description: "Port to Rust the player, the bullet and the door of the Godot TPS Demo, keeping the game playable and identical to the original at each script — with a single conservative upstream bug fix (door). Milestone B of docs/port-order.md (items 6, 7, 8)."
 
-## Contexto
+## Context
 
-Continuação do porte script a script. O Marco A (`specs/001-v1-leaves-and-input`, commits `6b12ebf`..`0e71a49`) deixou 10 scripts no original e entregou `PlayerInputSynchronizer` e `CameraNoiseShake` como classes nativas — por isso o jogador agora pode nascer com acesso **tipado** a elas, sem chamadas dinâmicas. Este marco porta os três scripts do "jogador completo"; os 7 restantes (`part`, `red_robot`, `flying_forklift`, `level`, `menu`, `main`, `settings`) ficam byte a byte intactos e continuam consumindo a API portada pelos nomes originais.
+Continuation of the script-by-script port. Milestone A (`specs/001-v1-leaves-and-input`, commits `6b12ebf`..`0e71a49`) left 10 scripts in the original and delivered `PlayerInputSynchronizer` and `CameraNoiseShake` as native classes — which is why the player can now be born with **typed** access to them, with no dynamic calls. This milestone ports the three scripts of the "complete player"; the remaining 7 (`part`, `red_robot`, `flying_forklift`, `level`, `menu`, `main`, `settings`) stay byte-for-byte intact and keep consuming the ported API by the original names.
 
-| # | Script original | Base | Node/cena afetada | Linhas | Consumidores que permanecem no original |
+| # | Original script | Base | Affected node/scene | Lines | Consumers that remain in the original |
 |---|---|---|---|---|---|
-| 1 | `player/player.gd` (`class_name Player`) | CharacterBody3D | raiz de `player/player.tscn` | 211 | `red_robot.gd:131,133,275,281` (`is Player`, `add_camera_shake_trauma`), `level.gd:118-119` (`name`, `player_id`), `bullet.gd:31-32` (`hit` por `has_method`) |
-| 2 | `player/bullet/bullet.gd` | CharacterBody3D | raiz de `player/bullet/bullet.tscn` (também instanciada como `BulletCache` em `player.tscn:679`) | 51 | `player.gd` (instancia a cena — passa a ser classe nativa neste marco) |
-| 3 | `door/door.gd` | Area3D | raiz de `door/door.tscn` | 12 | nenhum (`door.tscn` não é instanciada por nenhuma cena — asset órfão) |
+| 1 | `player/player.gd` (`class_name Player`) | CharacterBody3D | root of `player/player.tscn` | 211 | `red_robot.gd:131,133,275,281` (`is Player`, `add_camera_shake_trauma`), `level.gd:118-119` (`name`, `player_id`), `bullet.gd:31-32` (`hit` via `has_method`) |
+| 2 | `player/bullet/bullet.gd` | CharacterBody3D | root of `player/bullet/bullet.tscn` (also instantiated as `BulletCache` in `player.tscn:679`) | 51 | `player.gd` (instantiates the scene — becomes a native class in this milestone) |
+| 3 | `door/door.gd` | Area3D | root of `door/door.tscn` | 12 | none (`door.tscn` is not instantiated by any scene — orphan asset) |
 
-Referência de comportamento: o projeto original intocado em `../oxide_godot_origins/`.
+Behavior reference: the untouched original project in `../oxide_godot_origins/`.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Jogador portado (Priority: P1)
+### User Story 1 - Ported player (Priority: P1)
 
-O jogador continua a ser exatamente o mesmo personagem: anda, corre, pula, pousa com som, mira e atira; ao cair do mapa reaparece no ponto inicial. Tudo isso passa a ser produzido pela classe nativa `Player`, enquanto o level (que o instancia e lhe dá um `player_id`), o robô (que testa `is Player` e chama `add_camera_shake_trauma`) e a bala (que chama `hit`) continuam no original, sem nenhuma edição, encontrando tudo pelos nomes de sempre.
+The player continues to be exactly the same character: walks, runs, jumps, lands with sound, aims and shoots; when falling off the map it reappears at the initial point. All of this is now produced by the native `Player` class, while the level (which instantiates it and gives it a `player_id`), the robot (which tests `is Player` and calls `add_camera_shake_trauma`) and the bullet (which calls `hit`) remain in the original, with no edits, finding everything by the usual names.
 
-**Why this priority**: É o maior script do marco, o único com dependentes fora dele (`red_robot`, `level`, `bullet`) e pré-requisito direto da bala (que ele instancia) e da porta (que testa `is Player`). Também é o primeiro script portado que **consome** classes já portadas (`PlayerInputSynchronizer`, `CameraNoiseShake`) — prova a integração tipada entre classes nativas.
+**Why this priority**: It is the largest script of the milestone, the only one with dependents outside it (`red_robot`, `level`, `bullet`) and a direct prerequisite of the bullet (which it instantiates) and of the door (which tests `is Player`). It is also the first ported script that **consumes** already-ported classes (`PlayerInputSynchronizer`, `CameraNoiseShake`) — it proves the typed integration between native classes.
 
-**Independent Test**: `player.tscn` e `level.tscn` headless sem erros novos; no jogo, mover/pular/mirar/atirar/pouso/respawn indistinguíveis do original; o robô ainda atinge o jogador (tremor 13,0) e o level ainda o spawna com nome e id corretos.
+**Independent Test**: `player.tscn` and `level.tscn` headless with no new errors; in the game, move/jump/aim/shoot/landing/respawn indistinguishable from the original; the robot still hits the player (shake 13.0) and the level still spawns it with the correct name and id.
 
 **Acceptance Scenarios**:
 
-1. **Given** o level instancia o jogador, define `name` e `player_id` **antes** de adicioná-lo à árvore, **When** o node entra na cena, **Then** o `InputSynchronizer` filho tem autoridade multiplayer igual a `player_id` (o setter roda fora da árvore, como no original) e a replicação de `player_id` (spawn), `motion` e `current_animation` (por frame) continua válida pelos nomes da cena.
-2. **Given** o jogador está no chão sem input, **When** frames de física passam, **Then** anima WALK com `blend_position = (0, 0)` e não se move.
-3. **Given** o jogador segura `move_forward`, **When** frames de física passam, **Then** `motion` interpola linearmente para o input a 10×delta, a orientação do modelo gira (slerp a 10×delta) para a direção da câmera achatada em Y, a animação WALK recebe `blend_position = (|motion|, 0)` e o deslocamento vem do root motion da animação (velocidade horizontal = deslocamento/delta), com gravidade aplicada e `move_and_slide` com up = +Y.
-4. **Given** o jogador está no chão e o sincronizador de input sinaliza `jumping`, **When** o frame de física roda, **Then** `velocity.y = 5`, o jogador entra em `on_air`, o RPC `jump` toca a animação JUMP_UP e o som Jump, e `jumping` é zerado no sincronizador.
-5. **Given** o jogador está no ar, **When** `velocity.y > 0`, **Then** anima JUMP_UP; **When** `velocity.y ≤ 0`, **Then** anima JUMP_DOWN.
-6. **Given** o jogador esteve no ar por mais de 0,5 s, **When** toca o chão, **Then** o RPC `land` toca JUMP_DOWN e o som Land; `airborne_time` volta a 0.
-7. **Given** o jogador acabou de entrar na cena (`airborne_time` inicial = 100), **When** toca o chão pela primeira vez, **Then** o RPC `land` dispara uma vez (quirk do original, preservado).
-8. **Given** o jogador está mirando, **When** frames de física passam, **Then** a orientação faz slerp para o quaternion da base da câmera, anima STRAFE com `aim/add_amount = get_aim_rotation()` e `strafe/blend_position = (motion.x, −motion.y)`, e o root motion do AnimationTree é aplicado.
-9. **Given** o jogador está mirando, `shooting` ativo e o cooldown de 0,4 s zerado, **When** o frame de física roda, **Then** uma bala é instanciada como filha do **pai** do jogador (nome legível), posicionada na origem global de `ShootFrom`, orientada para `shoot_target`, com exceção de colisão contra o jogador; o RPC `shoot` reinicia e liga `ShootParticle` e `MuzzleFlash`, reinicia o cooldown, toca o som Shoot e chama `add_camera_shake_trauma(0.35)`.
-10. **Given** o cooldown ainda não zerou, **When** `shooting` continua ativo, **Then** nenhuma bala nova é criada.
-11. **Given** o robô acerta o jogador com o laser, **When** `red_robot.gd:133` chama `player.add_camera_shake_trauma(13.0)`, **Then** a câmera (`CameraNoiseShake`, via `player_input.camera_camera`) recebe `add_trauma(13.0)` — chamada tipada, sem `.call()`.
-12. **Given** uma bala de **outro** jogador atinge este jogador (só em multiplayer — as balas do próprio jogador têm exceção de colisão com ele, `player.gd:142`), **When** `bullet` chama `hit.rpc()` no colisor, **Then** o jogador recebe `add_camera_shake_trauma(0.75)`. Verificado por leitura de código; não observável single-player.
-13. **Given** o jogador cai abaixo de y = −40, **When** o frame de física roda, **Then** é teleportado para a posição inicial capturada ao entrar na cena.
-14. **Given** o peer local não é servidor, **When** o node entra na cena, **Then** o processamento por frame é desligado e, a cada frame de física, apenas `current_animation` (replicado) é animado — ramo verificado por leitura de código e headless (validação é single-player, onde o peer é servidor e autoridade).
-15. **Given** `red_robot.gd`, `level.gd` e `door.gd` (até o port 3) continuam no original, **When** usam `is Player`, `player_id`, `name`, `add_camera_shake_trauma`, `hit`, **Then** tudo resolve sem edição nesses scripts.
+1. **Given** the level instantiates the player, sets `name` and `player_id` **before** adding it to the tree, **When** the node enters the scene, **Then** the child `InputSynchronizer` has multiplayer authority equal to `player_id` (the setter runs outside the tree, as in the original) and the replication of `player_id` (spawn), `motion` and `current_animation` (per frame) remains valid by the scene's names.
+2. **Given** the player is on the ground with no input, **When** physics frames pass, **Then** it animates WALK with `blend_position = (0, 0)` and does not move.
+3. **Given** the player holds `move_forward`, **When** physics frames pass, **Then** `motion` interpolates linearly toward the input at 10×delta, the model orientation rotates (slerp at 10×delta) toward the camera direction flattened on Y, the WALK animation receives `blend_position = (|motion|, 0)` and the displacement comes from the animation's root motion (horizontal velocity = displacement/delta), with gravity applied and `move_and_slide` with up = +Y.
+4. **Given** the player is on the ground and the input synchronizer signals `jumping`, **When** the physics frame runs, **Then** `velocity.y = 5`, the player enters `on_air`, the `jump` RPC plays the JUMP_UP animation and the Jump sound, and `jumping` is zeroed in the synchronizer.
+5. **Given** the player is in the air, **When** `velocity.y > 0`, **Then** it animates JUMP_UP; **When** `velocity.y ≤ 0`, **Then** it animates JUMP_DOWN.
+6. **Given** the player has been in the air for more than 0.5 s, **When** it touches the ground, **Then** the `land` RPC plays JUMP_DOWN and the Land sound; `airborne_time` goes back to 0.
+7. **Given** the player has just entered the scene (initial `airborne_time` = 100), **When** it touches the ground for the first time, **Then** the `land` RPC fires once (quirk of the original, preserved).
+8. **Given** the player is aiming, **When** physics frames pass, **Then** the orientation slerps toward the camera base quaternion, it animates STRAFE with `aim/add_amount = get_aim_rotation()` and `strafe/blend_position = (motion.x, −motion.y)`, and the AnimationTree root motion is applied.
+9. **Given** the player is aiming, `shooting` active and the 0.4 s cooldown at zero, **When** the physics frame runs, **Then** a bullet is instantiated as a child of the player's **parent** (readable name), positioned at the global origin of `ShootFrom`, oriented toward `shoot_target`, with a collision exception against the player; the `shoot` RPC restarts and enables `ShootParticle` and `MuzzleFlash`, restarts the cooldown, plays the Shoot sound and calls `add_camera_shake_trauma(0.35)`.
+10. **Given** the cooldown has not reached zero yet, **When** `shooting` remains active, **Then** no new bullet is created.
+11. **Given** the robot hits the player with the laser, **When** `red_robot.gd:133` calls `player.add_camera_shake_trauma(13.0)`, **Then** the camera (`CameraNoiseShake`, via `player_input.camera_camera`) receives `add_trauma(13.0)` — typed call, without `.call()`.
+12. **Given** a bullet from **another** player hits this player (only in multiplayer — the player's own bullets have a collision exception with it, `player.gd:142`), **When** `bullet` calls `hit.rpc()` on the collider, **Then** the player receives `add_camera_shake_trauma(0.75)`. Verified by code reading; not observable single-player.
+13. **Given** the player falls below y = −40, **When** the physics frame runs, **Then** it is teleported to the initial position captured when entering the scene.
+14. **Given** the local peer is not the server, **When** the node enters the scene, **Then** per-frame processing is turned off and, on each physics frame, only `current_animation` (replicated) is animated — branch verified by code reading and headless (validation is single-player, where the peer is server and authority).
+15. **Given** `red_robot.gd`, `level.gd` and `door.gd` (until port 3) remain in the original, **When** they use `is Player`, `player_id`, `name`, `add_camera_shake_trauma`, `hit`, **Then** everything resolves with no edits to those scripts.
 
 ---
 
-### User Story 2 - Bala portada (Priority: P2)
+### User Story 2 - Ported bullet (Priority: P2)
 
-Ao atirar, a bala visível sai do cano, voa em linha reta a 20 unidades/s, explode ao acertar algo (chamando `hit` no alvo se ele tiver esse método — jogador ou robô) ou após 5 s, e some ao fim da animação de explosão. Se a opção de sombras estiver ligada nas configurações, a luz da explosão projeta sombra.
+When shooting, the visible bullet leaves the barrel, flies in a straight line at 20 units/s, explodes on hitting something (calling `hit` on the target if it has that method — player or robot) or after 5 s, and disappears at the end of the explosion animation. If the shadows option is enabled in the settings, the explosion light casts a shadow.
 
-**Why this priority**: Depende do jogador (que a instancia) e é o primeiro consumidor da exceção do autoload `Settings` (acesso dinâmico ao `config_file`). Introduz duck typing preservado do original (`has_method("hit")` + `rpc`) e um method track de animação (`destroy`) — dois nomes de contrato.
+**Why this priority**: Depends on the player (which instantiates it) and is the first consumer of the `Settings` autoload exception (dynamic access to `config_file`). Introduces duck typing preserved from the original (`has_method("hit")` + `rpc`) and an animation method track (`destroy`) — two contract names.
 
-**Independent Test**: `bullet.tscn` isolado e `player.tscn` (que carrega o `BulletCache`) headless sem erros novos; no jogo, a bala é visível, explode ao colidir e ao expirar, o robô reage ao `hit`.
+**Independent Test**: `bullet.tscn` isolated and `player.tscn` (which loads the `BulletCache`) headless with no new errors; in the game, the bullet is visible, explodes on collision and on expiry, the robot reacts to `hit`.
 
 **Acceptance Scenarios**:
 
-1. **Given** a bala é instanciada pelo jogador no servidor, **When** frames de física passam, **Then** ela se desloca `−delta × 20 × basis.z` por frame com `move_and_collide`.
-2. **Given** a bala colide com um corpo que tem método `hit` (robô; ou outro jogador, só em multiplayer), **When** a colisão ocorre, **Then** `hit` é chamado por RPC no colisor (duck typing do original), a colisão é desabilitada, o RPC `explode` dispara e `hit` interno vira `true`.
-3. **Given** a bala colide com um corpo **sem** método `hit` (parede), **When** a colisão ocorre, **Then** apenas desabilita a colisão e explode.
-4. **Given** a bala voa há 5 s sem colidir, **When** `time_alive` fica negativo, **Then** marca `hit = true` e explode; nos frames seguintes não faz mais nada.
-5. **Given** o RPC `explode` dispara, **When** roda, **Then** toca a animação "explode" e, se `Settings.config_file` tem `rendering/shadow_mapping` verdadeiro, liga `shadow_enabled` na luz.
-6. **Given** a animação "explode" chega ao method track `destroy`, **When** o peer é servidor, **Then** a bala é removida da cena; **When** não é servidor, **Then** nada acontece (o servidor replica a remoção).
-7. **Given** o peer não é servidor, **When** a bala entra na cena, **Then** o processamento de física é desligado e a colisão desabilitada (ramo por leitura de código/headless).
-8. **Given** `player.tscn` carrega, **When** o `BulletCache` (instância de `bullet.tscn`) é criado, **Then** a classe portada é instanciada ali sem erro e sem efeito visível (pré-aquecimento, como no original).
-9. **Given** a replicação da cena (`global_transform`), **When** a bala se move, **Then** a configuração de sincronização continua válida sem edição.
+1. **Given** the bullet is instantiated by the player on the server, **When** physics frames pass, **Then** it moves `−delta × 20 × basis.z` per frame with `move_and_collide`.
+2. **Given** the bullet collides with a body that has a `hit` method (robot; or another player, only in multiplayer), **When** the collision occurs, **Then** `hit` is called via RPC on the collider (duck typing of the original), the collision is disabled, the `explode` RPC fires and the internal `hit` becomes `true`.
+3. **Given** the bullet collides with a body **without** a `hit` method (wall), **When** the collision occurs, **Then** it only disables the collision and explodes.
+4. **Given** the bullet has been flying for 5 s without colliding, **When** `time_alive` becomes negative, **Then** it marks `hit = true` and explodes; in the following frames it does nothing else.
+5. **Given** the `explode` RPC fires, **When** it runs, **Then** it plays the "explode" animation and, if `Settings.config_file` has `rendering/shadow_mapping` true, enables `shadow_enabled` on the light.
+6. **Given** the "explode" animation reaches the `destroy` method track, **When** the peer is the server, **Then** the bullet is removed from the scene; **When** it is not the server, **Then** nothing happens (the server replicates the removal).
+7. **Given** the peer is not the server, **When** the bullet enters the scene, **Then** physics processing is turned off and the collision disabled (branch by code reading/headless).
+8. **Given** `player.tscn` loads, **When** the `BulletCache` (instance of `bullet.tscn`) is created, **Then** the ported class is instantiated there with no error and no visible effect (pre-warming, as in the original).
+9. **Given** the scene replication (`global_transform`), **When** the bullet moves, **Then** the synchronization configuration remains valid with no edits.
 
 ---
 
-### User Story 3 - Porta portada, com correção conservadora do bug do upstream (Priority: P3)
+### User Story 3 - Ported door, with conservative upstream bug fix (Priority: P3)
 
-A porta abre (animação "doorsimple_opening") quando o jogador entra na sua área, uma única vez. No original isso **nunca acontece**: o script procura `DoorModel/AnimationPlayer`, mas o node da cena chama-se `DoorModel2`; a referência fica nula, o Godot imprime `Node not found` ao instanciar e a porta não abre. A intenção do código é inequívoca (abrir ao entrar um `Player`) e o resultado a contradiz — é **bug**, não melhoria (constituição v1.3.0, Princípio I).
+The door opens ("doorsimple_opening" animation) when the player enters its area, a single time. In the original this **never happens**: the script looks for `DoorModel/AnimationPlayer`, but the scene node is named `DoorModel2`; the reference stays null, Godot prints `Node not found` on instantiation and the door does not open. The intent of the code is unambiguous (open when a `Player` enters) and the result contradicts it — it is a **bug**, not an improvement (constitution v1.3.0, Principle I).
 
-**Correção mínima declarada (requisito (a) da cláusula)**: a classe portada referencia `DoorModel2/AnimationPlayer`. Nada mais muda: o node da cena não é renomeado, a lógica de `open` não é tocada, `door.tscn` só recebe a troca de tipo e a remoção do script. A animação `doorsimple_opening` existe nesse `AnimationPlayer` (verificado no modelo `door/model/door.dae`).
+**Declared minimal fix (requirement (a) of the clause)**: the ported class references `DoorModel2/AnimationPlayer`. Nothing else changes: the scene node is not renamed, the `open` logic is not touched, `door.tscn` only receives the type swap and the script removal. The `doorsimple_opening` animation exists in that `AnimationPlayer` (verified in the model `door/model/door.dae`).
 
-**Why this priority**: Menor script, sem consumidores (asset órfão — nenhuma cena instancia `door.tscn`), e o único com correção de bug: fica por último para que a correção seja um commit isolado e auditável. Depende de US1 (`is Player`).
+**Why this priority**: Smallest script, with no consumers (orphan asset — no scene instantiates `door.tscn`), and the only one with a bug fix: it goes last so that the fix is an isolated, auditable commit. Depends on US1 (`is Player`).
 
-**Independent Test**: `door.tscn` headless instancia **sem** o `ERROR: Node not found` que o original produz; em cena de teste isolada (fora do repo ou temporária, não commitada) um `Player` entrando na área faz a animação tocar uma vez.
+**Independent Test**: `door.tscn` headless instantiates **without** the `ERROR: Node not found` that the original produces; in an isolated test scene (outside the repo or temporary, uncommitted) a `Player` entering the area makes the animation play once.
 
 **Acceptance Scenarios**:
 
-1. **Given** `door.tscn` é instanciada isoladamente, **When** entra na cena, **Then** nenhum erro é impresso (no original: `ERROR: Node not found: "DoorModel/AnimationPlayer" (relative to "/root/Door")`).
-2. **Given** a porta está fechada (`open = false`), **When** um corpo que é `Player` entra na área (sinal `body_entered` conectado na cena a `_on_door_body_entered`), **Then** a animação "doorsimple_opening" toca e `open = true`.
-3. **Given** a porta já está aberta, **When** um `Player` entra de novo, **Then** nada acontece.
-4. **Given** um corpo que **não** é `Player` (bala, robô, peça) entra na área, **When** o sinal dispara, **Then** nada acontece.
-5. **Given** a correção foi aplicada, **When** a revisão de conformidade roda, **Then** encontra os quatro requisitos: declaração nesta spec, comentário `// upstream bug fix: ...` no ponto exato da referência, menção na mensagem do commit, e entrada em `docs/upstream-bugs.md` (defeito, script/cena, correção, commit).
-6. **Given** o jogo roda de ponta a ponta, **When** comparado ao original, **Then** nada visível muda (a porta não está em nenhuma cena do jogo).
+1. **Given** `door.tscn` is instantiated in isolation, **When** it enters the scene, **Then** no error is printed (in the original: `ERROR: Node not found: "DoorModel/AnimationPlayer" (relative to "/root/Door")`).
+2. **Given** the door is closed (`open = false`), **When** a body that is a `Player` enters the area (`body_entered` signal connected in the scene to `_on_door_body_entered`), **Then** the "doorsimple_opening" animation plays and `open = true`.
+3. **Given** the door is already open, **When** a `Player` enters again, **Then** nothing happens.
+4. **Given** a body that is **not** a `Player` (bullet, robot, part) enters the area, **When** the signal fires, **Then** nothing happens.
+5. **Given** the fix has been applied, **When** the compliance review runs, **Then** it finds the four requirements: declaration in this spec, comment `// upstream bug fix: ...` at the exact spot of the reference, mention in the commit message, and entry in `docs/upstream-bugs.md` (defect, script/scene, fix, commit).
+6. **Given** the game runs end to end, **When** compared to the original, **Then** nothing visible changes (the door is not in any scene of the game).
 
 ---
 
 ### Edge Cases
 
-- **Ordem `player_id` → árvore**: o level define `player_id` antes de `add_child`; o setter precisa alcançar o filho `InputSynchronizer` fora da árvore (o filho já existe como parte da cena instanciada). Quirk preservado.
-- **Primeiro pouso**: `airborne_time` inicia em 100 → o primeiro contato com o chão dispara `land` (som de pouso ao spawnar), como no original.
-- **`jumping` zerado pelo jogador**: a cada frame de física o jogador escreve `player_input.jumping = false`, mesmo sem pular — contrato com `PlayerInputSynchronizer.jumping` (escrita tipada).
-- **Tiro com cooldown**: `FireCooldown` é `autostart` de 0,4 s — nos primeiros 0,4 s após o spawn não é possível atirar (original).
-- **Bala nascida dentro de um colisor**: `add_collision_exception_with(self)` evita acertar o próprio jogador; qualquer outro corpo na origem explode no primeiro frame (original).
-- **Bala expira e colide no mesmo frame**: `time_alive < 0` marca `hit` e explode; o `move_and_collide` do mesmo frame ainda roda e pode explodir de novo (dois RPCs `explode`) — comportamento do original, preservado.
-- **`Settings` em execução isolada**: `explode` lê `/root/Settings` dinamicamente. Na validação prevista (execução headless de `bullet.tscn`/`player.tscn` via `--path`) o autoload **está** carregado (verificado), então o acesso funciona como no jogo. O autoload só falta em harness de `SceneTree` (`-s`) fora do repo — cenário do revisor, não do implementador; nesse caso o erro é o mesmo do original e não conta.
-- **Porta: corpo que sai e volta**: só o primeiro `Player` abre; não há fechamento (original).
-- **Porta: erro do upstream eliminado**: `Node not found: "DoorModel/AnimationPlayer"` deixa de existir — ele **não** está no catálogo do `CLAUDE.md` (que lista só os 3 erros de import), portanto o catálogo não muda.
-- **Respawn**: abaixo de −40 o jogador é teleportado, mas `velocity` não é zerada (original); o fade do `ColorRect` (Marco A) já cobre a queda.
+- **Order `player_id` → tree**: the level sets `player_id` before `add_child`; the setter needs to reach the child `InputSynchronizer` outside the tree (the child already exists as part of the instantiated scene). Quirk preserved.
+- **First landing**: `airborne_time` starts at 100 → the first contact with the ground triggers `land` (landing sound on spawn), as in the original.
+- **`jumping` zeroed by the player**: on each physics frame the player writes `player_input.jumping = false`, even without jumping — contract with `PlayerInputSynchronizer.jumping` (typed write).
+- **Shooting with cooldown**: `FireCooldown` is `autostart` of 0.4 s — in the first 0.4 s after spawn it is not possible to shoot (original).
+- **Bullet born inside a collider**: `add_collision_exception_with(self)` avoids hitting the player itself; any other body at the origin explodes on the first frame (original).
+- **Bullet expires and collides in the same frame**: `time_alive < 0` marks `hit` and explodes; the `move_and_collide` of the same frame still runs and may explode again (two `explode` RPCs) — behavior of the original, preserved.
+- **`Settings` in isolated run**: `explode` reads `/root/Settings` dynamically. In the planned validation (headless run of `bullet.tscn`/`player.tscn` via `--path`) the autoload **is** loaded (verified), so the access works as in the game. The autoload is only missing in a `SceneTree` harness (`-s`) outside the repo — the reviewer's scenario, not the implementer's; in that case the error is the same as the original's and does not count.
+- **Door: body that leaves and comes back**: only the first `Player` opens; there is no closing (original).
+- **Door: upstream error eliminated**: `Node not found: "DoorModel/AnimationPlayer"` ceases to exist — it is **not** in the `CLAUDE.md` catalog (which lists only the 3 import errors), therefore the catalog does not change.
+- **Respawn**: below −40 the player is teleported, but `velocity` is not zeroed (original); the `ColorRect` fade (Milestone A) already covers the fall.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-**Comportamento — jogador (US1)**
+**Behavior — player (US1)**
 
-- **FR-001**: A classe do jogador MUST chamar-se `Player` (obrigatório: `red_robot.gd:131,275,281` e `door.gd:10` fazem `is Player`) e ter base `CharacterBody3D`.
-- **FR-002**: `player_id` (inteiro, default 1) MUST ser exportado, replicado no spawn, e seu setter MUST guardar o valor e chamar `set_multiplayer_authority(value)` no filho `InputSynchronizer` — funcionando quando chamado antes de o node entrar na árvore (`level.gd:119`).
-- **FR-003**: `current_animation` MUST ser exportado como enumeração `Animations {JUMP_UP=0, JUMP_DOWN=1, STRAFE=2, WALK=3}`, default WALK, replicado por frame; `motion` (vetor 2D) MUST continuar acessível por nome para a replicação (`player.tscn:26`).
-- **FR-004**: Ao entrar na cena, MUST capturar `orientation` = transform global do `PlayerModel` com origem zerada e a posição inicial; se não for servidor, MUST desligar o processamento por frame.
-- **FR-005**: A cada frame de física, no servidor MUST executar `apply_input(delta)`; nos demais peers MUST apenas animar `current_animation`.
-- **FR-006**: `animate(anim)` MUST gravar `current_animation` e configurar o `AnimationTree` pelas propriedades dinâmicas `parameters/state/transition_request` ("jump_up" | "jump_down" | "strafe" | "walk"), `parameters/aim/add_amount` (`get_aim_rotation()` em STRAFE, 0 em WALK), `parameters/strafe/blend_position` (`(motion.x, −motion.y)`) e `parameters/walk/blend_position` (`(|motion|, 0)`).
-- **FR-007**: `apply_input(delta)` MUST reproduzir, na ordem, a lógica de `player.gd:86-176`: interpolação de `motion` (10×delta); eixos X/Z da base da câmera achatados e normalizados; `airborne_time += delta`; no chão, `land` se `airborne_time > 0.5` e zerar; `on_air = airborne_time > 0.1`; pulo (`velocity.y = 5`, `airborne_time = 0.1`, RPC `jump`) se não `on_air` e `jumping`; `jumping = false` sempre; ramos ar / mira (slerp para a base da câmera, STRAFE, root motion, tiro com cooldown) / andar (slerp para `Basis.looking_at(alvo)` se |alvo| > 0,001, WALK, root motion); `orientation *= root_motion`; velocidade horizontal = `orientation.origin / delta`; gravidade; `move_and_slide` com up +Y; zerar origem e ortonormalizar `orientation`; base global do modelo = `orientation.basis`; respawn se y < −40.
-- **FR-008**: O tiro MUST instanciar `player/bullet/bullet.tscn` como filho do pai do jogador (`add_child` com nome legível), posicionar na origem global de `ShootFrom`, orientar com `look_at` para `shoot_target`, adicionar exceção de colisão com o jogador e disparar o RPC `shoot`.
-- **FR-009**: Os RPCs `jump`, `land`, `shoot`, `hit`, `add_camera_shake_trauma(amount)` MUST existir com esses nomes, modo `authority`, `call_local`, transferência `unreliable` (defaults de `@rpc("call_local")`), com os efeitos de `player.gd:179-211`.
-- **FR-010**: `add_camera_shake_trauma` MUST chamar `add_trauma(amount)` na câmera referenciada por `player_input.camera_camera` com acesso **tipado** (`CameraNoiseShake`), nunca por chamada dinâmica.
-- **FR-011**: O acesso ao `InputSynchronizer` MUST ser tipado (`PlayerInputSynchronizer`): leitura de `motion`, `aiming`, `shooting`, `shoot_target`, `jumping`, escrita de `jumping`, e chamadas a `get_aim_rotation`, `get_camera_base_quaternion`, `get_camera_rotation_basis`.
+- **FR-001**: The player class MUST be named `Player` (mandatory: `red_robot.gd:131,275,281` and `door.gd:10` do `is Player`) and have base `CharacterBody3D`.
+- **FR-002**: `player_id` (integer, default 1) MUST be exported, replicated on spawn, and its setter MUST store the value and call `set_multiplayer_authority(value)` on the child `InputSynchronizer` — working when called before the node enters the tree (`level.gd:119`).
+- **FR-003**: `current_animation` MUST be exported as enumeration `Animations {JUMP_UP=0, JUMP_DOWN=1, STRAFE=2, WALK=3}`, default WALK, replicated per frame; `motion` (2D vector) MUST remain accessible by name for replication (`player.tscn:26`).
+- **FR-004**: On entering the scene, MUST capture `orientation` = global transform of `PlayerModel` with zeroed origin and the initial position; if not server, MUST turn off per-frame processing.
+- **FR-005**: On each physics frame, on the server MUST execute `apply_input(delta)`; on the other peers MUST only animate `current_animation`.
+- **FR-006**: `animate(anim)` MUST store `current_animation` and configure the `AnimationTree` through the dynamic properties `parameters/state/transition_request` ("jump_up" | "jump_down" | "strafe" | "walk"), `parameters/aim/add_amount` (`get_aim_rotation()` in STRAFE, 0 in WALK), `parameters/strafe/blend_position` (`(motion.x, −motion.y)`) and `parameters/walk/blend_position` (`(|motion|, 0)`).
+- **FR-007**: `apply_input(delta)` MUST reproduce, in order, the logic of `player.gd:86-176`: interpolation of `motion` (10×delta); X/Z axes of the camera basis flattened and normalized; `airborne_time += delta`; on the ground, `land` if `airborne_time > 0.5` and zero it; `on_air = airborne_time > 0.1`; jump (`velocity.y = 5`, `airborne_time = 0.1`, `jump` RPC) if not `on_air` and `jumping`; `jumping = false` always; air / aim (slerp toward the camera basis, STRAFE, root motion, shooting with cooldown) / walk (slerp toward `Basis.looking_at(target)` if |target| > 0.001, WALK, root motion) branches; `orientation *= root_motion`; horizontal velocity = `orientation.origin / delta`; gravity; `move_and_slide` with up +Y; zero the origin and orthonormalize `orientation`; global basis of the model = `orientation.basis`; respawn if y < −40.
+- **FR-008**: Shooting MUST instantiate `player/bullet/bullet.tscn` as a child of the player's parent (`add_child` with readable name), position it at the global origin of `ShootFrom`, orient it with `look_at` toward `shoot_target`, add a collision exception with the player and fire the `shoot` RPC.
+- **FR-009**: The RPCs `jump`, `land`, `shoot`, `hit`, `add_camera_shake_trauma(amount)` MUST exist with these names, mode `authority`, `call_local`, transfer `unreliable` (defaults of `@rpc("call_local")`), with the effects of `player.gd:179-211`.
+- **FR-010**: `add_camera_shake_trauma` MUST call `add_trauma(amount)` on the camera referenced by `player_input.camera_camera` with **typed** access (`CameraNoiseShake`), never via dynamic call.
+- **FR-011**: Access to the `InputSynchronizer` MUST be typed (`PlayerInputSynchronizer`): reading of `motion`, `aiming`, `shooting`, `shoot_target`, `jumping`, writing of `jumping`, and calls to `get_aim_rotation`, `get_camera_base_quaternion`, `get_camera_rotation_basis`.
 
-**Comportamento — bala (US2)**
+**Behavior — bullet (US2)**
 
-- **FR-012**: A bala MUST ter base `CharacterBody3D`, velocidade 20, `time_alive` inicial 5 s, `hit` inicial falso, e referências a `AnimationPlayer`, `CollisionShape3D`, `OmniLight3D`.
-- **FR-013**: Ao entrar na cena em peer não-servidor, MUST desligar o processamento de física e desabilitar a colisão.
-- **FR-014**: A cada frame de física MUST reproduzir `bullet.gd:20-35`: retornar se `hit`; decrementar `time_alive` e explodir (marcando `hit`) se negativo; deslocar `−delta × 20 × basis.z` com `move_and_collide`; em colisão, chamar `hit` por RPC no colisor **se ele tiver esse método** (`has_method` — duck typing do original, preservado), desabilitar colisão, explodir, marcar `hit`.
-- **FR-015**: O RPC `explode` (`authority`, `call_local`, `unreliable`) MUST tocar a animação "explode" e ligar `shadow_enabled` na luz quando `Settings.config_file` tem `rendering/shadow_mapping` verdadeiro.
-- **FR-016**: O acesso a `Settings` MUST seguir a exceção do Princípio II: obter o autoload dinamicamente em `/root/Settings`, ler `config_file` e, a partir daí, usar a API tipada de `ConfigFile`. O backlog v2 item 1 já cobre isso — não duplicar.
-- **FR-017**: `destroy()` MUST existir com esse nome (method track da animação "explode", `bullet.tscn:104`), retornar se não for servidor, senão remover a bala da cena.
-- **FR-018**: A replicação de `global_transform` (`bullet.tscn:12`) MUST continuar válida sem edição.
+- **FR-012**: The bullet MUST have base `CharacterBody3D`, velocity 20, initial `time_alive` 5 s, initial `hit` false, and references to `AnimationPlayer`, `CollisionShape3D`, `OmniLight3D`.
+- **FR-013**: On entering the scene on a non-server peer, MUST turn off physics processing and disable the collision.
+- **FR-014**: On each physics frame MUST reproduce `bullet.gd:20-35`: return if `hit`; decrement `time_alive` and explode (marking `hit`) if negative; move `−delta × 20 × basis.z` with `move_and_collide`; on collision, call `hit` via RPC on the collider **if it has that method** (`has_method` — duck typing of the original, preserved), disable collision, explode, mark `hit`.
+- **FR-015**: The `explode` RPC (`authority`, `call_local`, `unreliable`) MUST play the "explode" animation and enable `shadow_enabled` on the light when `Settings.config_file` has `rendering/shadow_mapping` true.
+- **FR-016**: Access to `Settings` MUST follow the Principle II exception: obtain the autoload dynamically at `/root/Settings`, read `config_file` and, from there, use the typed `ConfigFile` API. v2 backlog item 1 already covers this — do not duplicate.
+- **FR-017**: `destroy()` MUST exist with that name (method track of the "explode" animation, `bullet.tscn:104`), return if not server, otherwise remove the bullet from the scene.
+- **FR-018**: The replication of `global_transform` (`bullet.tscn:12`) MUST remain valid with no edits.
 
-**Comportamento — porta (US3)**
+**Behavior — door (US3)**
 
-- **FR-019**: A porta MUST ter base `Area3D`, `open` inicial falso, e o handler `_on_door_body_entered(body)` com esse nome (conexão em `door.tscn:37`).
-- **FR-020**: Ao entrar um corpo, se não `open` e o corpo é `Player`, MUST tocar "doorsimple_opening" no `AnimationPlayer` do modelo e marcar `open = true`; caso contrário não faz nada.
+- **FR-019**: The door MUST have base `Area3D`, initial `open` false, and the handler `_on_door_body_entered(body)` with that name (connection in `door.tscn:37`).
+- **FR-020**: When a body enters, if not `open` and the body is a `Player`, MUST play "doorsimple_opening" on the model's `AnimationPlayer` and mark `open = true`; otherwise it does nothing.
 
-**Ciclo de porte — comuns aos três (Princípio II)**
+**Port cycle — common to the three (Principle II)**
 
-- **FR-021**: Cada script MUST virar exatamente uma classe registrada pela extensão nativa, com a mesma base (`CharacterBody3D`, `CharacterBody3D`, `Area3D`).
-- **FR-022**: O vínculo MUST ser por troca de `type` na `.tscn` com remoção de `script` e do `ext_resource` órfão; nenhum `.gd` ponte.
-- **FR-023**: `.gd` e `.gd.uid` MUST ser apagados no mesmo commit do port.
-- **FR-024**: Nomes de métodos expostos, RPCs e propriedades exportadas/replicadas MUST ser idênticos ao GDScript, conferidos contra `player.tscn` (`ServerSynchronizer`: `transform`, `player_id`, `PlayerModel:transform`, `motion`, `current_animation`), `bullet.tscn` (`global_transform`; method track `destroy`) e `door.tscn` (conexão `_on_door_body_entered`).
-- **FR-025**: O código portado MUST NOT chamar API customizada de GDScript. As únicas chamadas dinâmicas permitidas são as que o original já faz dinamicamente (`has_method("hit")` + `rpc("hit")` na bala; propriedades dinâmicas do `AnimationTree`, que são API base) e a exceção `Settings`.
-- **FR-026**: Cada alteração de código MUST ser seguida de build de debug sem warnings novos.
-- **FR-027**: Cada port MUST ser validado em headless: import com carregamento da extensão + execução da(s) cena(s) afetada(s) sem erros novos além da baseline (os 3 do `CLAUDE.md`). Para a porta, a baseline **exclui** o `Node not found` do original — ele deve desaparecer.
-- **FR-028**: Um commit por script, mensagem com script portado e cena alterada; a ordem de entrega MUST ser 1 → 2 → 3 e o jogo MUST ficar jogável após cada commit.
-- **FR-029**: Os 7 scripts fora do marco MUST permanecer byte a byte intactos; melhorias percebidas MUST ir para `docs/v2-backlog.md` no mesmo commit.
+- **FR-021**: Each script MUST become exactly one class registered by the native extension, with the same base (`CharacterBody3D`, `CharacterBody3D`, `Area3D`).
+- **FR-022**: The binding MUST be by `type` swap in the `.tscn` with removal of `script` and of the orphan `ext_resource`; no bridge `.gd`.
+- **FR-023**: `.gd` and `.gd.uid` MUST be deleted in the same commit as the port.
+- **FR-024**: Names of exposed methods, RPCs and exported/replicated properties MUST be identical to GDScript, verified against `player.tscn` (`ServerSynchronizer`: `transform`, `player_id`, `PlayerModel:transform`, `motion`, `current_animation`), `bullet.tscn` (`global_transform`; method track `destroy`) and `door.tscn` (`_on_door_body_entered` connection).
+- **FR-025**: The ported code MUST NOT call custom GDScript API. The only allowed dynamic calls are the ones the original already makes dynamically (`has_method("hit")` + `rpc("hit")` in the bullet; dynamic properties of the `AnimationTree`, which are base API) and the `Settings` exception.
+- **FR-026**: Each code change MUST be followed by a debug build with no new warnings.
+- **FR-027**: Each port MUST be validated headless: import with the extension loading + run of the affected scene(s) with no new errors beyond the baseline (the 3 from `CLAUDE.md`). For the door, the baseline **excludes** the original's `Node not found` — it must disappear.
+- **FR-028**: One commit per script, message with the ported script and the changed scene; the delivery order MUST be 1 → 2 → 3 and the game MUST remain playable after each commit.
+- **FR-029**: The 7 scripts outside the milestone MUST remain byte-for-byte intact; noticed improvements MUST go to `docs/v2-backlog.md` in the same commit.
 
-**Correção conservadora de bug do upstream — porta (Princípio I, v1.3.0)**
+**Conservative upstream bug fix — door (Principle I, v1.3.0)**
 
-- **FR-030**: O defeito: `door.gd:6` referencia `DoorModel/AnimationPlayer`, mas o node em `door.tscn:13` chama-se `DoorModel2`; resultado: `ERROR: Node not found: "DoorModel/AnimationPlayer" (relative to "/root/Door")` e a porta nunca abre. Classificação: **bug** (intenção inequívoca contradita pelo resultado).
-- **FR-031**: A correção MUST ser mínima: referenciar `DoorModel2/AnimationPlayer`. É PROIBIDO renomear o node da cena, alterar a lógica de `open`, ou tocar em `door.tscn` além da troca de `type` e remoção do script.
-- **FR-032**: A correção MUST estar isolada e identificável no código, com comentário `// upstream bug fix: ...` no ponto exato da referência.
-- **FR-033**: A mensagem do commit do port da porta MUST mencionar a correção.
-- **FR-034**: `docs/upstream-bugs.md` MUST ser criado neste marco (cabeçalho + primeira entrada: defeito, script/cena, correção aplicada, commit).
-- **FR-035**: Nenhuma outra correção MUST ser aplicada neste marco; qualquer outro defeito ou melhoria percebida vai para `docs/v2-backlog.md` (ou, se for bug objetivo, é declarado em spec futura).
+- **FR-030**: The defect: `door.gd:6` references `DoorModel/AnimationPlayer`, but the node in `door.tscn:13` is named `DoorModel2`; result: `ERROR: Node not found: "DoorModel/AnimationPlayer" (relative to "/root/Door")` and the door never opens. Classification: **bug** (unambiguous intent contradicted by the result).
+- **FR-031**: The fix MUST be minimal: reference `DoorModel2/AnimationPlayer`. It is FORBIDDEN to rename the scene node, change the `open` logic, or touch `door.tscn` beyond the `type` swap and script removal.
+- **FR-032**: The fix MUST be isolated and identifiable in the code, with comment `// upstream bug fix: ...` at the exact spot of the reference.
+- **FR-033**: The commit message of the door port MUST mention the fix.
+- **FR-034**: `docs/upstream-bugs.md` MUST be created in this milestone (header + first entry: defect, script/scene, fix applied, commit).
+- **FR-035**: No other fix MUST be applied in this milestone; any other noticed defect or improvement goes to `docs/v2-backlog.md` (or, if it is an objective bug, is declared in a future spec).
 
 ### Key Entities
 
-- **Player (contrato consumido por GDScript)**: nome de classe `Player`; propriedades `player_id` (int, setter com efeito colateral), `current_animation` (enum), `motion` (vetor 2D, replicado); RPCs `jump`, `land`, `shoot`, `hit`, `add_camera_shake_trauma(amount)`; método interno `animate(anim)` (não consumido por nenhum script externo — chamado apenas de dentro da própria classe e dos RPCs `jump`/`land`; fica privado, como os métodos internos do Marco A); consumidores `red_robot.gd`, `level.gd`, `bullet` (via `has_method`), `door`.
-- **Estado interno do jogador**: `airborne_time` (inicial 100), `orientation` e `root_motion` (transforms), `initial_position`; referências de cena `InputSynchronizer`, `AnimationTree`, `PlayerModel`, `ShootFrom` (+ `ShootParticle`, `MuzzleFlash`), `Crosshair`, `FireCooldown`, `SoundEffects/Jump|Land|Shoot`.
-- **Bullet**: `time_alive`, `hit`; RPC `explode`; método `destroy` (method track); replicação `global_transform`; dependência dinâmica de `Settings.config_file`.
-- **Door**: `open`; handler `_on_door_body_entered`; referência corrigida `DoorModel2/AnimationPlayer`.
-- **Registro de bugs do upstream** (`docs/upstream-bugs.md`): entrada por correção — defeito, script/cena, correção aplicada, commit.
+- **Player (contract consumed by GDScript)**: class name `Player`; properties `player_id` (int, setter with side effect), `current_animation` (enum), `motion` (2D vector, replicated); RPCs `jump`, `land`, `shoot`, `hit`, `add_camera_shake_trauma(amount)`; internal method `animate(anim)` (not consumed by any external script — called only from within the class itself and from the `jump`/`land` RPCs; stays private, like the internal methods of Milestone A); consumers `red_robot.gd`, `level.gd`, `bullet` (via `has_method`), `door`.
+- **Player internal state**: `airborne_time` (initial 100), `orientation` and `root_motion` (transforms), `initial_position`; scene references `InputSynchronizer`, `AnimationTree`, `PlayerModel`, `ShootFrom` (+ `ShootParticle`, `MuzzleFlash`), `Crosshair`, `FireCooldown`, `SoundEffects/Jump|Land|Shoot`.
+- **Bullet**: `time_alive`, `hit`; RPC `explode`; method `destroy` (method track); replication `global_transform`; dynamic dependency on `Settings.config_file`.
+- **Door**: `open`; handler `_on_door_body_entered`; corrected reference `DoorModel2/AnimationPlayer`.
+- **Upstream bug register** (`docs/upstream-bugs.md`): entry per fix — defect, script/scene, fix applied, commit.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: Ao final do marco o projeto contém exatamente **7** arquivos `.gd` (e 7 `.uid`); os 7 são byte a byte idênticos ao estado anterior ao marco.
-- **SC-002**: O jogo abre pelo menu, entra no level e — mover, pular (com som), pousar (com som), mirar, atirar com bala visível que explode e acerta robôs, tremor de câmera, respawn ao cair abaixo de −40 — é indistinguível do original em `../oxide_godot_origins/` numa comparação lado a lado feita pelo usuário.
-- **SC-003**: Para cada um dos 3 ports, a validação headless (import + cenas afetadas) reporta zero erros novos além dos 3 catalogados; para a porta, o `ERROR: Node not found` do original **não** aparece mais.
-- **SC-004**: Após cada um dos 3 commits o jogo é jogável de ponta a ponta.
-- **SC-005**: O histórico do marco tem exatamente 3 commits `Port …` (um por script) e nenhum toca os 7 scripts fora de escopo; o commit da porta menciona a correção do bug.
-- **SC-006**: Build de debug sem nenhum warning novo em todos os commits.
-- **SC-007**: Nenhuma linha portada introduz abstração, refatoração ou otimização; a única diferença de comportamento em relação ao original é a porta abrir, e ela está isolada por comentário, declarada aqui, no commit e em `docs/upstream-bugs.md` (4/4 requisitos da cláusula).
-- **SC-008**: `red_robot.gd`, `level.gd` e a bala continuam encontrando `Player`, `player_id`, `name`, `hit` e `add_camera_shake_trauma` pelos nomes originais — nenhum aviso de tipo/método/propriedade inexistente nos logs headless nem no editor.
-- **SC-009**: `door.tscn` instancia sem erro e, em teste isolado, abre exatamente uma vez para um `Player`.
+- **SC-001**: At the end of the milestone the project contains exactly **7** `.gd` files (and 7 `.uid`); the 7 are byte-for-byte identical to the state before the milestone.
+- **SC-002**: The game opens from the menu, enters the level and — move, jump (with sound), land (with sound), aim, shoot with a visible bullet that explodes and hits robots, camera shake, respawn when falling below −40 — is indistinguishable from the original in `../oxide_godot_origins/` in a side-by-side comparison done by the user.
+- **SC-003**: For each of the 3 ports, the headless validation (import + affected scenes) reports zero new errors beyond the 3 cataloged; for the door, the original's `ERROR: Node not found` **no longer** appears.
+- **SC-004**: After each of the 3 commits the game is playable end to end.
+- **SC-005**: The milestone history has exactly 3 `Port …` commits (one per script) and none touches the 7 out-of-scope scripts; the door commit mentions the bug fix.
+- **SC-006**: Debug build with no new warning in all commits.
+- **SC-007**: No ported line introduces abstraction, refactoring or optimization; the only behavior difference from the original is the door opening, and it is isolated by a comment, declared here, in the commit and in `docs/upstream-bugs.md` (4/4 requirements of the clause).
+- **SC-008**: `red_robot.gd`, `level.gd` and the bullet keep finding `Player`, `player_id`, `name`, `hit` and `add_camera_shake_trauma` by the original names — no warning of non-existent type/method/property in the headless logs nor in the editor.
+- **SC-009**: `door.tscn` instantiates with no error and, in an isolated test, opens exactly once for a `Player`.
 
 ## Assumptions
 
-- Fase v1 (constituição v1.3.0); Princípio I com a cláusula de correção conservadora usada uma única vez (porta).
-- Validação visual (SC-002, SC-009) pelo usuário; validação automatizada exclusivamente headless. O revisor pode rodar um harness de paridade fora do repositório; nada disso entra no código.
-- Validação single-player: o peer local é **servidor e autoridade**. Os ramos "cliente" (FR-004, FR-005, FR-013, FR-017) são verificados por leitura de código e headless; multiplayer real com dois peers está fora de escopo.
-- Fora de escopo: `part.gd`, `red_robot.gd`, `flying_forklift.gd`, `level.gd`, `menu.gd`, `main.gd`, `settings.gd`; acesso tipado ao `Settings` (backlog v2 item 1); qualquer outra correção ou melhoria.
-- `door.tscn` é asset órfão: a correção não muda nada visível no jogo; sua validação funcional é em cena de teste isolada não commitada.
-- O erro `Node not found` da porta não consta do catálogo do `CLAUDE.md`; a regra do Princípio II sobre atualizar o catálogo no mesmo commit fica satisfeita sem alteração (nada a remover) — registrar essa constatação na mensagem do commit da porta.
-- Quirks do original preservados propositalmente: `airborne_time = 100` inicial; setter de `player_id` fora da árvore; `jumping` zerado pelo jogador a cada frame; possível duplo `explode` quando a bala expira e colide no mesmo frame; `velocity` não zerada no respawn. Cada um é candidato ao backlog v2, não a correção.
-- `BulletCache` em `player.tscn` passa a instanciar a classe nativa da bala; como não é servidor-dependente (é só pré-aquecimento de shaders/recursos), não há efeito observável.
+- Phase v1 (constitution v1.3.0); Principle I with the conservative fix clause used a single time (door).
+- Visual validation (SC-002, SC-009) by the user; automated validation exclusively headless. The reviewer may run a parity harness outside the repository; none of that goes into the code.
+- Single-player validation: the local peer is **server and authority**. The "client" branches (FR-004, FR-005, FR-013, FR-017) are verified by code reading and headless; real multiplayer with two peers is out of scope.
+- Out of scope: `part.gd`, `red_robot.gd`, `flying_forklift.gd`, `level.gd`, `menu.gd`, `main.gd`, `settings.gd`; typed access to `Settings` (v2 backlog item 1); any other fix or improvement.
+- `door.tscn` is an orphan asset: the fix changes nothing visible in the game; its functional validation is in an isolated, uncommitted test scene.
+- The door's `Node not found` error is not in the `CLAUDE.md` catalog; the Principle II rule about updating the catalog in the same commit is satisfied with no change (nothing to remove) — record this finding in the door commit message.
+- Quirks of the original deliberately preserved: initial `airborne_time = 100`; `player_id` setter outside the tree; `jumping` zeroed by the player every frame; possible double `explode` when the bullet expires and collides in the same frame; `velocity` not zeroed on respawn. Each one is a v2 backlog candidate, not a fix.
+- `BulletCache` in `player.tscn` now instantiates the bullet's native class; since it is not server-dependent (it is only shader/resource pre-warming), there is no observable effect.

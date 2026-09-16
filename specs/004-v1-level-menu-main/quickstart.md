@@ -1,185 +1,185 @@
-# Quickstart: validação de cada port (Marco D)
+# Quickstart: validation of each port (Milestone D)
 
-Guia de execução/validação — o que rodar, na ordem, e o que esperar. Detalhes de código em
-[research.md](research.md); nomes a conferir em [contracts/](contracts/). Caminhos relativos à
-raiz do repositório (`oxide-godot/`, onde está este `specs/`).
+Execution/validation guide — what to run, in order, and what to expect. Code details in
+[research.md](research.md); names to check in [contracts/](contracts/). Paths relative to the
+repository root (`oxide-godot/`, where this `specs/` lives).
 
-## Pré-requisitos
+## Prerequisites
 
-- `/usr/bin/godot.x86_64` = Godot 4.7.2 stable (não há `godot` no PATH).
-- `cargo`/`rustc` 1.98.x; crate `godot` 0.5.5. **Neste marco `Cargo.toml` muda uma vez** (port 3:
-  `features = ["experimental-threads"]`, research D1) — fora disso, não editar.
-- **Nenhum editor Godot aberto** no projeto durante validação headless (`pgrep -a godot` vazio).
-  Avisar o usuário antes de começar; nunca matar o processo dele.
-- Árvore limpa na `main` (`git status --short` vazio) antes de cada port.
+- `/usr/bin/godot.x86_64` = Godot 4.7.2 stable (there is no `godot` on PATH).
+- `cargo`/`rustc` 1.98.x; crate `godot` 0.5.5. **In this milestone `Cargo.toml` changes once** (port 3:
+  `features = ["experimental-threads"]`, research D1) — other than that, do not edit it.
+- **No Godot editor open** on the project during headless validation (`pgrep -a godot` empty).
+  Warn the user before starting; never kill their process.
+- Clean tree on `main` (`git status --short` empty) before each port.
 
-## Baseline (medida em 2026-09-16, commit `a866428`, antes de qualquer port deste marco)
+## Baseline (measured on 2026-09-16, commit `a866428`, before any port of this milestone)
 
-- `cargo build`: **0 warnings** (sem a feature).
-- Import headless: linha 1 = `Initialize godot-rust (…)`; **0 linhas `ERROR`**. Os 3 erros do
-  upstream catalogados no `CLAUDE.md` só aparecem em import limpo e não contam.
+- `cargo build`: **0 warnings** (without the feature).
+- Headless import: line 1 = `Initialize godot-rust (…)`; **0 `ERROR` lines**. The 3 upstream errors
+  cataloged in `CLAUDE.md` only appear on a clean import and do not count.
 - `level/forklift/flying_forklift.tscn`: exit 124, 0 `ERROR`, 1 WARNING (HDR).
 - `level/level.tscn`: exit 124, 0 `ERROR`, 2 WARNINGs (HDR, Physics interpolation).
-- `menu/menu.tscn`: exit 124, 0 `ERROR`, 1 WARNING (HDR). Em headless o menu **hospeda sozinho**
-  (`_on_host_pressed` diferido) e carrega o level em thread; sem o `main`, o sinal
-  `replace_main_scene` é emitido e nada o consome.
-- `main/main.tscn`: exit 124, 2 WARNINGs. Fluxo completo boot → menu → host automático → level.
-  **Erro intermitente do engine** (1 em 6 execuções, a primeira após `--import`): 5 linhas
-  `ERROR` do renderizador dummy — `Initializing already initialized RID`, `Parameter "mem" is null.`,
-  3× `Parameter "m" is null.` (`rid_owner.h`, `dummy/storage/mesh_storage.h`). Vem da corrida
-  entre o carregamento do level em sub-thread e o renderizador dummy; o original intocado tem a
-  mesma arquitetura. **Regra**: se essas 5 linhas exatas aparecerem, executar de novo — não são
-  regressão se sumirem; qualquer outra linha `ERROR`, ou essas mesmas em 3 execuções seguidas, é
-  regressão. Catalogar no `CLAUDE.md` (edição operacional) no commit do port 3 junto com a linha
-  da feature.
-- `docs/upstream-bugs.md`: 2 entradas (não muda); `docs/v2-backlog.md`: 18 itens.
+- `menu/menu.tscn`: exit 124, 0 `ERROR`, 1 WARNING (HDR). In headless the menu **hosts by itself**
+  (deferred `_on_host_pressed`) and loads the level in a thread; without the `main`, the signal
+  `replace_main_scene` is emitted and nothing consumes it.
+- `main/main.tscn`: exit 124, 2 WARNINGs. Full flow boot → menu → automatic host → level.
+  **Intermittent engine error** (1 in 6 runs, the first after `--import`): 5 `ERROR` lines
+  from the dummy renderer — `Initializing already initialized RID`, `Parameter "mem" is null.`,
+  3× `Parameter "m" is null.` (`rid_owner.h`, `dummy/storage/mesh_storage.h`). It comes from the race
+  between the level loading in a sub-thread and the dummy renderer; the untouched original has the
+  same architecture. **Rule**: if those exact 5 lines appear, run again — they are not a
+  regression if they disappear; any other `ERROR` line, or those same ones in 3 consecutive runs, is a
+  regression. Catalog in `CLAUDE.md` (operational edit) in the port 3 commit together with the
+  feature line.
+- `docs/upstream-bugs.md`: 2 entries (does not change); `docs/v2-backlog.md`: 18 items.
 
-Qualquer linha `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
-`Nonexistent`, `panicked` ou **`shadows a native class`** que não esteja nesta baseline é regressão.
+Any `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
+`Nonexistent`, `panicked` or **`shadows a native class`** line not in this baseline is a regression.
 
-## Ciclo por script (repetir 4 vezes, na ordem 1 → 4)
+## Cycle per script (repeat 4 times, in order 1 → 4)
 
 ### 1. Build
 
 ```bash
 cd oxide_godot_core && cargo build 2>&1 | tail -20
-cargo build 2>&1 | grep -c '^warning'      # esperado: 0
+cargo build 2>&1 | grep -c '^warning'      # expected: 0
 ```
 
-No port 3, o primeiro build após ativar a feature regenera as bindings do `godot-core` (alguns
-minutos na primeira vez; o diretório `target/debug/build/godot-core-*/out` ganha um segundo
-hash). Depois disso, `ls -dt oxide_godot_core/target/debug/build/godot-core-*/out | head -1` é
-o diretório válido para consultar assinaturas.
+In port 3, the first build after enabling the feature regenerates the `godot-core` bindings (a few
+minutes the first time; the directory `target/debug/build/godot-core-*/out` gains a second
+hash). After that, `ls -dt oxide_godot_core/target/debug/build/godot-core-*/out | head -1` is
+the valid directory for looking up signatures.
 
-### 2. Import headless (extensão carregou?)
+### 2. Headless import (did the extension load?)
 
 ```bash
 cd oxide-godot && /usr/bin/godot.x86_64 --headless --import --path . 2>&1 | tee /tmp/import.log
-grep -n 'Initialize godot-rust' /tmp/import.log        # deve existir (linha 1)
-grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # esperado: vazio (ou só os 3 do upstream)
+grep -n 'Initialize godot-rust' /tmp/import.log        # must exist (line 1)
+grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # expected: empty (or only the 3 upstream ones)
 ```
 
-### 3. Execução headless da(s) cena(s) afetada(s)
+### 3. Headless run of the affected scene(s)
 
 ```bash
-cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <cena>.tscn 2>&1 | tee /tmp/run.log
-grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked|shadows a native class' /tmp/run.log   # esperado: vazio
-grep -c '^WARNING' /tmp/run.log                                                                                              # só os benignos da baseline
+cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <scene>.tscn 2>&1 | tee /tmp/run.log
+grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked|shadows a native class' /tmp/run.log   # expected: empty
+grep -c '^WARNING' /tmp/run.log                                                                                              # only the benign ones from the baseline
 ```
 
-| Port | `<cena>` a rodar | O que exercita |
+| Port | `<scene>` to run | What it exercises |
 |---|---|---|
-| 1 `flying_forklift.gd` | `level/forklift/flying_forklift.tscn` **e** `level/level.tscn` | `ready` da empilhadeira (Settings dinâmico, sorteio do modelo) isolada e nas instâncias do level |
-| 2 `level.gd` | `level/level.tscn` **e** `main/main.tscn` | Level isolado: Settings dinâmico, GI, spawn tipado de 4 `EnemyRobot` e do `Player` 1, conexões `peer_*`. `main.tscn` (ainda `main.gd`): menu hospeda → `replace_main_scene` → `main.gd` instancia o `Level` Rust e conecta `quit` por `has_signal` |
-| 3 `menu.gd` | `menu/menu.tscn` **e** `main/main.tscn` | Menu isolado em headless: `ready` (85 `OnReady`, 15 `ButtonGroup`), host automático, loading em thread (feature), `DoneTimer`, emissão de `replace_main_scene`. `main.tscn` (ainda `main.gd`): fluxo completo com `Menu` Rust |
-| 4 `main.gd` | `main/main.tscn` | Boot Rust → `Menu` → host → `Level`; `has_signal`/`connect` por nome resolvem nas classes Rust |
+| 1 `flying_forklift.gd` | `level/forklift/flying_forklift.tscn` **and** `level/level.tscn` | the forklift's `ready` (dynamic Settings, model pick) in isolation and in the level's instances |
+| 2 `level.gd` | `level/level.tscn` **and** `main/main.tscn` | Level in isolation: dynamic Settings, GI, typed spawn of 4 `EnemyRobot` and of `Player` 1, `peer_*` connections. `main.tscn` (still `main.gd`): menu hosts → `replace_main_scene` → `main.gd` instantiates the Rust `Level` and connects `quit` via `has_signal` |
+| 3 `menu.gd` | `menu/menu.tscn` **and** `main/main.tscn` | Menu in isolation in headless: `ready` (85 `OnReady`, 15 `ButtonGroup`), automatic host, threaded loading (feature), `DoneTimer`, emission of `replace_main_scene`. `main.tscn` (still `main.gd`): full flow with the Rust `Menu` |
+| 4 `main.gd` | `main/main.tscn` | Rust boot → `Menu` → host → `Level`; `has_signal`/`connect` by name resolve on the Rust classes |
 
-Exit 124 (timeout) é o esperado; a validação é a ausência de linhas novas no `grep`. Para
-`main.tscn`, aplicar a regra do erro intermitente da baseline.
+Exit 124 (timeout) is expected; the validation is the absence of new lines in the `grep`. For
+`main.tscn`, apply the baseline's intermittent-error rule.
 
-### 4. Verificações mecânicas do ciclo (Princípio II)
+### 4. Mechanical checks of the cycle (Principle II)
 
 ```bash
-ls oxide-godot/<caminho>/<script>.gd oxide-godot/<caminho>/<script>.gd.uid   # esperado: No such file
-grep -rn '<uid do .gd>' oxide-godot/ | grep -v '/.godot/'                     # esperado: vazio
-grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # esperado: vazio
-grep -c 'type="<Classe>"' oxide-godot/<cena>.tscn                             # 1
-grep -c 'ExtResource("<id>")' oxide-godot/<cena>.tscn                         # 0  (ids: forklift "3"; level/menu/main "1")
-git diff --stat HEAD -- 'oxide-godot/**/*.gd'   # só a deleção do script deste port; settings.gd nunca aparece
+ls oxide-godot/<path>/<script>.gd oxide-godot/<path>/<script>.gd.uid   # expected: No such file
+grep -rn '<uid of the .gd>' oxide-godot/ | grep -v '/.godot/'                     # expected: empty
+grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # expected: empty
+grep -c 'type="<Class>"' oxide-godot/<scene>.tscn                             # 1
+grep -c 'ExtResource("<id>")' oxide-godot/<scene>.tscn                         # 0  (ids: forklift "3"; level/menu/main "1")
+git diff --stat HEAD -- 'oxide-godot/**/*.gd'   # only the deletion of this port's script; settings.gd never appears
 ```
 
-Uids, ids e linhas por port: tabela "Edição das cenas" do [plan.md](plan.md).
+Uids, ids and lines per port: "Scene editing" table of [plan.md](plan.md).
 
-### 5. Conferência de nomes (todos os ports)
+### 5. Name check (all ports)
 
-Rodar a seção "Verificação antes do commit" do contrato do port
+Run the "Verification before the commit" section of the port's contract
 ([contracts/flying-forklift.md](contracts/flying-forklift.md), [level.md](contracts/level.md),
 [menu.md](contracts/menu.md), [main.md](contracts/main.md)).
 
-No port 2, conferir que `player.rs` e `red_robot.rs` só mudaram em visibilidade:
+In port 2, check that `player.rs` and `red_robot.rs` only changed in visibility:
 
 ```bash
 git diff HEAD -- oxide_godot_core/oxide_godot_lib/src/player.rs oxide_godot_core/oxide_godot_lib/src/red_robot.rs | grep '^[-+]' | grep -v '^[-+][-+]'
-# esperado: exatamente 4 linhas — "-    fn set_player_id(" / "+    pub(crate) fn set_player_id(" e "-    fn exploded();" / "+    pub(crate) fn exploded();"
+# expected: exactly 4 lines — "-    fn set_player_id(" / "+    pub(crate) fn set_player_id(" and "-    fn exploded();" / "+    pub(crate) fn exploded();"
 ```
 
-No port 3, conferir `Cargo.toml` e `CLAUDE.md`:
+In port 3, check `Cargo.toml` and `CLAUDE.md`:
 
 ```bash
-git diff HEAD -- oxide_godot_core/Cargo.toml | grep '^[-+]godot'   # 1 par: features = ["experimental-threads"]
-git diff --stat HEAD -- CLAUDE.md                                   # só linhas adicionadas (feature + erro intermitente)
+git diff HEAD -- oxide_godot_core/Cargo.toml | grep '^[-+]godot'   # 1 pair: features = ["experimental-threads"]
+git diff --stat HEAD -- CLAUDE.md                                   # only added lines (feature + intermittent error)
 ```
 
-### 6. Validação visual (usuário, no editor/jogo)
+### 6. Visual validation (user, in the editor/game)
 
-Abrir o projeto no editor, rodar (F5) e conferir o item do port na tabela "Validação visual por
-script" do [plan.md](plan.md), comparando com `../oxide_godot_origins/`. Ao abrir a cena editada:
-raiz com o tipo Rust, sem script; `menu.tscn` com as 10 conexões no painel de sinais; `main.tscn`
-com o node ainda chamado `main`.
+Open the project in the editor, run (F5) and check the port's item in the "Visual validation per
+script" table of [plan.md](plan.md), comparing with `../oxide_godot_origins/`. When opening the edited scene:
+root with the Rust type, no script; `menu.tscn` with the 10 connections in the signals panel; `main.tscn`
+with the node still named `main`.
 
-### 7. Backlog v2
+### 7. v2 backlog
 
-Adicionar em `docs/v2-backlog.md` os candidatos de research.md §"Backlog v2 candidato" do script
-(port 1: 19; port 2: 20–21; port 3: 22–23; port 4: 24), **antes** do commit. Numeração continua
-de 19.
+Add to `docs/v2-backlog.md` the candidates from research.md §"v2 backlog candidates" for the script
+(port 1: 19; port 2: 20–21; port 3: 22–23; port 4: 24), **before** the commit. Numbering continues
+from 19.
 
 ### 8. Commit
 
-Um commit por script, na `main`, incluindo: módulo Rust novo + `lib.rs` (+ port 2: `player.rs`,
-`red_robot.rs` só visibilidade; + port 3: `Cargo.toml`, `CLAUDE.md`), `.tscn` editada, `.gd` +
-`.gd.uid` apagados, `docs/v2-backlog.md`. Autor: the repository author.
+One commit per script, on `main`, including: new Rust module + `lib.rs` (+ port 2: `player.rs`,
+`red_robot.rs` visibility only; + port 3: `Cargo.toml`, `CLAUDE.md`), edited `.tscn`, `.gd` +
+`.gd.uid` deleted, `docs/v2-backlog.md`.
 
 ```
 Port flying_forklift.gd → FlyingForklift (CharacterBody3D); flying_forklift.tscn: node FlyingForklift type="CharacterBody3D"→"FlyingForklift"
 
-- base CharacterBody3D = tipo do node (script extends Node3D — constituição v1.3.1, Princípio II)
-- <notas>; backlog v2: item 19
+- base CharacterBody3D = the node's type (script extends Node3D — constitution v1.3.1, Principle II)
+- <notes>; v2 backlog: item 19
 ```
 
 ```
 Port level.gd → Level (Node3D); level.tscn: node Level type="Node3D"→"Level"
 
-- <notas: sinal quit; EnemyRobot/Player tipados; Settings dinâmico; add_player/del_player por closure>
-- player.rs / red_robot.rs: só visibilidade pub(crate) em set_player_id / exploded (acesso tipado, FR-025); nenhuma lógica movida
-- backlog v2: itens 20, 21
+- <notes: quit signal; EnemyRobot/Player typed; dynamic Settings; add_player/del_player via closure>
+- player.rs / red_robot.rs: only pub(crate) visibility on set_player_id / exploded (typed access, FR-025); no logic moved
+- v2 backlog: items 20, 21
 ```
 
 ```
 Port menu.gd → Menu (Node); menu.tscn: node Menu type="Node"→"Menu"
 
-- <notas: sinal replace_main_scene(PackedScene); 85 OnReady; 9 handlers; loading em thread>
-- Cargo.toml: feature experimental-threads do gdext (ResourceLoader::load_threaded_* não é gerado sem ela — godot-codegen special_cases.rs:83-86); versão 0.5.5 inalterada
-- CLAUDE.md: linha da feature + catálogo do erro intermitente do renderizador dummy em main.tscn headless
-- backlog v2: itens 22, 23
+- <notes: replace_main_scene(PackedScene) signal; 85 OnReady; 9 handlers; threaded loading>
+- Cargo.toml: gdext experimental-threads feature (ResourceLoader::load_threaded_* is not generated without it — godot-codegen special_cases.rs:83-86); version 0.5.5 unchanged
+- CLAUDE.md: feature line + catalog of the intermittent dummy-renderer error in headless main.tscn
+- v2 backlog: items 22, 23
 ```
 
 ```
 Port main.gd → Main (Node); main.tscn: node main type="Node"→"Main"
 
-- <notas: has_signal/connect por nome preservados; call_deferred por nome; node continua chamado "main">
-- backlog v2: item 24
+- <notes: has_signal/connect by name preserved; call_deferred by name; node still named "main">
+- v2 backlog: item 24
 ```
 
-## Verificação final do marco (após o 4º commit)
+## Final verification of the milestone (after the 4th commit)
 
 ```bash
-find oxide-godot -name '*.gd' -not -path '*/addons/*'                  # só oxide-godot/menu/settings.gd
+find oxide-godot -name '*.gd' -not -path '*/addons/*'                  # only oxide-godot/menu/settings.gd
 find oxide-godot -name '*.gd.uid' -not -path '*/addons/*' | wc -l      # 1
-git diff --stat a866428 -- 'oxide-godot/**/*.gd'                       # exatamente 4 deleções (flying_forklift, level, menu, main); settings.gd ausente
+git diff --stat a866428 -- 'oxide-godot/**/*.gd'                       # exactly 4 deletions (flying_forklift, level, menu, main); settings.gd absent
 git log --oneline a866428..HEAD | grep -c '^[0-9a-f]* Port '           # 4
-ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 14 módulos (… flying_forklift, level, menu, main_scene)
+ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 14 modules (… flying_forklift, level, menu, main_scene)
 grep -n '^godot' oxide_godot_core/Cargo.toml                           # godot = { version = "0.5.5", features = ["experimental-threads"] }
-grep -n 'experimental-threads' CLAUDE.md                               # 1+ linhas
-grep -c '^| [0-9]' docs/upstream-bugs.md                               # 2 (inalterado)
+grep -n 'experimental-threads' CLAUDE.md                               # 1+ lines
+grep -c '^| [0-9]' docs/upstream-bugs.md                               # 2 (unchanged)
 grep -c '^| [0-9]' docs/v2-backlog.md                                  # 24
-# FR-025: chamadas dinâmicas só as permitidas
-grep -nE '\.call\(' oxide_godot_core/oxide_godot_lib/src/{flying_forklift,level,menu,main_scene}.rs   # só "apply_graphics_settings" e "save_settings" (level.rs, menu.rs)
-grep -nE 'call_deferred\(' oxide_godot_core/oxide_godot_lib/src/{menu,main_scene}.rs                   # só "_on_host_pressed" (menu) e "change_scene_to_packed" (main_scene)
-grep -nE '\.get\("' oxide_godot_core/oxide_godot_lib/src/{flying_forklift,level,menu,main_scene}.rs   # só "config_file"
-grep -nE 'has_signal|from_object_method' oxide_godot_core/oxide_godot_lib/src/main_scene.rs           # "quit" e "replace_main_scene" — duck typing do original
+# FR-025: dynamic calls only the allowed ones
+grep -nE '\.call\(' oxide_godot_core/oxide_godot_lib/src/{flying_forklift,level,menu,main_scene}.rs   # only "apply_graphics_settings" and "save_settings" (level.rs, menu.rs)
+grep -nE 'call_deferred\(' oxide_godot_core/oxide_godot_lib/src/{menu,main_scene}.rs                   # only "_on_host_pressed" (menu) and "change_scene_to_packed" (main_scene)
+grep -nE '\.get\("' oxide_godot_core/oxide_godot_lib/src/{flying_forklift,level,menu,main_scene}.rs   # only "config_file"
+grep -nE 'has_signal|from_object_method' oxide_godot_core/oxide_godot_lib/src/main_scene.rs           # "quit" and "replace_main_scene" — the original's duck typing
 ```
 
-E, no jogo (SC-002): boot → menu → Play (barra de loading) → level jogável (jogador, robôs com
-respawn 15 s, empilhadeiras com modelos variados, GI conforme a opção) → ESC volta ao menu →
-Settings: aplicar, cancelar, reabrir, conferir `user://settings.ini` → Quit encerra — idêntico ao
+And, in the game (SC-002): boot → menu → Play (loading bar) → playable level (player, robots with
+15 s respawn, forklifts with varied models, GI according to the option) → ESC returns to the menu →
+Settings: apply, cancel, reopen, check `user://settings.ini` → Quit exits — identical to the
 original.

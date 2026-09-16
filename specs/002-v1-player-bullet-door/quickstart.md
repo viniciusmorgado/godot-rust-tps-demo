@@ -1,171 +1,171 @@
-# Quickstart: validação de cada port (Marco B)
+# Quickstart: validation of each port (Milestone B)
 
-Guia de execução/validação — o que rodar, na ordem, e o que esperar. Detalhes de código em
-[research.md](research.md); nomes a conferir em [contracts/](contracts/). Caminhos relativos à
-raiz do repositório (`oxide-godot/`, onde está este `specs/`).
+Execution/validation guide — what to run, in order, and what to expect. Code details in
+[research.md](research.md); names to check in [contracts/](contracts/). Paths relative to the
+repository root (`oxide-godot/`, where this `specs/` lives).
 
-## Pré-requisitos
+## Prerequisites
 
-- `/usr/bin/godot.x86_64` = Godot 4.7.2 stable (não há `godot` no PATH).
-- `cargo`/`rustc` 1.98.x; crate `godot` 0.5.5 já resolvido (não editar `Cargo.toml`).
-- **Nenhum editor Godot aberto** no projeto durante validação headless (`pgrep -a godot` vazio).
-  Avisar o usuário antes de começar; nunca matar o processo dele.
-- Árvore limpa na `main` (`git status --short` vazio) antes de cada port.
+- `/usr/bin/godot.x86_64` = Godot 4.7.2 stable (there is no `godot` on PATH).
+- `cargo`/`rustc` 1.98.x; crate `godot` 0.5.5 already resolved (do not edit `Cargo.toml`).
+- **No Godot editor open** on the project during headless validation (`pgrep -a godot` empty).
+  Warn the user before starting; never kill their process.
+- Clean tree on `main` (`git status --short` empty) before each port.
 
-## Baseline (medida em 2026-09-15, commit `108584e`, antes de qualquer port deste marco)
+## Baseline (measured on 2026-09-15, commit `108584e`, before any port of this milestone)
 
 - `cargo build`: **0 warnings**.
-- Import headless: linha 1 = `Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.official, safeguards strict)`;
-  **0 linhas `ERROR`** em `.godot/` já importado. Os 3 erros do upstream catalogados no
-  `CLAUDE.md` (`Cannon_Charge already exists`, `doorsimple_d.png` ausente, `surfaces.is_empty()`)
-  só aparecem em import limpo e não contam como regressão.
-- Execução headless de `level.tscn`, `player.tscn`, `player/bullet/bullet.tscn`: **0 linhas
-  `ERROR`/`SCRIPT ERROR`**, exit **124**. `WARNING` benignos e pré-existentes: `HDR output
-  requested, but it is not supported by this display server` (todas as cenas) e `[Physics
-  interpolation] Interpolated Camera3D triggered from outside physics process` (cenas com Player).
-- **`door/door.tscn`: exatamente 1 `ERROR`** — `ERROR: Node not found: "DoorModel/AnimationPlayer"
+- Headless import: line 1 = `Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.official, safeguards strict)`;
+  **0 `ERROR` lines** with `.godot/` already imported. The 3 upstream errors cataloged in
+  `CLAUDE.md` (`Cannon_Charge already exists`, missing `doorsimple_d.png`, `surfaces.is_empty()`)
+  only appear on a clean import and do not count as regressions.
+- Headless run of `level.tscn`, `player.tscn`, `player/bullet/bullet.tscn`: **0
+  `ERROR`/`SCRIPT ERROR` lines**, exit **124**. Benign, pre-existing `WARNING`s: `HDR output
+  requested, but it is not supported by this display server` (all scenes) and `[Physics
+  interpolation] Interpolated Camera3D triggered from outside physics process` (scenes with Player).
+- **`door/door.tscn`: exactly 1 `ERROR`** — `ERROR: Node not found: "DoorModel/AnimationPlayer"
   (relative to "/root/Door").` (`grep -c 'Node not found' /tmp/run.log` → `1`), exit 124, 1
-  WARNING (HDR). **Este erro DEVE desaparecer após o port 3** (FR-027, SC-003). Ele não consta do
-  catálogo do `CLAUDE.md` — nada a remover de lá.
+  WARNING (HDR). **This error MUST disappear after port 3** (FR-027, SC-003). It is not in the
+  `CLAUDE.md` catalog — nothing to remove from there.
 
-Qualquer linha `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
-`Nonexistent`, `panicked` que não esteja nesta baseline é regressão do port.
+Any `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
+`Nonexistent`, `panicked` line that is not in this baseline is a regression of the port.
 
-## Ciclo por script (repetir 3 vezes, na ordem 1 → 2 → 3)
+## Cycle per script (repeat 3 times, in the order 1 → 2 → 3)
 
 ### 1. Build
 
 ```bash
 cd oxide_godot_core && cargo build 2>&1 | tail -20
-cargo build 2>&1 | grep -c '^warning'      # esperado: 0
+cargo build 2>&1 | grep -c '^warning'      # expected: 0
 ```
 
-### 2. Import headless (extensão carregou?)
+### 2. Headless import (did the extension load?)
 
 ```bash
 cd oxide-godot && /usr/bin/godot.x86_64 --headless --import --path . 2>&1 | tee /tmp/import.log
-grep -n 'Initialize godot-rust' /tmp/import.log        # deve existir (linha 1)
-grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # esperado: vazio (ou só os 3 do upstream)
+grep -n 'Initialize godot-rust' /tmp/import.log        # must exist (line 1)
+grep -nE 'ERROR|SCRIPT ERROR' /tmp/import.log            # expected: empty (or only the 3 upstream ones)
 ```
 
-### 3. Execução headless da(s) cena(s) afetada(s)
+### 3. Headless run of the affected scene(s)
 
 ```bash
-cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <cena>.tscn 2>&1 | tee /tmp/run.log
-grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked' /tmp/run.log   # esperado: vazio
-grep -c '^WARNING' /tmp/run.log                                                                         # esperado: só os benignos da baseline
+cd oxide-godot && timeout 20 /usr/bin/godot.x86_64 --headless --path . <scene>.tscn 2>&1 | tee /tmp/run.log
+grep -nE 'ERROR|SCRIPT ERROR|Invalid call|Invalid get|Invalid set|Nonexistent|panicked' /tmp/run.log   # expected: empty
+grep -c '^WARNING' /tmp/run.log                                                                         # expected: only the benign ones from the baseline
 ```
 
-Exit 124 (timeout) é o esperado; exit 0 também é aceitável. A validação é a ausência de linhas
-novas no `grep`.
+Exit 124 (timeout) is the expected one; exit 0 is also acceptable. The validation is the absence of new
+lines in the `grep`.
 
-| Port | `<cena>` a rodar | O que exercita |
+| Port | `<scene>` to run | What it exercises |
 |---|---|---|
-| 1 `player.gd` | `player/player.tscn` **e** `level/level.tscn` | `ready` do Player (OnReady ×10, `orientation`), `physics_process` no servidor (`apply_input`, WALK, primeiro pouso → `land` RPC + som), `BulletCache` (bala ainda GDScript). No level: `level.gd` spawna o Player (`name`, `player_id` fora da árvore → setter), `red_robot.gd` resolve `is Player`/`add_camera_shake_trauma` pelo nome — qualquer nome errado aparece aqui |
-| 2 `bullet.gd` | `player/bullet/bullet.tscn`, `player/player.tscn` **e** `level/level.tscn` | Bala isolada: `ready` (servidor), voo, **expira aos 5 s → `explode` → `Settings` lido → `destroy` aos 1,5 s da animação** (tudo dentro dos 20 s). `player.tscn`: `BulletCache` instancia a classe Rust. Level: integração completa |
-| 3 `door.gd` | `door/door.tscn` (+ `level/level.tscn` por segurança) | Instanciação sem `Node not found`; conexão `_on_door_body_entered` resolve |
+| 1 `player.gd` | `player/player.tscn` **and** `level/level.tscn` | Player `ready` (OnReady ×10, `orientation`), `physics_process` on the server (`apply_input`, WALK, first landing → `land` RPC + sound), `BulletCache` (bullet still GDScript). In the level: `level.gd` spawns the Player (`name`, `player_id` outside the tree → setter), `red_robot.gd` resolves `is Player`/`add_camera_shake_trauma` by name — any wrong name shows up here |
+| 2 `bullet.gd` | `player/bullet/bullet.tscn`, `player/player.tscn` **and** `level/level.tscn` | Isolated bullet: `ready` (server), flight, **expires at 5 s → `explode` → `Settings` read → `destroy` at 1.5 s of the animation** (all within the 20 s). `player.tscn`: `BulletCache` instantiates the Rust class. Level: full integration |
+| 3 `door.gd` | `door/door.tscn` (+ `level/level.tscn` for safety) | Instantiation without `Node not found`; `_on_door_body_entered` connection resolves |
 
-**Port 3 — verificação adicional obrigatória**:
-
-```bash
-grep -c 'Node not found' /tmp/run.log          # esperado: 0 (baseline: 1)
-```
-
-### 4. Verificações mecânicas do ciclo (Princípio II)
+**Port 3 — mandatory additional check**:
 
 ```bash
-# o script e o uid sumiram, e nenhuma cena ainda aponta para eles
-ls oxide-godot/<caminho>/<script>.gd oxide-godot/<caminho>/<script>.gd.uid   # esperado: No such file
-grep -rn '<uid do .gd>' oxide-godot/                                          # esperado: vazio
-grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # esperado: vazio
-
-# o node trocou de tipo e não tem mais script
-grep -n 'type="<ClasseRust>"' oxide-godot/<cena>.tscn                          # esperado: 1 linha
-grep -n 'ExtResource("1")' oxide-godot/<cena>.tscn                             # esperado: vazio (nos 3 ports o id do script é "1")
-
-# os 7 .gd fora do marco não mudaram
-git diff --stat HEAD -- 'oxide-godot/**/*.gd'   # esperado: só a deleção do script deste port
+grep -c 'Node not found' /tmp/run.log          # expected: 0 (baseline: 1)
 ```
 
-Uids, ids e linhas por port: tabela "Edição das cenas" do [plan.md](plan.md).
+### 4. Mechanical checks of the cycle (Principle II)
 
-### 5. Conferência de nomes (todos os ports)
+```bash
+# the script and the uid are gone, and no scene still points to them
+ls oxide-godot/<path>/<script>.gd oxide-godot/<path>/<script>.gd.uid   # expected: No such file
+grep -rn '<uid of the .gd>' oxide-godot/                                          # expected: empty
+grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # expected: empty
 
-Rodar a seção "Verificação antes do commit" do contrato do port
+# the node changed type and no longer has a script
+grep -n 'type="<RustClass>"' oxide-godot/<scene>.tscn                          # expected: 1 line
+grep -n 'ExtResource("1")' oxide-godot/<scene>.tscn                             # expected: empty (in the 3 ports the script id is "1")
+
+# the 7 .gd outside the milestone did not change
+git diff --stat HEAD -- 'oxide-godot/**/*.gd'   # expected: only the deletion of this port's script
+```
+
+Uids, ids and lines per port: "Scene editing" table of [plan.md](plan.md).
+
+### 5. Name check (all ports)
+
+Run the "Verification before the commit" section of the port's contract
 ([contracts/player.md](contracts/player.md), [bullet.md](contracts/bullet.md),
-[door.md](contracts/door.md)); cada nome encontrado deve existir na classe Rust com o mesmo nome.
+[door.md](contracts/door.md)); each name found must exist in the Rust class with the same name.
 
-No port 1, conferir também que `player_input.rs` e `camera_noise_shake.rs` só mudaram em
-visibilidade:
+In port 1, also check that `player_input.rs` and `camera_noise_shake.rs` only changed in
+visibility:
 
 ```bash
 git diff HEAD -- oxide_godot_core/oxide_godot_lib/src/player_input.rs oxide_godot_core/oxide_godot_lib/src/camera_noise_shake.rs | grep '^[-+]' | grep -v '^[-+][-+]' | grep -v 'pub(crate)'
-# esperado: apenas as linhas "-" originais correspondentes (10 pares -/+ ao todo: 6 campos + 3 métodos + add_trauma); nenhuma outra linha
+# expected: only the corresponding original "-" lines (10 -/+ pairs in total: 6 fields + 3 methods + add_trauma); no other line
 ```
 
-### 6. Validação visual (usuário, no editor/jogo)
+### 6. Visual validation (user, in the editor/game)
 
-Abrir o projeto no editor, rodar (F5), entrar no level e conferir o item do port na tabela
-"Validação visual por script" do [plan.md](plan.md), comparando com `../oxide_godot_origins/`.
-Ao abrir a cena editada: o node raiz deve aparecer com o tipo Rust, sem script anexado;
-`player.tscn` deve manter `ServerSynchronizer`/`InputSynchronizer`/`BulletCache` intactos.
+Open the project in the editor, run (F5), enter the level and check the port's item in the
+"Visual validation per script" table of [plan.md](plan.md), comparing with `../oxide_godot_origins/`.
+When opening the edited scene: the root node must appear with the Rust type, with no script attached;
+`player.tscn` must keep `ServerSynchronizer`/`InputSynchronizer`/`BulletCache` intact.
 
-### 7. Backlog v2
+### 7. v2 backlog
 
-Adicionar em `docs/v2-backlog.md` os candidatos de research.md §"Backlog v2 candidato"
-atribuídos a **este** script (port 1: itens 10–12; port 2: item 13; port 3: item 14), **antes** do
-commit. Itens 1 (Settings) e 2 (`Hittable`) já existem — não duplicar. Numeração continua de 10.
+Add to `docs/v2-backlog.md` the candidates from research.md §"Candidate v2 backlog"
+assigned to **this** script (port 1: items 10–12; port 2: item 13; port 3: item 14), **before** the
+commit. Items 1 (Settings) and 2 (`Hittable`) already exist — do not duplicate. Numbering continues from 10.
 
 ### 8. Commit
 
-Um commit por script, na `main`, incluindo: módulo Rust novo + `lib.rs` (+ no port 1, as duas
-alterações de visibilidade), `.tscn` editada, `.gd` + `.gd.uid` apagados, `docs/v2-backlog.md`
-(se houver entrada) e, **no port 3, `docs/upstream-bugs.md` novo**. Autor:
-the repository author. Mensagem:
+One commit per script, on `main`, including: new Rust module + `lib.rs` (+ in port 1, the two
+visibility changes), edited `.tscn`, deleted `.gd` + `.gd.uid`, `docs/v2-backlog.md`
+(if there is an entry) and, **in port 3, the new `docs/upstream-bugs.md`**. Author:
+the repository author. Message:
 
 ```
-Port <script>.gd → <ClasseRust> (<Base>); <cena>.tscn: node <Nome> type="<Base>"→"<ClasseRust>"
+Port <script>.gd → <RustClass> (<Base>); <scene>.tscn: node <Name> type="<Base>"→"<RustClass>"
 
-- <notas: decisões de tradução, quirks preservados>
-- backlog v2: <itens adicionados, ou "nenhum">
+- <notes: translation decisions, preserved quirks>
+- v2 backlog: <items added, or "none">
 ```
 
-Port 1 acrescenta a nota: `- player_input.rs / camera_noise_shake.rs: só visibilidade pub(crate)
-nos campos/métodos consumidos pelo Player (acesso tipado, FR-010/FR-011); nenhuma lógica movida`.
+Port 1 adds the note: `- player_input.rs / camera_noise_shake.rs: only pub(crate) visibility
+on the fields/methods consumed by the Player (typed access, FR-010/FR-011); no logic moved`.
 
-**Port 3 — formato obrigatório (requisito (c) da cláusula de bugs)**:
+**Port 3 — mandatory format (requirement (c) of the bug clause)**:
 
 ```
 Port door.gd → Door (Area3D); door.tscn: node Door type="Area3D"→"Door"
 
-- upstream bug fix: door.gd referenciava "DoorModel/AnimationPlayer" (node inexistente); o port
-  referencia "DoorModel2/AnimationPlayer" — a porta passa a abrir e o "ERROR: Node not found"
-  desaparece (baseline 1 → 0). Correção mínima; node da cena não renomeado; lógica de open intacta.
-- docs/upstream-bugs.md criado com a entrada #1 (commit: este).
-- CLAUDE.md: catálogo inalterado — o erro da porta nunca constou dele (só os 3 erros de import).
-- backlog v2: item 14
+- upstream bug fix: door.gd referenced "DoorModel/AnimationPlayer" (non-existent node); the port
+  references "DoorModel2/AnimationPlayer" — the door now opens and the "ERROR: Node not found"
+  disappears (baseline 1 → 0). Minimal fix; scene node not renamed; open logic intact.
+- docs/upstream-bugs.md created with entry #1 (commit: this one).
+- CLAUDE.md: catalog unchanged — the door error was never in it (only the 3 import errors).
+- v2 backlog: item 14
 ```
 
-Coluna "commit" de `docs/upstream-bugs.md`: o hash só existe depois do commit, então a entrada
-identifica o commit pelo **assunto** (`Port door.gd → Door (Area3D); ...`) — suficiente para
-`git log --grep`. Se o hash literal for desejado, `git commit --amend` logo após o commit do port
-3, **antes** de qualquer outro commit (continua um commit por script).
+"commit" column of `docs/upstream-bugs.md`: the hash only exists after the commit, so the entry
+identifies the commit by its **subject** (`Port door.gd → Door (Area3D); ...`) — enough for
+`git log --grep`. If the literal hash is desired, `git commit --amend` right after the port
+3 commit, **before** any other commit (still one commit per script).
 
-## Verificação final do marco (após o 3º commit)
+## Final verification of the milestone (after the 3rd commit)
 
 ```bash
-find oxide-godot -name '*.gd' -not -path '*/addons/*' | wc -l          # esperado: 7
-find oxide-godot -name '*.gd.uid' -not -path '*/addons/*' | wc -l      # esperado: 7
-git diff --stat 108584e -- 'oxide-godot/**/*.gd'                       # esperado: só 3 deleções (player.gd, bullet.gd, door.gd)
-git log --oneline 108584e..HEAD | grep -c '^[0-9a-f]* Port '           # esperado: 3
-ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 8 módulos (debug_label, part_disappear, blast, camera_noise_shake, player_input, player, bullet, door)
-test -f docs/upstream-bugs.md && grep -c '^| 1 ' docs/upstream-bugs.md # 1 entrada
-git diff --stat 108584e -- CLAUDE.md                                   # esperado: vazio
-grep -rn 'upstream bug fix' oxide_godot_core/oxide_godot_lib/src/      # esperado: 1 linha (door.rs)
+find oxide-godot -name '*.gd' -not -path '*/addons/*' | wc -l          # expected: 7
+find oxide-godot -name '*.gd.uid' -not -path '*/addons/*' | wc -l      # expected: 7
+git diff --stat 108584e -- 'oxide-godot/**/*.gd'                       # expected: only 3 deletions (player.gd, bullet.gd, door.gd)
+git log --oneline 108584e..HEAD | grep -c '^[0-9a-f]* Port '           # expected: 3
+ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 8 modules (debug_label, part_disappear, blast, camera_noise_shake, player_input, player, bullet, door)
+test -f docs/upstream-bugs.md && grep -c '^| 1 ' docs/upstream-bugs.md # 1 entry
+git diff --stat 108584e -- CLAUDE.md                                   # expected: empty
+grep -rn 'upstream bug fix' oxide_godot_core/oxide_godot_lib/src/      # expected: 1 line (door.rs)
 ```
 
-E, no jogo (SC-002): menu → level → mover, pular (som), pousar (som), mirar, atirar com bala
-visível que explode e acerta robôs, tremor de câmera, respawn ao cair abaixo de −40 — idênticos
-ao original. Porta (SC-009): em cena de teste isolada, **não commitada** (p.ex. no scratchpad ou
-uma `.tscn` temporária em `oxide-godot/` removida antes do commit), `door.tscn` + um `Player`
-entrando na área → animação toca uma vez; `door.tscn` headless sem erro.
+And, in the game (SC-002): menu → level → move, jump (sound), land (sound), aim, shoot with a visible
+bullet that explodes and hits robots, camera shake, respawn when falling below −40 — identical
+to the original. Door (SC-009): in an isolated, **uncommitted** test scene (e.g. in the scratchpad or
+a temporary `.tscn` in `oxide-godot/` removed before the commit), `door.tscn` + a `Player`
+entering the area → animation plays once; `door.tscn` headless with no error.

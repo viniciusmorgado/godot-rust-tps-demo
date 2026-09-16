@@ -1,213 +1,213 @@
-# Feature Specification: Marco D — empilhadeira, level, menu e main (v1 raw port)
+# Feature Specification: Milestone D — forklift, level, menu and main (v1 raw port)
 
-**Feature Branch**: `004-v1-level-menu-main` (trabalho na `main`, como nos Marcos A–C)
+**Feature Branch**: `004-v1-level-menu-main` (work on `main`, as in Milestones A–C)
 
 **Created**: 2026-09-15
 
 **Status**: Draft
 
-**Fase**: v1 — Raw Port (Princípio I da constituição v1.3.1). Nenhuma abstração, refatoração ou otimização; melhorias percebidas vão para `docs/v2-backlog.md`. Nenhum bug do upstream é conhecido nos quatro scripts; se um defeito objetivo surgir durante o port, a cláusula de correção conservadora se aplica (declarar em spec, isolar com comentário, mencionar no commit, registrar em `docs/upstream-bugs.md`) — caso contrário, nada muda.
+**Phase**: v1 — Raw Port (Principle I of constitution v1.3.1). No abstraction, refactoring or optimization; noticed improvements go to `docs/v2-backlog.md`. No upstream bug is known in the four scripts; if an objective defect surfaces during the port, the conservative fix clause applies (declare in spec, isolate with a comment, mention in the commit, record in `docs/upstream-bugs.md`) — otherwise, nothing changes.
 
-**Input**: User description: "Portar para Rust a empilhadeira voadora, o level, o menu e o main do Godot TPS Demo, mantendo o jogo jogável e idêntico a cada script. Só settings.gd (autoload) fica em GDScript (marco E). Marco D de docs/port-order.md (itens 11–14)."
+**Input**: User description: "Port to Rust the flying forklift, the level, the menu and the main of the Godot TPS Demo, keeping the game playable and identical at each script. Only settings.gd (autoload) stays in GDScript (milestone E). Milestone D of docs/port-order.md (items 11–14)."
 
-## Contexto
+## Context
 
-Penúltimo marco da v1. Os Marcos A–C (`specs/001`–`003`, commits até `b8f7124`) deixaram 5 scripts no original e entregaram `Player`, `PlayerInputSynchronizer`, `CameraNoiseShake`, `Bullet`, `Door`, `Blast`, `PartDisappear`, `Part` e `EnemyRobot` como classes nativas. Este marco porta o fluxo de jogo inteiro — boot (`main`), menu (`menu`), fase (`level`) e a empilhadeira decorativa (`flying_forklift`) — deixando apenas o autoload `settings.gd` em GDScript, acessado dinamicamente via `/root/Settings` (exceção única do Princípio II; backlog v2 item 1).
+Penultimate milestone of v1. Milestones A–C (`specs/001`–`003`, commits up to `b8f7124`) left 5 scripts in the original and delivered `Player`, `PlayerInputSynchronizer`, `CameraNoiseShake`, `Bullet`, `Door`, `Blast`, `PartDisappear`, `Part` and `EnemyRobot` as native classes. This milestone ports the entire game flow — boot (`main`), menu (`menu`), stage (`level`) and the decorative forklift (`flying_forklift`) — leaving only the autoload `settings.gd` in GDScript, accessed dynamically via `/root/Settings` (the single exception of Principle II; v2 backlog item 1).
 
-Nomes de classe conferidos (regra do `CLAUDE.md`): `FlyingForklift`, `Level`, `Menu`, `Main` não coincidem com nenhuma classe do engine nem com identificadores de topo dos `.gd` remanescentes (`menu.gd` tem `var main` em minúsculas — identificadores do GDScript diferenciam maiúsculas; e `menu.gd` já estará portado quando `Main` for registrado).
+Class names checked (`CLAUDE.md` rule): `FlyingForklift`, `Level`, `Menu`, `Main` do not coincide with any engine class nor with top-level identifiers of the remaining `.gd` files (`menu.gd` has `var main` in lowercase — GDScript identifiers are case-sensitive; and `menu.gd` will already be ported when `Main` is registered).
 
-| # | Script original | Base do script | Tipo do node raiz | Cena | Linhas | Consumidores que permanecem no original |
+| # | Original script | Script base | Root node type | Scene | Lines | Consumers that remain in the original |
 |---|---|---|---|---|---|---|
-| 1 | `level/forklift/flying_forklift.gd` | `Node3D` | **`CharacterBody3D`** (`flying_forklift.tscn:36`, filho `Collider`) | `level/forklift/flying_forklift.tscn` (instanciada por `level.tscn:8`) | 21 | nenhum (usa `Settings.config_file`) |
-| 2 | `level/level.gd` | `Node3D` | `Node3D` (`level.tscn:40`) | `level/level.tscn` | 127 | `main.gd:30-31` (`has_signal("quit")` + conexão, até o port 4); `settings.gd` (`apply_graphics_settings` recebe o level como `scene_root`) |
-| 3 | `menu/menu.gd` | `Node` | `Node` (`menu.tscn:103`) | `menu/menu.tscn` | 460 | `main.gd:32-33` (`has_signal("replace_main_scene")` + conexão, até o port 4) |
-| 4 | `main/main.gd` | `Node` | `Node` (`main.tscn:5`, node chamado `main`) | `main/main.tscn` (cena principal, `project.godot:15`) | 33 | nenhum |
+| 1 | `level/forklift/flying_forklift.gd` | `Node3D` | **`CharacterBody3D`** (`flying_forklift.tscn:36`, child `Collider`) | `level/forklift/flying_forklift.tscn` (instantiated by `level.tscn:8`) | 21 | none (uses `Settings.config_file`) |
+| 2 | `level/level.gd` | `Node3D` | `Node3D` (`level.tscn:40`) | `level/level.tscn` | 127 | `main.gd:30-31` (`has_signal("quit")` + connection, until port 4); `settings.gd` (`apply_graphics_settings` receives the level as `scene_root`) |
+| 3 | `menu/menu.gd` | `Node` | `Node` (`menu.tscn:103`) | `menu/menu.tscn` | 460 | `main.gd:32-33` (`has_signal("replace_main_scene")` + connection, until port 4) |
+| 4 | `main/main.gd` | `Node` | `Node` (`main.tscn:5`, node named `main`) | `main/main.tscn` (main scene, `project.godot:15`) | 33 | none |
 
-Referência de comportamento: o projeto original intocado em `../oxide_godot_origins/`.
+Behavior reference: the untouched original project in `../oxide_godot_origins/`.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Empilhadeira voadora portada (Priority: P1)
+### User Story 1 - Flying forklift ported (Priority: P1)
 
-As empilhadeiras que flutuam pelo level continuam iguais: cada uma escolhe aleatoriamente um dos modelos disponíveis ao nascer e, se o jogador desligou o sombreamento nas configurações, o farol dela deixa de projetar sombra.
+The forklifts that float through the level stay the same: each one randomly picks one of the available models when it spawns and, if the player turned shadows off in the settings, its headlight stops casting a shadow.
 
-**Why this priority**: Menor script do marco, folha (só lê `Settings`), instanciada pelo `level.tscn` — prova, antes do level, a regra de base declarada abaixo (script `Node3D` em node `CharacterBody3D`).
+**Why this priority**: Smallest script of the milestone, a leaf (only reads `Settings`), instantiated by `level.tscn` — proves, before the level, the base rule declared below (`Node3D` script on a `CharacterBody3D` node).
 
-**Regra de base declarada nesta spec**: o script diz `extends Node3D`, mas o node raiz da cena é `CharacterBody3D` (com `CollisionShape3D` filho). Quando o `extends` do script é **ancestral** do tipo do node na cena, a classe portada MUST usar o tipo do node (`CharacterBody3D`): a troca de `type` não pode rebaixar o node nem descartar o corpo físico que a cena declara. O "mesma base" do Princípio II é lido como "mesma base efetiva do node".
+**Base rule declared in this spec**: the script says `extends Node3D`, but the scene's root node is `CharacterBody3D` (with a child `CollisionShape3D`). When the script's `extends` is an **ancestor** of the node's type in the scene, the ported class MUST use the node's type (`CharacterBody3D`): the `type` swap cannot demote the node nor discard the physics body the scene declares. The "same base" of Principle II is read as "same effective base of the node".
 
-**Independent Test**: `flying_forklift.tscn` e `level.tscn` headless sem erros novos; no jogo, as empilhadeiras aparecem com modelos variados (cor diferente entre elas) e, com sombras desligadas, o farol não projeta sombra.
+**Independent Test**: `flying_forklift.tscn` and `level.tscn` headless without new errors; in the game, the forklifts appear with varied models (different color among them) and, with shadows off, the headlight casts no shadow.
 
 **Acceptance Scenarios**:
 
-1. **Given** a empilhadeira entra na cena com `rendering/shadow_mapping` falso nas configurações, **When** `ready` roda, **Then** o `SpotLight3D` fica com sombra desligada; com verdadeiro, fica como está na cena.
-2. **Given** o primeiro filho da empilhadeira (`FlyingForkliftModel2`) tem *n* filhos (modelos), **When** `ready` roda, **Then** exatamente um deles — o de índice `floor(aleatório × n)` — fica visível e os demais invisíveis.
-3. **Given** o level instancia várias empilhadeiras, **When** o jogo roda, **Then** cada uma sorteia independentemente (modelos variados entre instâncias).
-4. **Given** o node raiz é `CharacterBody3D` na cena, **When** o `type` é trocado, **Then** o `Collider` filho continua válido e o corpo físico continua colidindo com o jogador e os robôs como antes.
+1. **Given** the forklift enters the scene with `rendering/shadow_mapping` false in the settings, **When** `ready` runs, **Then** the `SpotLight3D` has its shadow turned off; with true, it stays as it is in the scene.
+2. **Given** the forklift's first child (`FlyingForkliftModel2`) has *n* children (models), **When** `ready` runs, **Then** exactly one of them — the one at index `floor(random × n)` — is visible and the others invisible.
+3. **Given** the level instantiates several forklifts, **When** the game runs, **Then** each one picks independently (varied models among instances).
+4. **Given** the root node is `CharacterBody3D` in the scene, **When** the `type` is swapped, **Then** the child `Collider` remains valid and the physics body keeps colliding with the player and the robots as before.
 
 ---
 
-### User Story 2 - Level portado (Priority: P2)
+### User Story 2 - Level ported (Priority: P2)
 
-A fase continua a mesma: ao carregar, aplica as configurações gráficas e escolhe a técnica de iluminação global (SDFGI, VoxelGI ou lightmap) conforme as configurações; o servidor spawna quatro robôs e os jogadores em pontos aleatórios, e respawna cada robô 15 s depois que ele explode; ESC libera o mouse e volta ao menu.
+The stage stays the same: on load, it applies the graphics settings and picks the global illumination technique (SDFGI, VoxelGI or lightmap) according to the settings; the server spawns four robots and the players at random points, and respawns each robot 15 s after it explodes; ESC releases the mouse and returns to the menu.
 
-**Why this priority**: Consome `EnemyRobot` (sinal `exploded`) e `Player` (`player_id`) com acesso **tipado** — fecha o grafo de dependências das classes já portadas — e emite `quit` para o `main` (ainda GDScript até o port 4, conectando por `has_signal`).
+**Why this priority**: Consumes `EnemyRobot` (signal `exploded`) and `Player` (`player_id`) with **typed** access — closes the dependency graph of the already-ported classes — and emits `quit` to the `main` (still GDScript until port 4, connecting via `has_signal`).
 
-**Independent Test**: `level.tscn` headless sem erros novos (spawn dos 4 robôs e do jogador 1, conexão de `exploded` tipada); `main.tscn` headless ainda com o `main.gd` original chegando ao level; no jogo, iluminação conforme cada opção de GI, respawn de robôs, ESC volta ao menu.
+**Independent Test**: `level.tscn` headless without new errors (spawn of the 4 robots and of player 1, typed `exploded` connection); `main.tscn` headless still with the original `main.gd` reaching the level; in the game, lighting according to each GI option, robot respawn, ESC returns to the menu.
 
 **Acceptance Scenarios**:
 
-1. **Given** o level entra na cena, **When** `ready` roda, **Then** `Settings.apply_graphics_settings(janela, ambiente do WorldEnvironment, level)` é chamado (dinâmico) e, conforme `rendering/gi_type` (0 = SDFGI, 1 = VoxelGI, senão lightmap), o setup correspondente roda.
-2. **Given** `gi_type` = SDFGI, **When** o setup roda, **Then** `sdfgi_enabled` liga no ambiente, `VoxelGI` e `ReflectionProbes` ficam ocultos, um `LightmapGI` criado anteriormente é liberado, e `gi_quality` define a contagem de raios (2 = 96, 1 = 32, senão SDFGI desligado).
-3. **Given** `gi_type` = VoxelGI, **When** o setup roda, **Then** SDFGI desliga, `VoxelGI` visível, `ReflectionProbes` ocultos, `LightmapGI` anterior liberado, e `gi_quality` define a qualidade do VoxelGI (2 = alta, 1 = baixa, senão `VoxelGI` oculto).
-4. **Given** `gi_type` = lightmap, **When** o setup roda, **Then** SDFGI desliga, `VoxelGI` oculto, `ReflectionProbes` visíveis; se não existe, um `LightmapGI` chamado "LightmapGI" é criado com `light_data = res://level/level.lmbake` e adicionado ao level; se `gi_quality` = 0, o `LightmapGI` e os `ReflectionProbes` ficam ocultos.
-5. **Given** o peer é servidor, **When** `ready` roda, **Then** um robô é spawnado em cada filho de `RobotSpawnpoints` (transform do ponto, `exploded` conectado a `_respawn_robot` com o ponto vinculado, filho de `SpawnedNodes` com nome legível), os pontos de `PlayerSpawnpoints` são embaralhados, o jogador 1 e cada peer já conectado recebem um ponto, e `peer_connected`/`peer_disconnected` ficam conectados a `add_player`/`del_player`.
-6. **Given** um robô emite `exploded`, **When** 15 s passam, **Then** outro robô nasce no mesmo ponto.
-7. **Given** `add_player(id)` sem ponto, **When** roda, **Then** um filho aleatório de `PlayerSpawnpoints` é escolhido; o jogador é instanciado com `name = str(id)`, `player_id = id` (acesso tipado a `Player`), transform do ponto, filho de `SpawnedNodes`.
-8. **Given** `del_player(id)`, **When** `SpawnedNodes` tem um filho chamado `str(id)`, **Then** ele é removido; senão nada acontece.
-9. **Given** o jogador pressiona a ação `quit` (ESC), **When** `_input` recebe o evento, **Then** o mouse fica visível e o sinal `quit` é emitido — o `main` volta ao menu.
-10. **Given** `main.gd` continua no original até o port 4, **When** chama `node.has_signal("quit")` e conecta, **Then** resolve por nome sem edição.
-11. **Given** o `MultiplayerSpawner` da cena (`level.tscn:73-75`), **When** robôs e jogadores são adicionados a `SpawnedNodes`, **Then** a replicação continua válida (API base).
-12. **Given** o peer não é servidor, **When** `ready` roda, **Then** só as configurações gráficas e o GI são aplicados (ramo por leitura de código).
+1. **Given** the level enters the scene, **When** `ready` runs, **Then** `Settings.apply_graphics_settings(window, WorldEnvironment's environment, level)` is called (dynamic) and, according to `rendering/gi_type` (0 = SDFGI, 1 = VoxelGI, otherwise lightmap), the corresponding setup runs.
+2. **Given** `gi_type` = SDFGI, **When** the setup runs, **Then** `sdfgi_enabled` is turned on in the environment, `VoxelGI` and `ReflectionProbes` are hidden, a previously created `LightmapGI` is freed, and `gi_quality` sets the ray count (2 = 96, 1 = 32, otherwise SDFGI off).
+3. **Given** `gi_type` = VoxelGI, **When** the setup runs, **Then** SDFGI turns off, `VoxelGI` visible, `ReflectionProbes` hidden, previous `LightmapGI` freed, and `gi_quality` sets the VoxelGI quality (2 = high, 1 = low, otherwise `VoxelGI` hidden).
+4. **Given** `gi_type` = lightmap, **When** the setup runs, **Then** SDFGI turns off, `VoxelGI` hidden, `ReflectionProbes` visible; if it does not exist, a `LightmapGI` named "LightmapGI" is created with `light_data = res://level/level.lmbake` and added to the level; if `gi_quality` = 0, the `LightmapGI` and the `ReflectionProbes` are hidden.
+5. **Given** the peer is server, **When** `ready` runs, **Then** a robot is spawned at each child of `RobotSpawnpoints` (the point's transform, `exploded` connected to `_respawn_robot` with the point bound, child of `SpawnedNodes` with a readable name), the `PlayerSpawnpoints` points are shuffled, player 1 and each already-connected peer receive a point, and `peer_connected`/`peer_disconnected` are connected to `add_player`/`del_player`.
+6. **Given** a robot emits `exploded`, **When** 15 s pass, **Then** another robot spawns at the same point.
+7. **Given** `add_player(id)` without a point, **When** it runs, **Then** a random child of `PlayerSpawnpoints` is chosen; the player is instantiated with `name = str(id)`, `player_id = id` (typed access to `Player`), the point's transform, child of `SpawnedNodes`.
+8. **Given** `del_player(id)`, **When** `SpawnedNodes` has a child named `str(id)`, **Then** it is removed; otherwise nothing happens.
+9. **Given** the player presses the `quit` action (ESC), **When** `_input` receives the event, **Then** the mouse becomes visible and the `quit` signal is emitted — the `main` returns to the menu.
+10. **Given** `main.gd` stays in the original until port 4, **When** it calls `node.has_signal("quit")` and connects, **Then** it resolves by name without editing.
+11. **Given** the scene's `MultiplayerSpawner` (`level.tscn:73-75`), **When** robots and players are added to `SpawnedNodes`, **Then** replication remains valid (base API).
+12. **Given** the peer is not server, **When** `ready` runs, **Then** only the graphics settings and the GI are applied (branch by code reading).
 
 ---
 
-### User Story 3 - Menu portado (Priority: P3)
+### User Story 3 - Menu ported (Priority: P3)
 
-O menu continua igual: Play carrega o level com barra de progresso e troca a cena; Play Online mostra host/connect; Settings mostra 15 linhas de opções gráficas que refletem a configuração atual, com Apply gravando e aplicando e Cancel descartando; Quit fecha o jogo. Em modo headless, o menu hospeda automaticamente.
+The menu stays the same: Play loads the level with a progress bar and swaps the scene; Play Online shows host/connect; Settings shows 15 rows of graphics options that reflect the current configuration, with Apply saving and applying and Cancel discarding; Quit closes the game. In headless mode, the menu hosts automatically.
 
-**Why this priority**: Maior script do marco (460 linhas, ~90 referências de UI, 15 grupos de botões, ~30 opções mapeadas para inteiros do engine). Consome só `Settings` (dinâmico) e emite `replace_main_scene` para o `main`.
+**Why this priority**: Largest script of the milestone (460 lines, ~90 UI references, 15 button groups, ~30 options mapped to engine integers). Consumes only `Settings` (dynamic) and emits `replace_main_scene` to the `main`.
 
-**Independent Test**: `menu.tscn` headless sem erros novos (em headless o menu hospeda e carrega o level sozinho — exercita `_on_host_pressed`, `_on_play_pressed`, `_process`, `_on_loading_done_timer_timeout`); no jogo, cada botão do menu e cada linha de Settings se comporta como no original, com persistência em `user://settings.ini`.
+**Independent Test**: `menu.tscn` headless without new errors (in headless the menu hosts and loads the level by itself — exercises `_on_host_pressed`, `_on_play_pressed`, `_process`, `_on_loading_done_timer_timeout`); in the game, every menu button and every Settings row behaves as in the original, with persistence in `user://settings.ini`.
 
 **Acceptance Scenarios**:
 
-1. **Given** o menu entra na cena, **When** `ready` roda, **Then** `Settings.apply_graphics_settings` é chamado; em headless, `_on_host_pressed` é agendado (deferred); `Play` recebe foco; sem MetalFX (driver ≠ "metal"), os botões `MetalFXSpatial` e `MetalFXTemporal` ficam ocultos; cada uma das 15 linhas de opção recebe um `ButtonGroup` próprio atribuído a todos os `BaseButton` filhos.
-2. **Given** `Loading` está visível, **When** frames passam, **Then** o status do carregamento em thread de `res://level/level.tscn` é consultado: em progresso → barra = progresso × 100; carregado → barra = 100, processamento desligado, `DoneTimer` (0,5 s) iniciado; erro → mensagem impressa, `Main` visível, `Loading` oculto.
-3. **Given** Play é pressionado, **When** `_on_play_pressed` roda, **Then** `Main` oculta, `Loading` visível, carregamento em thread do level requisitado (com sub-threads).
-4. **Given** `DoneTimer` expira, **When** `_on_loading_done_timer_timeout` roda, **Then** o `multiplayer_peer` recebe o `peer` do menu e `replace_main_scene` é emitido com a cena carregada.
-5. **Given** Settings é pressionado, **When** `_on_settings_pressed` roda, **Then** `Main` oculta, `Settings` visível, `Cancel` com foco, e em cada linha o botão correspondente ao valor atual do `config_file` fica pressionado, com os mapeamentos exatos de `menu.gd:175-311` (modo de janela: Windowed/Maximized → Windowed, Fullscreen, senão ExclusiveFullscreen; vsync 4 valores; max_fps 30/40/60/72/90/120/144/senão Unlimited; escala de resolução por comparação aproximada com 1/3, 1/2, 1/1,7, 1/1,5, 1/1,3, senão Native; filtro de escala 6 modos com fallback MetalFX temporal se suportado ou FSR2; tipo de GI 3; qualidade de GI 3; TAA; MSAA 4; AA de tela 3; sombras; SSAO −1/médio/alto; SSIL idem; bloom; névoa volumétrica).
-6. **Given** Apply é pressionado, **When** `_on_apply_pressed` roda, **Then** `Main` visível, `Play` com foco, `Settings` oculto; cada opção é gravada no `config_file` conforme o botão pressionado, com os valores exatos de `menu.gd:318-441` (Unlimited grava 0; escalas gravam 1/3, 1/2, 1/1,7, 1/1,5, 1/1,3, 1,0; TAA/sombras/bloom/névoa gravam o booleano do botão "Enabled"; SSAO/SSIL desligados gravam −1); depois `Settings.apply_graphics_settings` e `Settings.save_settings` (dinâmicos).
-7. **Given** Cancel ou Back é pressionado, **When** `_on_cancel_pressed` roda, **Then** `Main` visível, `Play` com foco, `Settings` e `Online` ocultos — nada gravado.
-8. **Given** Play Online, **When** pressionado, **Then** `Online` visível e `Main` oculto; Host cria um servidor ENet na porta do `SpinBox` e chama `_on_play_pressed`; Connect cria um cliente ENet com endereço e porta e chama `_on_play_pressed`; ambos ocultam `Online` (ramos verificados por leitura de código e pelo host automático em headless).
-9. **Given** Quit é pressionado, **When** roda, **Then** o jogo encerra.
-10. **Given** os 10 `[connection]` de `menu.tscn:836-845`, **When** os botões/timer disparam, **Then** os handlers `_on_play_pressed`, `_on_play_online_pressed`, `_on_settings_pressed`, `_on_quit_pressed`, `_on_host_pressed`, `_on_connect_pressed`, `_on_cancel_pressed` (Back **e** Cancel), `_on_apply_pressed`, `_on_loading_done_timer_timeout` resolvem por nome.
-11. **Given** `main.gd` continua no original até o port 4, **When** chama `node.has_signal("replace_main_scene")` e conecta a um método de 1 argumento, **Then** o sinal é emitido com a `PackedScene` e chega.
-12. **Given** todos os valores de enum do engine (modo de janela, vsync, modos de escala 3D, MSAA, AA de tela, qualidades de SSAO/SSIL) e do `settings.gd` (tipo/qualidade de GI), **When** lidos ou gravados no `config_file`, **Then** são os mesmos inteiros que o original e o `settings.gd` usam — `user://settings.ini` gravado pelo menu portado é lido pelo `settings.gd` e vice-versa.
+1. **Given** the menu enters the scene, **When** `ready` runs, **Then** `Settings.apply_graphics_settings` is called; in headless, `_on_host_pressed` is scheduled (deferred); `Play` receives focus; without MetalFX (driver ≠ "metal"), the `MetalFXSpatial` and `MetalFXTemporal` buttons are hidden; each of the 15 option rows receives its own `ButtonGroup` assigned to all child `BaseButton`s.
+2. **Given** `Loading` is visible, **When** frames pass, **Then** the status of the threaded load of `res://level/level.tscn` is polled: in progress → bar = progress × 100; loaded → bar = 100, processing off, `DoneTimer` (0.5 s) started; error → message printed, `Main` visible, `Loading` hidden.
+3. **Given** Play is pressed, **When** `_on_play_pressed` runs, **Then** `Main` hidden, `Loading` visible, threaded load of the level requested (with sub-threads).
+4. **Given** `DoneTimer` expires, **When** `_on_loading_done_timer_timeout` runs, **Then** the `multiplayer_peer` receives the menu's `peer` and `replace_main_scene` is emitted with the loaded scene.
+5. **Given** Settings is pressed, **When** `_on_settings_pressed` runs, **Then** `Main` hidden, `Settings` visible, `Cancel` focused, and in each row the button matching the current `config_file` value is pressed, with the exact mappings of `menu.gd:175-311` (window mode: Windowed/Maximized → Windowed, Fullscreen, otherwise ExclusiveFullscreen; vsync 4 values; max_fps 30/40/60/72/90/120/144/otherwise Unlimited; resolution scale by approximate comparison with 1/3, 1/2, 1/1.7, 1/1.5, 1/1.3, otherwise Native; scale filter 6 modes with fallback MetalFX temporal if supported or FSR2; GI type 3; GI quality 3; TAA; MSAA 4; screen-space AA 3; shadows; SSAO −1/medium/high; SSIL likewise; bloom; volumetric fog).
+6. **Given** Apply is pressed, **When** `_on_apply_pressed` runs, **Then** `Main` visible, `Play` focused, `Settings` hidden; each option is written to the `config_file` according to the pressed button, with the exact values of `menu.gd:318-441` (Unlimited writes 0; scales write 1/3, 1/2, 1/1.7, 1/1.5, 1/1.3, 1.0; TAA/shadows/bloom/fog write the boolean of the "Enabled" button; SSAO/SSIL off write −1); then `Settings.apply_graphics_settings` and `Settings.save_settings` (dynamic).
+7. **Given** Cancel or Back is pressed, **When** `_on_cancel_pressed` runs, **Then** `Main` visible, `Play` focused, `Settings` and `Online` hidden — nothing written.
+8. **Given** Play Online, **When** pressed, **Then** `Online` visible and `Main` hidden; Host creates an ENet server on the `SpinBox` port and calls `_on_play_pressed`; Connect creates an ENet client with address and port and calls `_on_play_pressed`; both hide `Online` (branches verified by code reading and by the automatic host in headless).
+9. **Given** Quit is pressed, **When** it runs, **Then** the game exits.
+10. **Given** the 10 `[connection]`s of `menu.tscn:836-845`, **When** the buttons/timer fire, **Then** the handlers `_on_play_pressed`, `_on_play_online_pressed`, `_on_settings_pressed`, `_on_quit_pressed`, `_on_host_pressed`, `_on_connect_pressed`, `_on_cancel_pressed` (Back **and** Cancel), `_on_apply_pressed`, `_on_loading_done_timer_timeout` resolve by name.
+11. **Given** `main.gd` stays in the original until port 4, **When** it calls `node.has_signal("replace_main_scene")` and connects to a 1-argument method, **Then** the signal is emitted with the `PackedScene` and arrives.
+12. **Given** all the engine enum values (window mode, vsync, 3D scale modes, MSAA, screen-space AA, SSAO/SSIL qualities) and the `settings.gd` ones (GI type/quality), **When** read from or written to the `config_file`, **Then** they are the same integers the original and `settings.gd` use — a `user://settings.ini` written by the ported menu is read by `settings.gd` and vice versa.
 
 ---
 
-### User Story 4 - Main portado (Priority: P4)
+### User Story 4 - Main ported (Priority: P4)
 
-O boot do jogo continua igual: a cena principal desliga o relay de multiplayer, limita a 60 fps em headless, aplica o modo de janela salvo e vai ao menu; trocar de cena remove a anterior e conecta os sinais `quit` (→ voltar ao menu) e `replace_main_scene` (→ trocar para a cena recebida) do novo node, se ele os tiver.
+The game boot stays the same: the main scene turns off the multiplayer relay, caps at 60 fps in headless, applies the saved window mode and goes to the menu; switching scenes removes the previous one and connects the signals `quit` (→ back to the menu) and `replace_main_scene` (→ switch to the received scene) of the new node, if it has them.
 
-**Why this priority**: Último e menor; depende de `Level` e `Menu` terem os sinais como classes nativas (o `has_signal` continua dinâmico — duck typing do original). Fecha o fluxo completo em código portado.
+**Why this priority**: Last and smallest; depends on `Level` and `Menu` having the signals as native classes (the `has_signal` remains dynamic — the original's duck typing). Closes the full flow in ported code.
 
-**Independent Test**: `main.tscn` headless (boot → menu → host automático → level) sem erros novos; no jogo, Play → level, ESC → menu, Quit encerra.
+**Independent Test**: `main.tscn` headless (boot → menu → automatic host → level) without new errors; in the game, Play → level, ESC → menu, Quit exits.
 
 **Acceptance Scenarios**:
 
-1. **Given** `main.tscn` inicia, **When** `ready` roda, **Then** `server_relay` desliga; em headless `max_fps = 60`; o modo da janela recebe `video/display_mode` do `config_file` (dinâmico); `go_to_main_menu` roda.
-2. **Given** `go_to_main_menu`, **When** roda, **Then** `menu.tscn` é carregado, o `multiplayer_peer` atual é fechado e substituído por um `OfflineMultiplayerPeer`, e `change_scene_to_packed(menu)` roda.
-3. **Given** `replace_main_scene(cena)` é chamado (pelo sinal do menu), **When** roda, **Then** `change_scene_to_packed` é chamado **em deferred, pelo nome** — por isso `change_scene_to_packed` MUST ser exposto com esse nome.
-4. **Given** `change_scene_to_packed(cena)`, **When** roda, **Then** a cena é instanciada, todos os filhos atuais são removidos e liberados, o novo node é adicionado; se ele tem sinal `quit` (`has_signal` — duck typing preservado), conecta a `go_to_main_menu`; se tem `replace_main_scene`, conecta a `replace_main_scene`.
-5. **Given** `Level` e `Menu` já são classes nativas com esses sinais, **When** o `has_signal` dinâmico roda, **Then** encontra ambos (conferido em headless).
-6. **Given** o node raiz de `main.tscn` chama-se `main` (minúsculo), **When** o `type` vira `Main`, **Then** o nome do node não muda (nome de node ≠ nome de classe).
+1. **Given** `main.tscn` starts, **When** `ready` runs, **Then** `server_relay` turns off; in headless `max_fps = 60`; the window mode receives `video/display_mode` from the `config_file` (dynamic); `go_to_main_menu` runs.
+2. **Given** `go_to_main_menu`, **When** it runs, **Then** `menu.tscn` is loaded, the current `multiplayer_peer` is closed and replaced by an `OfflineMultiplayerPeer`, and `change_scene_to_packed(menu)` runs.
+3. **Given** `replace_main_scene(scene)` is called (by the menu's signal), **When** it runs, **Then** `change_scene_to_packed` is called **deferred, by name** — which is why `change_scene_to_packed` MUST be exposed with that name.
+4. **Given** `change_scene_to_packed(scene)`, **When** it runs, **Then** the scene is instantiated, all current children are removed and freed, the new node is added; if it has a `quit` signal (`has_signal` — duck typing preserved), connects it to `go_to_main_menu`; if it has `replace_main_scene`, connects it to `replace_main_scene`.
+5. **Given** `Level` and `Menu` are already native classes with those signals, **When** the dynamic `has_signal` runs, **Then** it finds both (checked in headless).
+6. **Given** the root node of `main.tscn` is named `main` (lowercase), **When** the `type` becomes `Main`, **Then** the node's name does not change (node name ≠ class name).
 
 ---
 
 ### Edge Cases
 
-- **Empilhadeira: base do script ≠ tipo do node** — regra declarada na US1: prevalece o tipo do node (`CharacterBody3D`). É a primeira vez que isso ocorre no projeto; fica registrado para os revisores.
-- **Empilhadeira: sorteio com `floor(aleatório × n)`** — para *n* = 3, cada modelo tem 1/3; `randomize()` é chamado antes (como no original — o gerador global é re-semeado a cada empilhadeira; preservar).
-- **Level: `LightmapGI` criado em runtime** — o node só existe após um `setup_lightmapgi`; `setup_sdfgi`/`setup_voxelgi` liberam-no se existir (o level é recriado a cada Play, então na prática nasce nulo).
-- **Level: `add_player` conectado a `peer_connected(id)`** — o sinal passa 1 argumento; o parâmetro `spawn_point` default nulo cobre o caso (o método MUST aceitar a chamada com 1 argumento vindo do sinal e com 2 vindo do `ready`).
-- **Level: `_respawn_robot` após o level ser destruído** — o timer de 15 s é criado pela árvore; se o level já saiu (ESC → menu), o callback não deve tocar um level liberado (comportamento equivalente ao do original, cujo `await` num objeto liberado é descartado).
-- **Level: `spawn_robot(spawn_point)` sem tipo** — o original recebe `Variant`; só usa `.transform`; o port tipa como `Node3D` (o que a cena garante).
-- **Menu: `signal replace_main_scene` declarado sem parâmetros** e emitido com 1 argumento (`emit_signal("replace_main_scene", cena)`). O port declara o sinal **com** o parâmetro (`PackedScene`), porque a emissão tipada exige — o consumidor (`main.gd`/`Main`) sempre recebeu 1 argumento; nada observável muda. Registrado aqui por transparência, não é correção de bug.
-- **Menu: `_on_host_pressed` diferido em headless** — em `--headless`, o menu hospeda e carrega o level sozinho: a validação headless de `menu.tscn` e `main.tscn` exercita o fluxo Play inteiro (loading, timer, `replace_main_scene`).
-- **Menu: carregamento em thread** — `load_threaded_get_status` recebe um array para progresso; o port usa a forma da API que devolve o progresso (mesmo valor).
-- **Menu: `metalfx_supported`** — falso fora de macOS; os dois botões MetalFX ficam ocultos e o fallback do filtro de escala é FSR2 (original).
-- **Menu: `_make_button_group`** — pula filhos que não são `BaseButton` (rótulos das linhas).
-- **Main: `remove_child` + `queue_free`** dos filhos atuais, na ordem do original (remove antes de liberar).
-- **Main: `randomize()`** — re-semeia o gerador global no boot (além das chamadas do level e das empilhadeiras).
-- **Settings**: as 3 chamadas dinâmicas ao autoload (`config_file` get/set, `apply_graphics_settings(window, environment, scene_root)`, `save_settings()`) são a exceção do Princípio II; `settings.gd` fica intacto e é o Marco E.
+- **Forklift: script base ≠ node type** — rule declared in US1: the node's type prevails (`CharacterBody3D`). It is the first time this occurs in the project; recorded for the reviewers.
+- **Forklift: pick with `floor(random × n)`** — for *n* = 3, each model has 1/3; `randomize()` is called beforehand (as in the original — the global generator is re-seeded for every forklift; preserve).
+- **Level: `LightmapGI` created at runtime** — the node only exists after a `setup_lightmapgi`; `setup_sdfgi`/`setup_voxelgi` free it if it exists (the level is recreated on every Play, so in practice it starts null).
+- **Level: `add_player` connected to `peer_connected(id)`** — the signal passes 1 argument; the null-default `spawn_point` parameter covers the case (the method MUST accept the call with 1 argument coming from the signal and with 2 coming from `ready`).
+- **Level: `_respawn_robot` after the level is destroyed** — the 15 s timer is created by the tree; if the level has already left (ESC → menu), the callback must not touch a freed level (behavior equivalent to the original's, whose `await` on a freed object is discarded).
+- **Level: `spawn_robot(spawn_point)` untyped** — the original receives `Variant`; it only uses `.transform`; the port types it as `Node3D` (which the scene guarantees).
+- **Menu: `signal replace_main_scene` declared without parameters** and emitted with 1 argument (`emit_signal("replace_main_scene", scene)`). The port declares the signal **with** the parameter (`PackedScene`), because typed emission requires it — the consumer (`main.gd`/`Main`) always received 1 argument; nothing observable changes. Recorded here for transparency, it is not a bug fix.
+- **Menu: `_on_host_pressed` deferred in headless** — in `--headless`, the menu hosts and loads the level by itself: the headless validation of `menu.tscn` and `main.tscn` exercises the whole Play flow (loading, timer, `replace_main_scene`).
+- **Menu: threaded loading** — `load_threaded_get_status` receives an array for progress; the port uses the API form that returns the progress (same value).
+- **Menu: `metalfx_supported`** — false outside macOS; the two MetalFX buttons are hidden and the scale filter fallback is FSR2 (original).
+- **Menu: `_make_button_group`** — skips children that are not `BaseButton` (the row labels).
+- **Main: `remove_child` + `queue_free`** of the current children, in the original's order (remove before freeing).
+- **Main: `randomize()`** — re-seeds the global generator at boot (besides the level's and the forklifts' calls).
+- **Settings**: the 3 dynamic calls to the autoload (`config_file` get/set, `apply_graphics_settings(window, environment, scene_root)`, `save_settings()`) are the Principle II exception; `settings.gd` stays intact and is Milestone E.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-**Comportamento — empilhadeira (US1)**
+**Behavior — forklift (US1)**
 
-- **FR-001**: A empilhadeira MUST ter base `CharacterBody3D` (tipo do node raiz em `flying_forklift.tscn:36`; regra "tipo do node prevalece quando o `extends` do script é seu ancestral") e referência ao `SpotLight3D`.
-- **FR-002**: Ao entrar na cena MUST desligar a sombra do `SpotLight3D` se `Settings.config_file` `rendering/shadow_mapping` for falso; re-semear o gerador aleatório; e, entre os *n* filhos do primeiro filho, deixar visível só o de índice `floor(aleatório × n)`.
+- **FR-001**: The forklift MUST have base `CharacterBody3D` (root node type in `flying_forklift.tscn:36`; rule "the node's type prevails when the script's `extends` is its ancestor") and a reference to the `SpotLight3D`.
+- **FR-002**: On entering the scene it MUST turn off the `SpotLight3D` shadow if `Settings.config_file` `rendering/shadow_mapping` is false; re-seed the random generator; and, among the *n* children of the first child, leave visible only the one at index `floor(random × n)`.
 
-**Comportamento — level (US2)**
+**Behavior — level (US2)**
 
-- **FR-003**: O level MUST ter base `Node3D`, sinal `quit` (sem argumentos) e referências a `WorldEnvironment`, `RobotSpawnpoints`, `PlayerSpawnpoints`, `SpawnedNodes`; `lightmap_gi` inicia nulo.
-- **FR-004**: Ao entrar na cena MUST chamar `Settings.apply_graphics_settings(janela, ambiente, level)` (dinâmico) e escolher `setup_sdfgi` (`gi_type` = 0), `setup_voxelgi` (1) ou `setup_lightmapgi` (demais), lendo `rendering/gi_type` do `config_file` como inteiro (os valores do enum `GIType` do `settings.gd`; literais inteiros na v1 — backlog item 1).
-- **FR-005**: `setup_sdfgi`, `setup_voxelgi` e `setup_lightmapgi` MUST reproduzir `level.gd:45-93` (visibilidade de `VoxelGI`/`ReflectionProbes`, liberação/criação do `LightmapGI` com `light_data = res://level/level.lmbake` e nome "LightmapGI", chamadas ao servidor de renderização para contagem de raios 96/32 e qualidade alta/baixa do VoxelGI, com `gi_quality` lido como inteiro 0/1/2).
-- **FR-006**: No servidor, `ready` MUST spawnar um robô por filho de `RobotSpawnpoints`, re-semear, embaralhar os filhos de `PlayerSpawnpoints`, `add_player(1, primeiro)` e `add_player(id, próximo)` para cada peer, e conectar `peer_connected` → `add_player` e `peer_disconnected` → `del_player`.
-- **FR-007**: `spawn_robot(spawn_point)` MUST instanciar `red_robot.tscn` com acesso **tipado** a `EnemyRobot`, copiar o `transform` do ponto, conectar `exploded` a `_respawn_robot` com o ponto vinculado, e adicionar a `SpawnedNodes` com nome legível; `_respawn_robot(spawn_point)` MUST esperar 15 s e chamar `spawn_robot`.
-- **FR-008**: `add_player(id, spawn_point = nulo)` MUST sortear um filho de `PlayerSpawnpoints` quando não recebe ponto, instanciar `player.tscn` com acesso **tipado** a `Player`, definir `name = str(id)`, `player_id = id`, copiar o `transform` e adicionar a `SpawnedNodes`; `del_player(id)` MUST remover o filho `str(id)` de `SpawnedNodes` se existir. Ambos MUST ser invocados pelos sinais do `MultiplayerAPI`: `peer_connected(id)` → `add_player(id)` sem ponto (sorteio) e `peer_disconnected(id)` → `del_player(id)`. A forma da conexão (por nome, ou callable tipado que chama o método com o ponto ausente — a plataforma de destino não tem parâmetro default em métodos expostos) é decisão do plan; o comportamento observável é o mesmo.
-- **FR-009**: `_input` MUST, na ação `quit`, tornar o mouse visível e emitir `quit`.
-- **FR-010**: `res://enemies/red_robot/red_robot.tscn` e `res://player/player.tscn` MUST ser carregados por `load` no ponto de uso (padrão `preload` → `load` dos marcos anteriores); os métodos `setup_*` e `_respawn_robot`/`spawn_robot` internos MUST manter os nomes.
+- **FR-003**: The level MUST have base `Node3D`, signal `quit` (no arguments) and references to `WorldEnvironment`, `RobotSpawnpoints`, `PlayerSpawnpoints`, `SpawnedNodes`; `lightmap_gi` starts null.
+- **FR-004**: On entering the scene it MUST call `Settings.apply_graphics_settings(window, environment, level)` (dynamic) and choose `setup_sdfgi` (`gi_type` = 0), `setup_voxelgi` (1) or `setup_lightmapgi` (others), reading `rendering/gi_type` from the `config_file` as an integer (the values of the `GIType` enum of `settings.gd`; integer literals in v1 — backlog item 1).
+- **FR-005**: `setup_sdfgi`, `setup_voxelgi` and `setup_lightmapgi` MUST reproduce `level.gd:45-93` (visibility of `VoxelGI`/`ReflectionProbes`, freeing/creation of the `LightmapGI` with `light_data = res://level/level.lmbake` and name "LightmapGI", calls to the rendering server for ray count 96/32 and VoxelGI high/low quality, with `gi_quality` read as integer 0/1/2).
+- **FR-006**: On the server, `ready` MUST spawn one robot per child of `RobotSpawnpoints`, re-seed, shuffle the children of `PlayerSpawnpoints`, `add_player(1, first)` and `add_player(id, next)` for each peer, and connect `peer_connected` → `add_player` and `peer_disconnected` → `del_player`.
+- **FR-007**: `spawn_robot(spawn_point)` MUST instantiate `red_robot.tscn` with **typed** access to `EnemyRobot`, copy the point's `transform`, connect `exploded` to `_respawn_robot` with the point bound, and add to `SpawnedNodes` with a readable name; `_respawn_robot(spawn_point)` MUST wait 15 s and call `spawn_robot`.
+- **FR-008**: `add_player(id, spawn_point = null)` MUST pick a random child of `PlayerSpawnpoints` when it receives no point, instantiate `player.tscn` with **typed** access to `Player`, set `name = str(id)`, `player_id = id`, copy the `transform` and add to `SpawnedNodes`; `del_player(id)` MUST remove the child `str(id)` from `SpawnedNodes` if it exists. Both MUST be invoked by the `MultiplayerAPI` signals: `peer_connected(id)` → `add_player(id)` without a point (random pick) and `peer_disconnected(id)` → `del_player(id)`. The form of the connection (by name, or a typed callable that calls the method with the point absent — the target platform has no default parameter in exposed methods) is the plan's decision; the observable behavior is the same.
+- **FR-009**: `_input` MUST, on the `quit` action, make the mouse visible and emit `quit`.
+- **FR-010**: `res://enemies/red_robot/red_robot.tscn` and `res://player/player.tscn` MUST be loaded by `load` at the point of use (`preload` → `load` pattern of the previous milestones); the internal `setup_*` methods and `_respawn_robot`/`spawn_robot` MUST keep their names.
 
-**Comportamento — menu (US3)**
+**Behavior — menu (US3)**
 
-- **FR-011**: O menu MUST ter base `Node`, sinal `replace_main_scene(cena: PackedScene)`, constante `LEVEL_PATH = "res://level/level.tscn"`, estado `peer` (inicial `OfflineMultiplayerPeer`) e `metalfx_supported` (driver de renderização atual == "metal"), e as referências de `menu.gd:11-104` com os mesmos caminhos de node.
-- **FR-012**: Ao entrar na cena MUST reproduzir `menu.gd:107-125` (aplicar configurações; `_on_host_pressed` diferido em headless; foco em Play; ocultar MetalFX quando não suportado; `_make_button_group` nas 15 linhas).
-- **FR-013**: Por frame MUST reproduzir `menu.gd:128-141` (status do carregamento em thread → barra, timer, ou erro impresso + voltar ao Main).
-- **FR-014**: Os 9 handlers `_on_play_pressed`, `_on_play_online_pressed`, `_on_settings_pressed`, `_on_quit_pressed`, `_on_host_pressed`, `_on_connect_pressed`, `_on_cancel_pressed`, `_on_apply_pressed`, `_on_loading_done_timer_timeout` MUST existir com esses nomes (10 conexões em `menu.tscn:836-845`) e os efeitos de `menu.gd:153-460`.
-- **FR-015**: `_on_settings_pressed` e `_on_apply_pressed` MUST usar exatamente os valores e as ordens de comparação de `menu.gd:175-311` e `318-441` (inteiros dos enums do engine — modo de janela, vsync, modos de escala 3D, MSAA, AA de tela, qualidades de SSAO/SSIL — e do `settings.gd` — tipo/qualidade de GI; `−1` para SSAO/SSIL desligados; `0` para fps ilimitado; escalas `1/3`, `1/2`, `1/1,7`, `1/1,5`, `1/1,3`, `1,0` com comparação aproximada na leitura).
-- **FR-016**: `_on_host_pressed`/`_on_connect_pressed` MUST criar um `ENetMultiplayerPeer` (servidor na porta do `SpinBox`; cliente com endereço e porta), chamar `_on_play_pressed` e ocultar `Online`; `_on_loading_done_timer_timeout` MUST atribuir `peer` ao `multiplayer_peer` e emitir `replace_main_scene` com o level carregado.
-- **FR-017**: `_make_button_group` MUST ser interno (não consumido externamente) e atribuir um `ButtonGroup` novo a cada `BaseButton` filho da linha, pulando os demais filhos.
+- **FR-011**: The menu MUST have base `Node`, signal `replace_main_scene(scene: PackedScene)`, constant `LEVEL_PATH = "res://level/level.tscn"`, state `peer` (initially `OfflineMultiplayerPeer`) and `metalfx_supported` (current rendering driver == "metal"), and the references of `menu.gd:11-104` with the same node paths.
+- **FR-012**: On entering the scene it MUST reproduce `menu.gd:107-125` (apply settings; `_on_host_pressed` deferred in headless; focus on Play; hide MetalFX when unsupported; `_make_button_group` on the 15 rows).
+- **FR-013**: Per frame it MUST reproduce `menu.gd:128-141` (threaded load status → bar, timer, or printed error + back to Main).
+- **FR-014**: The 9 handlers `_on_play_pressed`, `_on_play_online_pressed`, `_on_settings_pressed`, `_on_quit_pressed`, `_on_host_pressed`, `_on_connect_pressed`, `_on_cancel_pressed`, `_on_apply_pressed`, `_on_loading_done_timer_timeout` MUST exist with those names (10 connections in `menu.tscn:836-845`) and the effects of `menu.gd:153-460`.
+- **FR-015**: `_on_settings_pressed` and `_on_apply_pressed` MUST use exactly the values and comparison orders of `menu.gd:175-311` and `318-441` (integers of the engine enums — window mode, vsync, 3D scale modes, MSAA, screen-space AA, SSAO/SSIL qualities — and of `settings.gd` — GI type/quality; `−1` for SSAO/SSIL off; `0` for unlimited fps; scales `1/3`, `1/2`, `1/1.7`, `1/1.5`, `1/1.3`, `1.0` with approximate comparison on read).
+- **FR-016**: `_on_host_pressed`/`_on_connect_pressed` MUST create an `ENetMultiplayerPeer` (server on the `SpinBox` port; client with address and port), call `_on_play_pressed` and hide `Online`; `_on_loading_done_timer_timeout` MUST assign `peer` to the `multiplayer_peer` and emit `replace_main_scene` with the loaded level.
+- **FR-017**: `_make_button_group` MUST be internal (not consumed externally) and assign a new `ButtonGroup` to each child `BaseButton` of the row, skipping the other children.
 
-**Comportamento — main (US4)**
+**Behavior — main (US4)**
 
-- **FR-018**: O main MUST ter base `Node` e reproduzir `main.gd:4-10` em `ready` (`server_relay = false`; `max_fps = 60` em headless; re-semear; modo da janela = `video/display_mode` do `config_file`; `go_to_main_menu`).
-- **FR-019**: `go_to_main_menu`, `replace_main_scene(cena)` e `change_scene_to_packed(cena)` MUST existir com esses nomes; `replace_main_scene` MUST chamar `change_scene_to_packed` em deferred **pelo nome** (como o original), o que exige `change_scene_to_packed` exposto.
-- **FR-020**: `change_scene_to_packed` MUST instanciar, remover e liberar todos os filhos atuais, adicionar o novo node e conectar `quit` → `go_to_main_menu` e `replace_main_scene` → `replace_main_scene` **se** o node tiver esses sinais (`has_signal` — duck typing do original, preservado).
+- **FR-018**: The main MUST have base `Node` and reproduce `main.gd:4-10` in `ready` (`server_relay = false`; `max_fps = 60` in headless; re-seed; window mode = `video/display_mode` from the `config_file`; `go_to_main_menu`).
+- **FR-019**: `go_to_main_menu`, `replace_main_scene(scene)` and `change_scene_to_packed(scene)` MUST exist with those names; `replace_main_scene` MUST call `change_scene_to_packed` deferred **by name** (like the original), which requires `change_scene_to_packed` to be exposed.
+- **FR-020**: `change_scene_to_packed` MUST instantiate, remove and free all current children, add the new node and connect `quit` → `go_to_main_menu` and `replace_main_scene` → `replace_main_scene` **if** the node has those signals (`has_signal` — the original's duck typing, preserved).
 
-**Ciclo de porte — comuns aos quatro (Princípio II)**
+**Port cycle — common to all four (Principle II)**
 
-- **FR-021**: Cada script MUST virar exatamente uma classe nativa: `FlyingForklift: CharacterBody3D`, `Level: Node3D`, `Menu: Node`, `Main: Node`. Os nomes MUST ser conferidos contra classes do engine e identificadores de topo dos `.gd` remanescentes antes de cada port (regra do `CLAUDE.md`); colisão → parar.
-- **FR-022**: O vínculo MUST ser por troca de `type` na raiz de cada cena (`flying_forklift.tscn:36`, `level.tscn:40`, `menu.tscn:103`, `main.tscn:5`), com remoção de `script` e do `ext_resource` órfão; nenhum `.gd` ponte; nenhum node renomeado (inclusive `main`).
-- **FR-023**: `.gd` e `.gd.uid` MUST ser apagados no mesmo commit do port.
-- **FR-024**: Nomes de sinais, métodos expostos e handlers MUST ser idênticos ao GDScript: `quit`, `replace_main_scene`, os 9 handlers do menu, `go_to_main_menu`, `replace_main_scene`, `change_scene_to_packed`, `add_player`, `del_player`, `_respawn_robot`, `spawn_robot`. Conferidos contra `menu.tscn:836-845`, `main.gd:30-33` e os sinais do `MultiplayerAPI`.
-- **FR-025**: O código portado MUST NOT chamar API customizada de GDScript, exceto o autoload `Settings` (`config_file` get/set, `apply_graphics_settings`, `save_settings` — dinâmicos via `/root/Settings`, exceção do Princípio II, backlog item 1). Os acessos a `EnemyRobot.exploded` e `Player.player_id` MUST ser tipados. O `has_signal` do `main` é duck typing do original (permitido).
-- **FR-026**: Cada alteração de código MUST ser seguida de build de debug sem warnings novos.
-- **FR-027**: Cada port MUST ser validado em headless: import com carregamento da extensão + `flying_forklift.tscn`, `level.tscn`, `menu.tscn`, `main.tscn` (as que a story afeta) sem erros novos além da baseline (os 3 do `CLAUDE.md`).
-- **FR-028**: Um commit por script, ordem 1 → 2 → 3 → 4; o jogo MUST ficar jogável após cada commit (o `main.gd` original conecta os sinais das classes nativas por `has_signal` até o port 4).
-- **FR-029**: `settings.gd` MUST permanecer byte a byte intacto; melhorias percebidas MUST ir para `docs/v2-backlog.md` no mesmo commit; nenhuma correção de bug é prevista (defeito objetivo → parar, declarar em spec, então os 4 requisitos da cláusula).
+- **FR-021**: Each script MUST become exactly one native class: `FlyingForklift: CharacterBody3D`, `Level: Node3D`, `Menu: Node`, `Main: Node`. The names MUST be checked against engine classes and top-level identifiers of the remaining `.gd` files before each port (`CLAUDE.md` rule); collision → stop.
+- **FR-022**: The binding MUST be by `type` swap at the root of each scene (`flying_forklift.tscn:36`, `level.tscn:40`, `menu.tscn:103`, `main.tscn:5`), with removal of `script` and of the orphaned `ext_resource`; no bridge `.gd`; no node renamed (including `main`).
+- **FR-023**: `.gd` and `.gd.uid` MUST be deleted in the same commit as the port.
+- **FR-024**: Names of signals, exposed methods and handlers MUST be identical to the GDScript: `quit`, `replace_main_scene`, the 9 menu handlers, `go_to_main_menu`, `replace_main_scene`, `change_scene_to_packed`, `add_player`, `del_player`, `_respawn_robot`, `spawn_robot`. Checked against `menu.tscn:836-845`, `main.gd:30-33` and the `MultiplayerAPI` signals.
+- **FR-025**: The ported code MUST NOT call custom GDScript API, except the `Settings` autoload (`config_file` get/set, `apply_graphics_settings`, `save_settings` — dynamic via `/root/Settings`, Principle II exception, backlog item 1). Accesses to `EnemyRobot.exploded` and `Player.player_id` MUST be typed. The `main`'s `has_signal` is the original's duck typing (allowed).
+- **FR-026**: Every code change MUST be followed by a debug build without new warnings.
+- **FR-027**: Each port MUST be validated in headless: import with extension loading + `flying_forklift.tscn`, `level.tscn`, `menu.tscn`, `main.tscn` (those the story affects) without new errors beyond the baseline (the 3 from `CLAUDE.md`).
+- **FR-028**: One commit per script, order 1 → 2 → 3 → 4; the game MUST remain playable after each commit (the original `main.gd` connects the native classes' signals via `has_signal` until port 4).
+- **FR-029**: `settings.gd` MUST remain byte-for-byte intact; noticed improvements MUST go to `docs/v2-backlog.md` in the same commit; no bug fix is planned (objective defect → stop, declare in spec, then the 4 requirements of the clause).
 
 ### Key Entities
 
-- **FlyingForklift**: referência `spot_light`; sem contrato externo além da cena (nenhum método/propriedade consumido por outros scripts).
-- **Level (contrato consumido por `main.gd`/`Main`, `settings.gd`, `MultiplayerAPI`)**: sinal `quit`; métodos `add_player(id, spawn_point = nulo)`, `del_player(id)` (conectados a sinais do `MultiplayerAPI`), `spawn_robot`, `_respawn_robot`, `setup_sdfgi/voxelgi/lightmapgi`; estado `lightmap_gi`; referências `WorldEnvironment`, `RobotSpawnpoints`, `PlayerSpawnpoints`, `SpawnedNodes`, `VoxelGI`, `ReflectionProbes`.
-- **Menu (contrato consumido por `menu.tscn` e `main.gd`/`Main`)**: sinal `replace_main_scene(cena)`; 9 handlers (10 conexões); estado `peer`, `metalfx_supported`; ~90 referências de UI (`menu.gd:11-104`); método interno `_make_button_group`.
-- **Main (raiz do jogo)**: métodos `go_to_main_menu`, `replace_main_scene`, `change_scene_to_packed` (este chamado por nome em deferred).
-- **Configurações (`user://settings.ini`, via `settings.gd`)**: seções `video` (`display_mode`, `vsync`, `max_fps`, `resolution_scale`, `scale_filter`) e `rendering` (`gi_type`, `gi_quality`, `taa`, `msaa`, `screen_space_aa`, `shadow_mapping`, `ssao_quality`, `ssil_quality`, `bloom`, `volumetric_fog`) — lidas/gravadas com os mesmos inteiros/booleanos/floats do original.
+- **FlyingForklift**: reference `spot_light`; no external contract beyond the scene (no method/property consumed by other scripts).
+- **Level (contract consumed by `main.gd`/`Main`, `settings.gd`, `MultiplayerAPI`)**: signal `quit`; methods `add_player(id, spawn_point = null)`, `del_player(id)` (connected to `MultiplayerAPI` signals), `spawn_robot`, `_respawn_robot`, `setup_sdfgi/voxelgi/lightmapgi`; state `lightmap_gi`; references `WorldEnvironment`, `RobotSpawnpoints`, `PlayerSpawnpoints`, `SpawnedNodes`, `VoxelGI`, `ReflectionProbes`.
+- **Menu (contract consumed by `menu.tscn` and `main.gd`/`Main`)**: signal `replace_main_scene(scene)`; 9 handlers (10 connections); state `peer`, `metalfx_supported`; ~90 UI references (`menu.gd:11-104`); internal method `_make_button_group`.
+- **Main (game root)**: methods `go_to_main_menu`, `replace_main_scene`, `change_scene_to_packed` (the latter called by name, deferred).
+- **Settings (`user://settings.ini`, via `settings.gd`)**: sections `video` (`display_mode`, `vsync`, `max_fps`, `resolution_scale`, `scale_filter`) and `rendering` (`gi_type`, `gi_quality`, `taa`, `msaa`, `screen_space_aa`, `shadow_mapping`, `ssao_quality`, `ssil_quality`, `bloom`, `volumetric_fog`) — read/written with the same integers/booleans/floats as the original.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: Ao final do marco o projeto contém exatamente **1** arquivo `.gd` (`menu/settings.gd`, e 1 `.uid`), byte a byte idêntico ao estado anterior ao marco.
-- **SC-002**: O jogo completo — boot → menu (Play, Play Online, Settings com as 15 linhas refletindo e gravando cada opção, Quit) → loading com barra → level jogável (jogador, robôs, respawn 15 s, empilhadeiras com modelos variados, iluminação conforme o GI escolhido) → ESC volta ao menu — é indistinguível do original em `../oxide_godot_origins/` numa comparação lado a lado feita pelo usuário, incluindo aplicar/cancelar/reabrir Settings e conferir a persistência em `user://settings.ini`.
-- **SC-003**: Para cada um dos 4 ports, a validação headless (import + cenas afetadas) reporta zero erros novos além dos 3 catalogados; `main.tscn` headless percorre boot → menu → host automático → level sem erro.
-- **SC-004**: Após cada um dos 4 commits o jogo é jogável de ponta a ponta.
-- **SC-005**: O histórico do marco tem exatamente 4 commits `Port …` e nenhum toca `settings.gd`.
-- **SC-006**: Build de debug sem nenhum warning novo em todos os commits.
-- **SC-007**: Nenhuma linha portada introduz abstração, refatoração, otimização ou correção; `docs/upstream-bugs.md` permanece com 2 entradas.
-- **SC-008**: `settings.gd` continua funcionando com as cenas portadas: `apply_graphics_settings` recebe janela/ambiente/level dos dois chamadores, e o `settings.ini` gravado pelo menu portado é lido sem alteração de valores.
+- **SC-001**: At the end of the milestone the project contains exactly **1** `.gd` file (`menu/settings.gd`, and 1 `.uid`), byte-for-byte identical to the state before the milestone.
+- **SC-002**: The full game — boot → menu (Play, Play Online, Settings with the 15 rows reflecting and writing each option, Quit) → loading with bar → playable level (player, robots, 15 s respawn, forklifts with varied models, lighting according to the chosen GI) → ESC returns to the menu — is indistinguishable from the original in `../oxide_godot_origins/` in a side-by-side comparison done by the user, including applying/canceling/reopening Settings and checking persistence in `user://settings.ini`.
+- **SC-003**: For each of the 4 ports, the headless validation (import + affected scenes) reports zero new errors beyond the 3 cataloged; `main.tscn` headless goes through boot → menu → automatic host → level without error.
+- **SC-004**: After each of the 4 commits the game is playable end to end.
+- **SC-005**: The milestone's history has exactly 4 `Port …` commits and none touches `settings.gd`.
+- **SC-006**: Debug build without any new warning in all commits.
+- **SC-007**: No ported line introduces abstraction, refactoring, optimization or fix; `docs/upstream-bugs.md` remains with 2 entries.
+- **SC-008**: `settings.gd` keeps working with the ported scenes: `apply_graphics_settings` receives window/environment/level from both callers, and the `settings.ini` written by the ported menu is read without value changes.
 
 ## Assumptions
 
-- Fase v1 (constituição v1.3.1); nenhuma correção de bug prevista.
-- Validação visual (SC-002) pelo usuário, incluindo o menu de configurações completo; validação automatizada exclusivamente headless. O revisor pode rodar um harness de paridade fora do repositório.
-- Validação single-player: o peer local é servidor (`OfflineMultiplayerPeer`); host/connect reais e ramos "cliente" (FR-006, FR-016) são verificados por leitura de código e pelo host automático em headless.
-- Fora de escopo: `settings.gd` (Marco E); acesso tipado ao `Settings`; qualquer melhoria; multiplayer real com dois peers.
-- Regra de base declarada (US1): quando o `extends` do script é ancestral do tipo do node raiz, a classe usa o tipo do node — `FlyingForklift: CharacterBody3D`.
-- `signal replace_main_scene` do menu passa a declarar o parâmetro `PackedScene` que o original já emite; não é correção, é exigência da emissão tipada (documentado em Edge Cases).
-- Quirks preservados propositalmente (candidatos ao backlog v2, não a correção): `randomize()` chamado em três lugares (main, level, cada empilhadeira); `spawn_robot(spawn_point)` sem tipo no original; `add_player` sem `force_readable_name` (o nome já é `str(id)`) enquanto `spawn_robot` usa; `_on_apply_pressed` com cadeias `if/elif` que não gravam nada se nenhum botão da linha estiver pressionado; leitura de `gi_type`/`gi_quality` como inteiros literais em vez do enum do `settings.gd`.
-- O node raiz de `main.tscn` chama-se `main` (minúsculo) e continua assim; a classe chama-se `Main`.
+- Phase v1 (constitution v1.3.1); no bug fix planned.
+- Visual validation (SC-002) by the user, including the full settings menu; automated validation exclusively headless. The reviewer may run a parity harness outside the repository.
+- Single-player validation: the local peer is server (`OfflineMultiplayerPeer`); real host/connect and "client" branches (FR-006, FR-016) are verified by code reading and by the automatic host in headless.
+- Out of scope: `settings.gd` (Milestone E); typed access to `Settings`; any improvement; real multiplayer with two peers.
+- Base rule declared (US1): when the script's `extends` is an ancestor of the root node's type, the class uses the node's type — `FlyingForklift: CharacterBody3D`.
+- The menu's `signal replace_main_scene` now declares the `PackedScene` parameter the original already emits; it is not a fix, it is a requirement of typed emission (documented in Edge Cases).
+- Quirks preserved on purpose (candidates for the v2 backlog, not for a fix): `randomize()` called in three places (main, level, each forklift); `spawn_robot(spawn_point)` untyped in the original; `add_player` without `force_readable_name` (the name is already `str(id)`) while `spawn_robot` uses it; `_on_apply_pressed` with `if/elif` chains that write nothing if no button of the row is pressed; reading `gi_type`/`gi_quality` as integer literals instead of the `settings.gd` enum.
+- The root node of `main.tscn` is named `main` (lowercase) and stays that way; the class is named `Main`.

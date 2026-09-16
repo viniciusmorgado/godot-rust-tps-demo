@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Marco A — folhas e input do jogador (v1 raw port)
+# Specification Quality Checklist: Milestone A — leaves and player input (v1 raw port)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-15

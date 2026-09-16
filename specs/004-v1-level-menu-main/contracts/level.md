@@ -1,52 +1,52 @@
-# Contrato: `Level` (port 2)
+# Contract: `Level` (port 2)
 
-- Classe registrada: `Level` (nome livre; sem colisão). Base: `Node3D`.
-- Node na cena: raiz de `level/level.tscn` (l.40). Instanciado pelo `Menu` via
+- Registered class: `Level` (free name; no collision). Base: `Node3D`.
+- Node in the scene: root of `level/level.tscn` (l.40). Instantiated by the `Menu` via
   `replace_main_scene` → `Main.change_scene_to_packed`.
 
-## Sinal
+## Signal
 
-| Assinatura Godot | Rust | Consumidor |
+| Godot signature | Rust | Consumer |
 |---|---|---|
-| `signal quit` | `#[signal] fn quit();` (bloco principal) | `main.gd:30-31` — `node.has_signal("quit")` + `node.quit.connect(go_to_main_menu)` (até o port 4; depois `Main` faz o mesmo por nome) |
+| `signal quit` | `#[signal] fn quit();` (main block) | `main.gd:30-31` — `node.has_signal("quit")` + `node.quit.connect(go_to_main_menu)` (until port 4; afterwards `Main` does the same by name) |
 
-## Métodos (todos privados — nenhum é chamado por nome fora da classe)
+## Methods (all private — none is called by name outside the class)
 
-| Original | Rust | Consumidor |
+| Original | Rust | Consumer |
 |---|---|---|
-| `add_player(id: int, spawn_point: Marker3D = null)` | `fn add_player(&mut self, id: i32, spawn_point: Option<Gd<Marker3D>>)` | `ready` (2 args); `multiplayer.peer_connected` (1 arg) — conectado por closure tipada `|this, id: i64| this.add_player(id as i32, None)` |
-| `del_player(id: int)` | `fn del_player(&mut self, id: i32)` | `multiplayer.peer_disconnected` — closure tipada |
+| `add_player(id: int, spawn_point: Marker3D = null)` | `fn add_player(&mut self, id: i32, spawn_point: Option<Gd<Marker3D>>)` | `ready` (2 args); `multiplayer.peer_connected` (1 arg) — connected via typed closure `|this, id: i64| this.add_player(id as i32, None)` |
+| `del_player(id: int)` | `fn del_player(&mut self, id: i32)` | `multiplayer.peer_disconnected` — typed closure |
 | `spawn_robot(spawn_point)` | `fn spawn_robot(&mut self, spawn_point: Gd<Node3D>)` | `ready`; `_respawn_robot` |
-| `_respawn_robot(spawn_point)` | `fn _respawn_robot(&mut self, spawn_point: Gd<Node3D>)` | `EnemyRobot.exploded` (closure `move` com o ponto — o `.bind()` do original) |
-| `setup_sdfgi/voxelgi/lightmapgi` | privados | `ready` |
+| `_respawn_robot(spawn_point)` | `fn _respawn_robot(&mut self, spawn_point: Gd<Node3D>)` | `EnemyRobot.exploded` (`move` closure with the point — the original's `.bind()`) |
+| `setup_sdfgi/voxelgi/lightmapgi` | private | `ready` |
 
-Nota: o original conecta `add_player`/`del_player` como `Callable`s por referência de método
-(parâmetro default cobre o 2º argumento). gdext não tem parâmetro default em `#[func]`; a
-conexão tipada por closure preserva o efeito (spec FR-008). Backlog v2 item 21.
+Note: the original connects `add_player`/`del_player` as `Callable`s by method reference
+(the default parameter covers the 2nd argument). gdext has no default parameter in `#[func]`; the
+typed connection via closure preserves the effect (spec FR-008). v2 backlog item 21.
 
-## Propriedades
+## Properties
 
-Nenhuma exportada/replicada. `lightmap_gi` é interno.
+None exported/replicated. `lightmap_gi` is internal.
 
-## O que o Level consome das classes Rust (visibilidade `pub(crate)`, research D2)
+## What the Level consumes from the Rust classes (`pub(crate)` visibility, research D2)
 
-`EnemyRobot::exploded` (sinal → `pub(crate) fn exploded();` em `red_robot.rs`);
-`Player::set_player_id` (→ `pub(crate)` em `player.rs`). Ambos só a palavra de visibilidade, no
-commit do port 2.
+`EnemyRobot::exploded` (signal → `pub(crate) fn exploded();` in `red_robot.rs`);
+`Player::set_player_id` (→ `pub(crate)` in `player.rs`). Both only the visibility keyword, in
+the port 2 commit.
 
-## Chamadas dinâmicas (exceção `Settings`)
+## Dynamic calls (`Settings` exception)
 
 `get_node("/root/Settings")` → `.call("apply_graphics_settings", [window, environment, self])`,
 `.get("config_file")` (`gi_type`, `gi_quality`).
 
-## Verificação antes do commit
+## Verification before the commit
 
 ```bash
 cd oxide-godot
-grep -n 'has_signal(&"quit")\|node.quit.connect' main/main.gd                  # l.30-31 (até o port 4)
-grep -n 'spawn_path\|_spawnable_scenes' level/level.tscn                       # l.74-75 — MultiplayerSpawner intocado
+grep -n 'has_signal(&"quit")\|node.quit.connect' main/main.gd                  # l.30-31 (until port 4)
+grep -n 'spawn_path\|_spawnable_scenes' level/level.tscn                       # l.74-75 — MultiplayerSpawner untouched
 grep -n 'name="RobotSpawnpoints"\|name="PlayerSpawnpoints"\|name="SpawnedNodes"\|name="WorldEnvironment"\|name="VoxelGI"\|name="ReflectionProbes"' level/level.tscn   # 6 nodes
 grep -c 'type="Level"' level/level.tscn                                        # 1
 grep -c 'ExtResource("1")' level/level.tscn                                    # 0
-git diff HEAD -- ../oxide_godot_core/oxide_godot_lib/src/player.rs ../oxide_godot_core/oxide_godot_lib/src/red_robot.rs | grep '^[-+]' | grep -v '^[-+][-+]'   # exatamente 4 linhas (2 pares)
+git diff HEAD -- ../oxide_godot_core/oxide_godot_lib/src/player.rs ../oxide_godot_core/oxide_godot_lib/src/red_robot.rs | grep '^[-+]' | grep -v '^[-+][-+]'   # exactly 4 lines (2 pairs)
 ```

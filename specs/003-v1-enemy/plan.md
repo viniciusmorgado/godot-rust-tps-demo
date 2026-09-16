@@ -1,100 +1,100 @@
-# Implementation Plan: Marco C — inimigo: peça e robô vermelho (v1 raw port)
+# Implementation Plan: Milestone C — enemy: part and red robot (v1 raw port)
 
-**Branch**: `main` (a v1 vive na `main`; cada port é um commit atômico que deixa o jogo jogável) | **Date**: 2026-09-15 | **Spec**: [spec.md](spec.md)
+**Branch**: `main` (v1 lives on `main`; each port is an atomic commit that leaves the game playable) | **Date**: 2026-09-15 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/003-v1-enemy/spec.md`
 
-**Fase**: v1 — Raw Port (Princípio I, constituição v1.3.0). Tradução direta; nenhuma abstração,
-refatoração ou otimização. Nenhuma correção de bug prevista — `docs/upstream-bugs.md` permanece
-com 1 entrada.
+**Phase**: v1 — Raw Port (Principle I, constitution v1.3.0). Direct translation; no abstraction,
+refactoring or optimization. No bug fix planned — `docs/upstream-bugs.md` remains
+with 1 entry.
 
 ## Summary
 
-Portar `part.gd` (57 linhas, `RigidBody3D`, sem cena própria — 3 nodes de `red_robot.tscn`) e
-`red_robot.gd` (283 linhas, `CharacterBody3D`, raiz de `red_robot.tscn`) para duas classes gdext
-0.5.5, trocando o `type` dos 3 nodes de peça (port 1) e da raiz (port 2) na mesma cena de 11.053
-linhas, apagando `.gd` + `.gd.uid` no mesmo commit — na ordem part → red_robot, um commit por
-script. Os 5 scripts restantes ficam intactos e continuam encontrando `exploded` (`level.gd:99`)
-e `hit` (bala). Abordagem técnica: `fade_value` com `#[var(set = set_fade_value)]` aplicando ao
-shader do `next_pass` (setter acionado também pelo `set_indexed` da replicação — confirmado);
-duplicação de material por `Gd::duplicate_resource()` (o `duplicate()` gerado está deprecado);
-`await` → `create_timer(..).signals().timeout().connect_other(..)`; `#[signal] exploded` no bloco
-`#[godot_api]` principal, emitido por `signals().exploded().emit()` e conectado por nome pelo
-`level.gd`; enum `State` derivado (`via = i64`); a transformação inversa `Vector3 * Transform3D`
-traduzida como `basis.transposed() * (v − origin)` (a `affine_inverse` diverge com escala —
-confirmado numericamente); raycasts com exclusão **efetiva** pelo RID do robô; `collider ==
-player` por `instance_id()`; acesso tipado a `Part::explode` (`pub(crate)` desde o port 1) e a
-`Player::add_camera_shake_trauma` (`pub(crate)` no commit do robô); `Blast` e `PartDisappear`
-instanciados por API base. Tudo compilado num rascunho (0 warnings) e exercitado em headless —
+Port `part.gd` (57 lines, `RigidBody3D`, no scene of its own — 3 nodes of `red_robot.tscn`) and
+`red_robot.gd` (283 lines, `CharacterBody3D`, root of `red_robot.tscn`) to two gdext 0.5.5
+classes, swapping the `type` of the 3 part nodes (port 1) and of the root (port 2) in the same 11,053-line
+scene, deleting `.gd` + `.gd.uid` in the same commit — in the order part → red_robot, one commit per
+script. The 5 remaining scripts stay intact and keep finding `exploded` (`level.gd:99`)
+and `hit` (bullet). Technical approach: `fade_value` with `#[var(set = set_fade_value)]` applying to the
+`next_pass` shader (setter also triggered by the replication's `set_indexed` — confirmed);
+material duplication via `Gd::duplicate_resource()` (the generated `duplicate()` is deprecated);
+`await` → `create_timer(..).signals().timeout().connect_other(..)`; `#[signal] exploded` in the main
+`#[godot_api]` block, emitted via `signals().exploded().emit()` and connected by name by
+`level.gd`; derived `State` enum (`via = i64`); the inverse transformation `Vector3 * Transform3D`
+translated as `basis.transposed() * (v − origin)` (`affine_inverse` diverges with scale —
+confirmed numerically); raycasts with **effective** exclusion by the robot's RID; `collider ==
+player` by `instance_id()`; typed access to `Part::explode` (`pub(crate)` since port 1) and to
+`Player::add_camera_shake_trauma` (`pub(crate)` in the robot's commit); `Blast` and `PartDisappear`
+instantiated through base API. Everything compiled in a draft (0 warnings) and exercised headless —
 [research.md](research.md) §E.
 
 ## Technical Context
 
-**Language/Version**: Rust 1.98.1 (edition 2024); crate `godot` 0.5.5 (godot-rust/gdext), já em
-`[workspace.dependencies]` — NÃO alterar versão nem features.
+**Language/Version**: Rust 1.98.1 (edition 2024); crate `godot` 0.5.5 (godot-rust/gdext), already in
+`[workspace.dependencies]` — do NOT change version or features.
 
-**Primary Dependencies**: gdext 0.5.5 (API prebuilt 4.6 — manter); Godot 4.7.2 stable em
-`/usr/bin/godot.x86_64`. `.gdextension` com `reloadable = true`, lib debug em
-`oxide_godot_core/target/debug/liboxide_godot.so`. Bindings geradas em
-`oxide_godot_core/target/debug/build/godot-core-aea5c50e7fda9d57/out/` (único diretório em
-2026-09-15; se houver mais de um, `ls -dt .../godot-core-*/out | head -1`).
+**Primary Dependencies**: gdext 0.5.5 (prebuilt API 4.6 — keep); Godot 4.7.2 stable at
+`/usr/bin/godot.x86_64`. `.gdextension` with `reloadable = true`, debug lib at
+`oxide_godot_core/target/debug/liboxide_godot.so`. Bindings generated in
+`oxide_godot_core/target/debug/build/godot-core-aea5c50e7fda9d57/out/` (single directory on
+2026-09-15; if there is more than one, `ls -dt .../godot-core-*/out | head -1`).
 
 **Storage**: N/A
 
-**Testing**: `cargo build` (perfil debug, 0 warnings) + Godot headless (import + `red_robot.tscn`
-+ `level.tscn`). Sem testes unitários Rust nesta fase. Validação visual pelo usuário.
+**Testing**: `cargo build` (debug profile, 0 warnings) + Godot headless (import + `red_robot.tscn`
++ `level.tscn`). No Rust unit tests in this phase. Visual validation by the user.
 
 **Target Platform**: Linux x86_64 desktop
 
-**Project Type**: GDExtension cdylib (`oxide_godot_core/oxide_godot_lib`) + projeto Godot
+**Project Type**: GDExtension cdylib (`oxide_godot_core/oxide_godot_lib`) + Godot project
 (`oxide-godot/`)
 
-**Performance Goals**: paridade com o original (não otimizar — Princípio I)
+**Performance Goals**: parity with the original (do not optimize — Principle I)
 
-**Constraints**: Princípios I e II da constituição v1.3.0; nomes de métodos/propriedades/RPCs/sinal
-idênticos ao GDScript; um commit por script; `.gd` + `.gd.uid` apagados no mesmo commit;
-melhorias só em `docs/v2-backlog.md`; nenhuma correção de bug (se surgir defeito objetivo, parar e
-declarar em spec antes de qualquer commit).
+**Constraints**: Principles I and II of constitution v1.3.0; method/property/RPC/signal names
+identical to the GDScript; one commit per script; `.gd` + `.gd.uid` deleted in the same commit;
+improvements only in `docs/v2-backlog.md`; no bug fix (if an objective defect appears, stop and
+declare it in the spec before any commit).
 
-**Scale/Scope**: 2 scripts, 340 linhas de GDScript, 1 cena editada duas vezes (4 nodes), 2
-commits, +1 arquivo Rust existente tocado só em visibilidade (`player.rs`).
+**Scale/Scope**: 2 scripts, 340 lines of GDScript, 1 scene edited twice (4 nodes), 2
+commits, +1 existing Rust file touched only in visibility (`player.rs`).
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-### Princípio I — Porte em Três Fases
+### Principle I — Three-Phase Port
 
-| Regra | Status | Evidência |
+| Rule | Status | Evidence |
 |---|---|---|
-| Fase declarada em spec/plan/tasks | ✅ | spec.md "Fase: v1"; este plan "Fase: v1" |
-| Tradução direta, sem remodelar nodes/cenas | ✅ | `red_robot.tscn` só recebe troca de `type` em 4 nodes e remoção de `script`/`ext_resource`; nenhum node renomeado ou movido |
-| Nenhuma abstração/refatoração/otimização | ✅ | Um módulo por script; os 3 raycasts repetidos do original ficam **inline** (research D12 — helper descartado por ser extração); quirks preservados (research D15): `body.name == "Target"`, `pass # Kill.`, `player: Node3D`, `await` 10 s no `hit`, puff no pai da peça, exports não replicados |
-| Melhorias → `docs/v2-backlog.md` no mesmo commit | ✅ | Candidatos 15–18 em research.md §"Backlog v2 candidato", atribuídos por script |
-| Correção de bugs | N/A | Nenhum defeito objetivo conhecido; `docs/upstream-bugs.md` fica com 1 entrada. Se um surgir: parar, declarar na spec (requisito a), e só então comentário/commit/registro (b–d) |
+| Phase declared in spec/plan/tasks | ✅ | spec.md "Phase: v1"; this plan "Phase: v1" |
+| Direct translation, without remodeling nodes/scenes | ✅ | `red_robot.tscn` only receives a `type` swap on 4 nodes and removal of `script`/`ext_resource`; no node renamed or moved |
+| No abstraction/refactoring/optimization | ✅ | One module per script; the original's 3 repeated raycasts stay **inline** (research D12 — helper discarded for being an extraction); quirks preserved (research D15): `body.name == "Target"`, `pass # Kill.`, `player: Node3D`, 10 s `await` in `hit`, puff on the part's parent, non-replicated exports |
+| Improvements → `docs/v2-backlog.md` in the same commit | ✅ | Candidates 15–18 in research.md §"Candidate v2 backlog", assigned per script |
+| Bug fixes | N/A | No objective defect known; `docs/upstream-bugs.md` stays with 1 entry. If one appears: stop, declare in the spec (requirement a), and only then comment/commit/record (b–d) |
 
-### Princípio II — Ciclo de Porte Verificável
+### Principle II — Verifiable Port Cycle
 
-| Regra | Status | Evidência |
+| Rule | Status | Evidence |
 |---|---|---|
-| Uma classe por script, mesma base | ✅ | `Part: RigidBody3D`, `EnemyRobot: CharacterBody3D` |
-| Vínculo por troca de `type` na `.tscn`; nenhum `.gd` ponte | ✅ | Tabela "Edição das cenas" abaixo (port 1: 3 nodes + `ext_resource id="24"`; port 2: raiz + `id="1"`) |
-| Nomes de `#[func]`/RPC/sinal idênticos | ✅ | `explode`, `destroy`; `exploded`, `hit`, `play_shoot`, `shoot_check`, `resume_approach`, `_on_area_body_entered`, `_on_area_body_exited` — [contracts/](contracts/); probe §E.2 confirma `has_method`/`has_signal` |
-| Nomes de propriedades exportadas/replicadas idênticos (conferidos na `.tscn`) | ✅ | Peça: `red_robot.tscn:10419` `.:fade_value` → `#[export] #[var(set)]` (setter acionado por `set_indexed`, §E.1). Robô: l.33/36/39/42 `health`/`state`/`target_position`/`dead` → `#[export]`; `aim_preparing`/`test_shoot` exportados e não replicados, como no original |
-| `cargo build` sem warnings novos | ✅ | Baseline 0; rascunho compilou com 0 (após trocar `duplicate()` deprecado por `duplicate_resource()`) |
-| Validação headless (import + cena) | ✅ | quickstart.md §2–3; baseline medida em `4bb8f7f` (§E.3) |
-| Commit por port com script + cena na mensagem | ✅ | quickstart.md §8 |
-| `.gd` + `.gd.uid` apagados no mesmo commit | ✅ | Tabela "Edição das cenas"; `grep` do uid após remoção |
-| Ordem de baixo para cima | ✅ | `docs/port-order.md` itens 9 → 10. Peça primeiro: consome só `PartDisappear` (Marco A) por API base. Robô depois: consome `Part` (tipado), `Player` (tipado), `Blast` (API base) — todos já em Rust |
-| Rust não chama API customizada de GDScript | ✅ | O robô não consome nenhum script GDScript remanescente; únicas chamadas dinâmicas são `AnimationTree.set/get("parameters/…")`, `col.get("position"/"collider")` (Dictionary do raycast) — API base. Nenhum `.call(` (verificação final no quickstart) |
-| Exceção `Settings` | N/A | Não usado por nenhum dos dois scripts |
-| Catálogo do `CLAUDE.md` reflete a baseline | ✅ | Nenhum erro eliminado; `CLAUDE.md` intocado (verificação final) |
+| One class per script, same base | ✅ | `Part: RigidBody3D`, `EnemyRobot: CharacterBody3D` |
+| Binding by `type` swap in the `.tscn`; no bridge `.gd` | ✅ | Table "Scene edits" below (port 1: 3 nodes + `ext_resource id="24"`; port 2: root + `id="1"`) |
+| Identical `#[func]`/RPC/signal names | ✅ | `explode`, `destroy`; `exploded`, `hit`, `play_shoot`, `shoot_check`, `resume_approach`, `_on_area_body_entered`, `_on_area_body_exited` — [contracts/](contracts/); probe §E.2 confirms `has_method`/`has_signal` |
+| Identical exported/replicated property names (checked in the `.tscn`) | ✅ | Part: `red_robot.tscn:10419` `.:fade_value` → `#[export] #[var(set)]` (setter triggered by `set_indexed`, §E.1). Robot: l.33/36/39/42 `health`/`state`/`target_position`/`dead` → `#[export]`; `aim_preparing`/`test_shoot` exported and not replicated, as in the original |
+| `cargo build` with no new warnings | ✅ | Baseline 0; draft compiled with 0 (after swapping the deprecated `duplicate()` for `duplicate_resource()`) |
+| Headless validation (import + scene) | ✅ | quickstart.md §2–3; baseline measured at `4bb8f7f` (§E.3) |
+| Commit per port with script + scene in the message | ✅ | quickstart.md §8 |
+| `.gd` + `.gd.uid` deleted in the same commit | ✅ | Table "Scene edits"; `grep` of the uid after removal |
+| Bottom-up order | ✅ | `docs/port-order.md` items 9 → 10. Part first: consumes only `PartDisappear` (Milestone A) through base API. Robot afterwards: consumes `Part` (typed), `Player` (typed), `Blast` (base API) — all already in Rust |
+| Rust does not call custom GDScript API | ✅ | The robot consumes no remaining GDScript script; the only dynamic calls are `AnimationTree.set/get("parameters/…")`, `col.get("position"/"collider")` (raycast Dictionary) — base API. No `.call(` (final verification in the quickstart) |
+| `Settings` exception | N/A | Not used by either script |
+| `CLAUDE.md` catalogue reflects the baseline | ✅ | No error eliminated; `CLAUDE.md` untouched (final verification) |
 
-**Visibilidade `pub(crate)`**: `Part::explode` (`#[func] pub(crate)`, port 1) e
-`Player::add_camera_shake_trauma` (port 2, só a palavra de visibilidade em `player.rs`) —
-não-violação justificada, precedente do Marco B; ver Complexity Tracking.
+**`pub(crate)` visibility**: `Part::explode` (`#[func] pub(crate)`, port 1) and
+`Player::add_camera_shake_trauma` (port 2, only the visibility keyword in `player.rs`) —
+justified non-violation, Milestone B precedent; see Complexity Tracking.
 
-**Resultado do gate (pré-Phase 0)**: PASS.
+**Gate result (pre-Phase 0)**: PASS.
 
 ## Project Structure
 
@@ -102,91 +102,91 @@ não-violação justificada, precedente do Marco B; ver Complexity Tracking.
 
 ```text
 specs/003-v1-enemy/
-├── plan.md              # Este arquivo
-├── spec.md              # Especificação (commit 4bb8f7f)
-├── research.md          # Phase 0: assinaturas confirmadas por compilação + probes headless + baseline
-├── data-model.md        # Phase 1: Part e EnemyRobot (contrato, interno, máquina de estados)
-├── quickstart.md        # Phase 1: comandos de validação, baseline, formato dos commits
+├── plan.md              # This file
+├── spec.md              # Specification (commit 4bb8f7f)
+├── research.md          # Phase 0: signatures confirmed by compilation + headless probes + baseline
+├── data-model.md        # Phase 1: Part and EnemyRobot (contract, internal, state machine)
+├── quickstart.md        # Phase 1: validation commands, baseline, commit format
 ├── contracts/
-│   ├── part.md          # explode, destroy, 4 exports; consumidor red_robot.gd:96-98; replicação l.10419
+│   ├── part.md          # explode, destroy, 4 exports; consumer red_robot.gd:96-98; replication l.10419
 │   └── red-robot.md     # exploded, hit, play_shoot, shoot_check, resume_approach, _on_area_body_*, 6 exports
 ├── checklists/requirements.md
-└── tasks.md             # Phase 2 (/speckit-tasks — não criado por este comando)
+└── tasks.md             # Phase 2 (/speckit-tasks — not created by this command)
 ```
 
 ### Source Code (repository root)
 
 ```text
 oxide_godot_core/oxide_godot_lib/src/
-├── lib.rs                      # +2 linhas `mod`
-├── debug_label.rs, part_disappear.rs, blast.rs, camera_noise_shake.rs, player_input.rs   # inalterados
-├── player.rs                   # port 2: `add_camera_shake_trauma` → pub(crate) (só visibilidade)
-├── bullet.rs, door.rs          # inalterados
-├── part.rs                     # struct Part,     base=RigidBody3D      (port 1)  NOVO
-└── red_robot.rs                # struct EnemyRobot, base=CharacterBody3D (port 2)  NOVO
+├── lib.rs                      # +2 `mod` lines
+├── debug_label.rs, part_disappear.rs, blast.rs, camera_noise_shake.rs, player_input.rs   # unchanged
+├── player.rs                   # port 2: `add_camera_shake_trauma` → pub(crate) (visibility only)
+├── bullet.rs, door.rs          # unchanged
+├── part.rs                     # struct Part,     base=RigidBody3D      (port 1)  NEW
+└── red_robot.rs                # struct EnemyRobot, base=CharacterBody3D (port 2)  NEW
 
 oxide-godot/enemies/red_robot/
-├── red_robot.tscn              # port 1: Death/PartShield1|2, Death/PartHead → type="Part"; port 2: raiz → type="EnemyRobot"
-├── red_robot.gd (+ .uid)       # port 2: APAGAR
-└── parts/part.gd (+ .uid)      # port 1: APAGAR
+├── red_robot.tscn              # port 1: Death/PartShield1|2, Death/PartHead → type="Part"; port 2: root → type="EnemyRobot"
+├── red_robot.gd (+ .uid)       # port 2: DELETE
+└── parts/part.gd (+ .uid)      # port 1: DELETE
 
-docs/v2-backlog.md              # itens 15 (port 1), 16–18 (port 2)
+docs/v2-backlog.md              # items 15 (port 1), 16–18 (port 2)
 ```
 
-**Structure Decision**: um módulo Rust por script, sem módulo compartilhado (Princípio I).
-`Part` e `EnemyRobot` são nomes livres (sem `class_name`) — `RedRobot` foi descartado em T024 por colidir com `const RedRobot` em `level.gd:6` ("shadows a native class"; ver research D1), conferidos sem colisão nas bindings.
-`Part::explode` nasce `#[func] pub(crate)` no port 1 para que o commit do robô não toque em
-`part.rs`. Detalhes de cada classe em [research.md](research.md) §"Mapa por script".
+**Structure Decision**: one Rust module per script, no shared module (Principle I).
+`Part` and `EnemyRobot` are free names (no `class_name`) — `RedRobot` was discarded in T024 for colliding with `const RedRobot` in `level.gd:6` ("shadows a native class"; see research D1), checked without collision in the bindings.
+`Part::explode` is born `#[func] pub(crate)` in port 1 so that the robot's commit does not touch
+`part.rs`. Details of each class in [research.md](research.md) §"Map per script".
 
-## Edição das cenas (`enemies/red_robot/red_robot.tscn`, 11.053 linhas; linhas conferidas em 2026-09-15 — reconferir com `grep -n` antes de editar)
+## Scene edits (`enemies/red_robot/red_robot.tscn`, 11,053 lines; lines checked on 2026-09-15 — re-check with `grep -n` before editing)
 
-| Port | Node (linha) | `type` antes → depois | Remover | Manter | Apagar |
+| Port | Node (line) | `type` before → after | Remove | Keep | Delete |
 |---|---|---|---|---|---|
-| 1 | `Death/PartShield1` (l.10833) | `RigidBody3D` → `Part` | l.10841 `script = ExtResource("24")` | l.10834–10840: `transform`, `collision_layer = 3`, `collision_mask = 3`, `mass = 2000.0`, `physics_material_override`, `freeze = true`, `angular_damp = 0.3`; filhos l.10843+ (`MultiplayerSynchronizer` com `replication_config` + `public_visibility = false`, `Model`, `Col1`, `Col2`) | — |
-| 1 | `Death/PartShield2` (l.10885) | `RigidBody3D` → `Part` | l.10892 `script = ExtResource("24")` | idem (l.10886–10891; filhos l.10894+) | — |
-| 1 | `Death/PartHead` (l.10936) | `RigidBody3D` → `Part` | l.10944 `script = ExtResource("24")` | idem (l.10937–10943; filhos l.10946+) | — |
-| 1 | — | — | l.26 `[ext_resource type="Script" uid="uid://c3vo80hyj6w6c" path="res://enemies/red_robot/parts/part.gd" id="24"]` | todos os outros `ext_resource` | `parts/part.gd`, `parts/part.gd.uid` |
-| 2 | raiz `RedRobot` (l.10584 → **10583** após o port 1: só −1 do `ext_resource` l.26 — as 3 linhas `script` removidas ficam abaixo da raiz e não a deslocam) | `CharacterBody3D` → `EnemyRobot` | `script = ExtResource("1")` (l.10587 → 10583); l.3 `[ext_resource type="Script" uid="uid://bf14mo0lrrvjl" path="res://enemies/red_robot/red_robot.gd" id="1"]` | `collision_layer/mask = 3`; `MultiplayerSynchronizer` (`replication_config`); `AnimationTree`; `ShootAnimation` (method tracks); `PlayerDetectionArea`; as 2 `[connection …]` (fim do arquivo) | `red_robot.gd`, `red_robot.gd.uid` |
+| 1 | `Death/PartShield1` (l.10833) | `RigidBody3D` → `Part` | l.10841 `script = ExtResource("24")` | l.10834–10840: `transform`, `collision_layer = 3`, `collision_mask = 3`, `mass = 2000.0`, `physics_material_override`, `freeze = true`, `angular_damp = 0.3`; children l.10843+ (`MultiplayerSynchronizer` with `replication_config` + `public_visibility = false`, `Model`, `Col1`, `Col2`) | — |
+| 1 | `Death/PartShield2` (l.10885) | `RigidBody3D` → `Part` | l.10892 `script = ExtResource("24")` | same (l.10886–10891; children l.10894+) | — |
+| 1 | `Death/PartHead` (l.10936) | `RigidBody3D` → `Part` | l.10944 `script = ExtResource("24")` | same (l.10937–10943; children l.10946+) | — |
+| 1 | — | — | l.26 `[ext_resource type="Script" uid="uid://c3vo80hyj6w6c" path="res://enemies/red_robot/parts/part.gd" id="24"]` | all the other `ext_resource` | `parts/part.gd`, `parts/part.gd.uid` |
+| 2 | root `RedRobot` (l.10584 → **10583** after port 1: only −1 from the `ext_resource` l.26 — the 3 removed `script` lines are below the root and do not shift it) | `CharacterBody3D` → `EnemyRobot` | `script = ExtResource("1")` (l.10587 → 10583); l.3 `[ext_resource type="Script" uid="uid://bf14mo0lrrvjl" path="res://enemies/red_robot/red_robot.gd" id="1"]` | `collision_layer/mask = 3`; `MultiplayerSynchronizer` (`replication_config`); `AnimationTree`; `ShootAnimation` (method tracks); `PlayerDetectionArea`; the 2 `[connection …]` (end of file) | `red_robot.gd`, `red_robot.gd.uid` |
 
-Após o port 1, **todas** as linhas ≥ 26 deslocam −1 e as ≥ 10841 deslocam até −4; após o port 2,
-as ≥ 3 deslocam −1 de novo. Editar por `sed` só depois de `grep -n` na mesma sessão. Conferido:
-`ExtResource("24")` ocorre exatamente 3 vezes e `ExtResource("1")` exatamente 1 vez na cena
-(nenhum outro recurso usa esses ids). Depois de cada remoção: `grep -rn "<uid>" oxide-godot/ | grep -v /.godot/`
-deve retornar vazio.
+After port 1, **all** lines ≥ 26 shift −1 and those ≥ 10841 shift up to −4; after port 2,
+those ≥ 3 shift −1 again. Edit via `sed` only after `grep -n` in the same session. Checked:
+`ExtResource("24")` occurs exactly 3 times and `ExtResource("1")` exactly 1 time in the scene
+(no other resource uses those ids). After each removal: `grep -rn "<uid>" oxide-godot/ | grep -v /.godot/`
+must return empty.
 
-## Validação visual por script (SC-002 — feita pelo usuário no editor/jogo)
+## Visual validation per script (SC-002 — done by the user in the editor/game)
 
-| Port | O que conferir no jogo (comparar com `../oxide_godot_origins/`) |
+| Port | What to check in the game (compare with `../oxide_godot_origins/`) |
 |---|---|
-| 1 | Matar um robô (5 tiros): os dois escudos e a cabeça se soltam para cima com rotação aleatória, caem e quicam com física, ficam de 3 a 6 s no chão, somem num fade (~0,3 s, com o brilho de `emission_cutout`) e terminam com o puff (Marco A). Cada peça some no seu próprio tempo, sem afetar as outras. No editor: os 3 nodes com tipo `Part`, sem script, `freeze` marcado |
-| 2 | Robô parado ao longe (IDLE, animação idle); ao aproximar, vira (`turn_left/right`) e anda (`walk`) até ficar de frente; ~6 s de frente → mira (laser vermelho aparece e é clipado no cenário/jogador, animação de mira acompanha o jogador); ~1 s → atira (animação "shoot", faíscas do laser, impacto no ponto, **tremor forte** se acertar); volta a aproximar. Cada tiro recebido: animação de dano (uma de três) + som; 5º tiro: morte como no port 1 + faíscas + som de explosão; 10 s depois o robô some; 15 s após a morte, outro robô nasce no mesmo ponto (level). Sair da área de detecção → robô volta a IDLE |
+| 1 | Kill a robot (5 shots): the two shields and the head come loose upward with random rotation, fall and bounce with physics, stay 3 to 6 s on the ground, vanish in a fade (~0.3 s, with the `emission_cutout` glow) and end with the puff (Milestone A). Each part vanishes at its own time, without affecting the others. In the editor: the 3 nodes with type `Part`, no script, `freeze` checked |
+| 2 | Robot standing still far away (IDLE, idle animation); when approaching, it turns (`turn_left/right`) and walks (`walk`) until facing; ~6 s facing → aims (red laser appears and is clipped against the scenery/player, aim animation follows the player); ~1 s → shoots ("shoot" animation, laser sparks, impact at the point, **strong shake** if it hits); goes back to approaching. Each shot received: damage animation (one of three) + sound; 5th shot: death as in port 1 + sparks + explosion sound; 10 s later the robot disappears; 15 s after the death, another robot spawns at the same point (level). Leaving the detection area → robot goes back to IDLE |
 
 ## Complexity Tracking
 
-> Preenchido para registrar **não-violações justificadas** (o gate não tem violações).
+> Filled in to record **justified non-violations** (the gate has no violations).
 
-| Item | Por que é necessário | Alternativa mais simples rejeitada porque |
+| Item | Why it is necessary | Simpler alternative rejected because |
 |---|---|---|
-| `Part::explode` como `#[func] pub(crate)` (port 1) | `#[func]` porque `red_robot.gd` chama por nome até o port 2 (Princípio II, nomes preservados); `pub(crate)` porque FR-018 exige acesso tipado do robô no port 2 — declarado já no port 1 para que o commit do robô não edite `part.rs` | Só `#[func]` e `bind_mut().call("explode")` no port 2 — acesso dinâmico entre classes Rust (proibido) |
-| `Player::add_camera_shake_trauma` → `pub(crate)` em `player.rs` (commit do robô) | FR-018: `player.bind_mut().add_camera_shake_trauma(13.0)` tipado após `try_cast::<Player>`; só a palavra de visibilidade muda (precedente Marco B) | `player.call("add_camera_shake_trauma", …)` ou `rpc` — dinâmico; o original chama diretamente |
+| `Part::explode` as `#[func] pub(crate)` (port 1) | `#[func]` because `red_robot.gd` calls it by name until port 2 (Principle II, names preserved); `pub(crate)` because FR-018 requires typed access from the robot in port 2 — declared already in port 1 so that the robot's commit does not edit `part.rs` | Only `#[func]` and `bind_mut().call("explode")` in port 2 — dynamic access between Rust classes (forbidden) |
+| `Player::add_camera_shake_trauma` → `pub(crate)` in `player.rs` (robot's commit) | FR-018: `player.bind_mut().add_camera_shake_trauma(13.0)` typed after `try_cast::<Player>`; only the visibility keyword changes (Milestone B precedent) | `player.call("add_camera_shake_trauma", …)` or `rpc` — dynamic; the original calls it directly |
 
-## Constitution Check — re-avaliação pós-design (Phase 1)
+## Constitution Check — post-design re-evaluation (Phase 1)
 
-Re-avaliado após research.md, data-model.md, contracts/ e quickstart.md:
+Re-evaluated after research.md, data-model.md, contracts/ and quickstart.md:
 
-- Nenhum artefato introduz módulo comum, trait ou helper: os raycasts repetidos ficam inline
-  (research D12 descartou o helper como refatoração). ✅
-- Os contratos reproduzem todos os nomes conferidos na cena e nos consumidores: peça
-  (`explode` — `red_robot.gd:96-98`; `fade_value` — `red_robot.tscn:10419`), robô (`exploded` —
-  `level.gd:99`; `hit` — `bullet.rs`; method tracks l.10296-10299; conexões l.11050-11051;
-  replicação l.30-42). ✅
-- Todas as assinaturas compilaram com 0 warnings; probes confirmaram setter por `set_indexed`,
-  duplicação de material/`next_pass`, sinal por nome, exports/defaults, e a identidade
+- No artifact introduces a common module, trait or helper: the repeated raycasts stay inline
+  (research D12 discarded the helper as refactoring). ✅
+- The contracts reproduce all the names checked in the scene and in the consumers: part
+  (`explode` — `red_robot.gd:96-98`; `fade_value` — `red_robot.tscn:10419`), robot (`exploded` —
+  `level.gd:99`; `hit` — `bullet.rs`; method tracks l.10296-10299; connections l.11050-11051;
+  replication l.30-42). ✅
+- All signatures compiled with 0 warnings; probes confirmed setter via `set_indexed`,
+  material/`next_pass` duplication, signal by name, exports/defaults, and the identity
   `v * t = transposed * (v − origin)`. ✅
-- Decisões que se afastam do texto do input do comando, impostas pelo compilador ou pela
-  fidelidade: `duplicate_resource()` em vez de `duplicate()` (deprecado, warning); `create_timer`
-  sem `unwrap` (retorna `Gd` direto); `VarDictionary` para o resultado do raycast; `StringName::from("Target")`
-  na comparação de nome; raycasts inline em vez de helpers. ✅
-- Nenhum bug corrigido; `docs/upstream-bugs.md` e `CLAUDE.md` intocados. ✅
+- Decisions that depart from the text of the command's input, imposed by the compiler or by
+  fidelity: `duplicate_resource()` instead of `duplicate()` (deprecated, warning); `create_timer`
+  without `unwrap` (returns `Gd` directly); `VarDictionary` for the raycast result; `StringName::from("Target")`
+  in the name comparison; inline raycasts instead of helpers. ✅
+- No bug fixed; `docs/upstream-bugs.md` and `CLAUDE.md` untouched. ✅
 
-**Resultado do gate (pós-Phase 1)**: PASS.
+**Gate result (post-Phase 1)**: PASS.

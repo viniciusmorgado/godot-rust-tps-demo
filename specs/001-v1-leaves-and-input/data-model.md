@@ -1,95 +1,95 @@
-# Data Model: Marco A — folhas e input do jogador (v1 raw port)
+# Data Model: Milestone A — leaves and player input (v1 raw port)
 
-Não há persistência. As "entidades" são o estado em memória de dois nodes cujo estado é lido por
-código que permanece em GDScript (`player.gd`) ou replicado pela cena (`player.tscn`). Os outros
-três nodes (`DebugLabel`, `PartDisappear`, `Blast`) têm estado puramente interno e efêmero e
-não expõem nada — listados no fim por completude.
+There is no persistence. The "entities" are the in-memory state of two nodes whose state is read by
+code that remains in GDScript (`player.gd`) or replicated by the scene (`player.tscn`). The other
+three nodes (`DebugLabel`, `PartDisappear`, `Blast`) have purely internal and ephemeral state and
+expose nothing — listed at the end for completeness.
 
-## 1. PlayerInputSynchronizer (node `InputSynchronizer` em `player.tscn`)
+## 1. PlayerInputSynchronizer (node `InputSynchronizer` in `player.tscn`)
 
-### Estado replicado / lido pelo jogador
+### State replicated / read by the player
 
-| Campo | Tipo Godot | Tipo Rust | Default | Escrito por | Lido por | Replicado (`player.tscn`) |
+| Field | Godot type | Rust type | Default | Written by | Read by | Replicated (`player.tscn`) |
 |---|---|---|---|---|---|---|
-| `aiming` | `bool` | `bool` | `false` | `process` (transição de mira) | `player.gd:121` | ✅ `properties/5` |
-| `shoot_target` | `Vector3` | `Vector3` | `(0,0,0)` | `process` (enquanto `shooting`) | `player.gd:135` | ✅ `properties/2` |
-| `motion` | `Vector2` | `Vector2` | `(0,0)` | `process` (todo frame) | `player.gd:87` | ✅ `properties/3` |
-| `shooting` | `bool` | `bool` | `false` | `process` (todo frame) | `player.gd:133` | ✅ `properties/4` |
-| `jumping` | `bool` | `bool` | `false` | RPC `jump` (→ `true`) | `player.gd:107` (lê), `:114` (escreve `false`) | ❌ (por RPC, como no original) |
+| `aiming` | `bool` | `bool` | `false` | `process` (aim transition) | `player.gd:121` | ✅ `properties/5` |
+| `shoot_target` | `Vector3` | `Vector3` | `(0,0,0)` | `process` (while `shooting`) | `player.gd:135` | ✅ `properties/2` |
+| `motion` | `Vector2` | `Vector2` | `(0,0)` | `process` (every frame) | `player.gd:87` | ✅ `properties/3` |
+| `shooting` | `bool` | `bool` | `false` | `process` (every frame) | `player.gd:133` | ✅ `properties/4` |
+| `jumping` | `bool` | `bool` | `false` | RPC `jump` (→ `true`) | `player.gd:107` (reads), `:114` (writes `false`) | ❌ (via RPC, as in the original) |
 
-Todos `#[export]` (getter + setter gerados) com o nome exato acima.
+All `#[export]` (generated getter + setter) with the exact name above.
 
-### Referências preenchidas pela cena (`node_paths`, `player.tscn:343,346–351`)
+### References filled in by the scene (`node_paths`, `player.tscn:343,346–351`)
 
-| Campo | Tipo Godot | Tipo Rust | NodePath na cena |
+| Field | Godot type | Rust type | NodePath in the scene |
 |---|---|---|---|
 | `camera_animation` | `AnimationPlayer` | `Option<Gd<AnimationPlayer>>` | `../CameraBase/Animation` |
 | `crosshair` | `TextureRect` | `Option<Gd<TextureRect>>` | `../Crosshair` |
 | `camera_base` | `Node3D` | `Option<Gd<Node3D>>` | `../CameraBase` |
 | `camera_rot` | `Node3D` | `Option<Gd<Node3D>>` | `../CameraBase/CameraRot` |
-| `camera_camera` | `Camera3D` | `Option<Gd<Camera3D>>` | `../CameraBase/CameraRot/SpringArm3D/Camera3D` (é o `CameraNoiseShake` após o port 4) |
+| `camera_camera` | `Camera3D` | `Option<Gd<Camera3D>>` | `../CameraBase/CameraRot/SpringArm3D/Camera3D` (it is the `CameraNoiseShake` after port 4) |
 | `color_rect` | `ColorRect` | `Option<Gd<ColorRect>>` | `../ColorRect` |
 
-`player.gd:211` lê `camera_camera` e chama `add_trauma` nele — a referência precisa continuar
-exposta com esse nome.
+`player.gd:211` reads `camera_camera` and calls `add_trauma` on it — the reference must remain
+exposed under that name.
 
-### Estado interno (não exposto)
+### Internal state (not exposed)
 
-| Campo | Tipo Rust | Default | Semântica |
+| Field | Rust type | Default | Semantics |
 |---|---|---|---|
-| `toggled_aim` | `bool` | `false` | Mira ligada por toque curto (≤ 0,4 s) |
-| `aiming_timer` | `f32` | `0.0` | Segundos acumulados com a mira ativa; zera quando inativa |
+| `toggled_aim` | `bool` | `false` | Aim turned on by a short tap (≤ 0.4 s) |
+| `aiming_timer` | `f32` | `0.0` | Seconds accumulated with aim active; resets to zero when inactive |
 
-### Constantes
+### Constants
 
 `CAMERA_CONTROLLER_ROTATION_SPEED = 3.0`, `CAMERA_MOUSE_ROTATION_SPEED = 0.001`,
 `CAMERA_X_ROT_MIN = (-89.9°).to_radians()`, `CAMERA_X_ROT_MAX = (70°).to_radians()`,
-`AIM_HOLD_THRESHOLD = 0.4` — todas `f32` (alimentam `Vector2`/rotação).
+`AIM_HOLD_THRESHOLD = 0.4` — all `f32` (they feed `Vector2`/rotation).
 
-### Máquina de estados da mira (por frame, em `process`)
+### Aim state machine (per frame, in `process`)
 
 ```
-entrada: just_released(aim), pressed(aim), just_pressed(aim), aiming_timer, toggled_aim
+input: just_released(aim), pressed(aim), just_pressed(aim), aiming_timer, toggled_aim
 current_aim =
-  se just_released(aim) e aiming_timer ≤ 0.4:  true; toggled_aim = true          (toque curto → toggle ON)
-  senão:                                        toggled_aim ou pressed(aim);
-                                                se just_pressed(aim): toggled_aim = false   (novo toque → toggle OFF)
+  if just_released(aim) and aiming_timer ≤ 0.4:  true; toggled_aim = true          (short tap → toggle ON)
+  else:                                          toggled_aim or pressed(aim);
+                                                if just_pressed(aim): toggled_aim = false   (new tap → toggle OFF)
 aiming_timer = current_aim ? aiming_timer + delta : 0
-se aiming ≠ current_aim: aiming = current_aim; camera_animation.play(aiming ? "shoot" : "far")
+if aiming ≠ current_aim: aiming = current_aim; camera_animation.play(aiming ? "shoot" : "far")
 ```
 
-### Invariantes
+### Invariants
 
-- `camera_rot.rotation.x ∈ [CAMERA_X_ROT_MIN, CAMERA_X_ROT_MAX]` após qualquer `rotate_camera`.
+- `camera_rot.rotation.x ∈ [CAMERA_X_ROT_MIN, CAMERA_X_ROT_MAX]` after any `rotate_camera`.
 - `get_aim_rotation() ∈ [-1, 1]`.
-- `color_rect.modulate.a ∈ [0, 1]`: `= min((-17 - y)/15, 1)` se `y < -17`, senão `*= (1 - 4·delta)`.
-- Só a autoridade multiplayer processa `process`/`input`; nos demais peers o node fica inerte e
-  `color_rect` oculto (decisão tomada uma vez, em `ready`).
+- `color_rect.modulate.a ∈ [0, 1]`: `= min((-17 - y)/15, 1)` if `y < -17`, otherwise `*= (1 - 4·delta)`.
+- Only the multiplayer authority runs `process`/`input`; on the other peers the node stays inert and
+  `color_rect` hidden (decision taken once, in `ready`).
 
-## 2. CameraNoiseShake (node `Camera3D` em `player.tscn`)
+## 2. CameraNoiseShake (node `Camera3D` in `player.tscn`)
 
 ### Interface
 
-| Método | Assinatura Godot | Chamado por |
+| Method | Godot signature | Called by |
 |---|---|---|
-| `add_trauma` | `add_trauma(amount: float) -> void` | `player.gd:211` (0.35 ao atirar, 0.75 ao ser atingido; 13.0 via `red_robot.gd:133` → `player.gd:210`) |
+| `add_trauma` | `add_trauma(amount: float) -> void` | `player.gd:211` (0.35 when shooting, 0.75 when hit; 13.0 via `red_robot.gd:133` → `player.gd:210`) |
 
-### Estado interno
+### Internal state
 
-| Campo | Tipo Rust | Inicialização | Semântica |
+| Field | Rust type | Initialization | Semantics |
 |---|---|---|---|
-| `trauma` | `f32` | `0.0` | Intensidade acumulada, `∈ [0, 1.2]` |
-| `time` | `f64` | `0.0` | Posição no ruído; `+= delta · 1.0 · 5000` por frame com trauma |
-| `start_rotation` | `Vector3` | `rotation` em `ready` | Rotação de repouso; base para o tremor (capturada uma vez — quirk preservado) |
-| `noise` | `Gd<FastNoiseLite>` | `new_gd()`; em `ready`: `seed`, `fractal_octaves = 1`, `fractal_lacunarity = 1.0` | Gerador 1D |
-| `noise_seed` | `i32` | `randi() as i32` | Semente; `+1`/`+2` para pitch/roll |
+| `trauma` | `f32` | `0.0` | Accumulated intensity, `∈ [0, 1.2]` |
+| `time` | `f64` | `0.0` | Position in the noise; `+= delta · 1.0 · 5000` per frame with trauma |
+| `start_rotation` | `Vector3` | `rotation` in `ready` | Rest rotation; base for the shake (captured once — quirk preserved) |
+| `noise` | `Gd<FastNoiseLite>` | `new_gd()`; in `ready`: `seed`, `fractal_octaves = 1`, `fractal_lacunarity = 1.0` | 1D generator |
+| `noise_seed` | `i32` | `randi() as i32` | Seed; `+1`/`+2` for pitch/roll |
 
-### Constantes
+### Constants
 
 `SPEED = 1.0`, `DECAY_RATE = 1.5`, `MAX_YAW = 0.05`, `MAX_PITCH = 0.05`, `MAX_ROLL = 0.1`,
 `MAX_TRAUMA = 1.2` (`f32`).
 
-### Transições (por frame, em `process`, só se `trauma > 0`)
+### Transitions (per frame, in `process`, only if `trauma > 0`)
 
 ```
 trauma = max(trauma - 1.5·delta, 0)
@@ -102,16 +102,16 @@ rotation = start_rotation + Vector3(0.05·shake·noise(seed+1, time),   // pitch
 
 `add_trauma(a)`: `trauma = min(trauma + a, 1.2)`.
 
-### Invariantes
+### Invariants
 
-- `trauma ∈ [0, 1.2]` sempre.
-- No frame em que `trauma` chega a 0, `rotation == start_rotation` (shake = 0) e nos frames
-  seguintes a câmera não é tocada.
+- `trauma ∈ [0, 1.2]` always.
+- On the frame in which `trauma` reaches 0, `rotation == start_rotation` (shake = 0) and on the following
+  frames the camera is not touched.
 
-## 3. Nodes sem estado exposto
+## 3. Nodes with no exposed state
 
-| Classe | Estado interno | Ciclo de vida |
+| Class | Internal state | Lifecycle |
 |---|---|---|
-| `DebugLabel` | nenhum (usa `visible`/`text` do próprio `Label`) | vive com `level.tscn` |
-| `PartDisappear` | `mini_blasts: OnReady<Gd<CpuParticles3D>>` | `ready` → +0,2 s emite → +2·lifetime `queue_free` |
+| `DebugLabel` | none (uses the `Label`'s own `visible`/`text`) | lives with `level.tscn` |
+| `PartDisappear` | `mini_blasts: OnReady<Gd<CpuParticles3D>>` | `ready` → +0.2 s emits → +2·lifetime `queue_free` |
 | `Blast` | `light_rays`, `animation_player` (`OnReady`), `camera: Option<Gd<Camera3D>>` | `ready` → `animation_finished` → `queue_free` |

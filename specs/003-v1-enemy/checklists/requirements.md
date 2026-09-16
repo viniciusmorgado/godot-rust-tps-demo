@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Marco C — inimigo: peça e robô vermelho (v1 raw port)
+# Specification Quality Checklist: Milestone C — enemy: part and red robot (v1 raw port)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-15
@@ -32,7 +32,7 @@
 ## Notes
 
 - Validation run 1 (2026-09-15): all items pass after one wording pass (non-quoted "Rust"
-  mentions replaced by "classe nativa"; the word survives only inside the verbatim user input
+  mentions replaced by "native class"; the word survives only inside the verbatim user input
   quote). FR-001…FR-027 read monotonically.
 - **On "no implementation details"**: same rationale as `specs/001` and `specs/002`: behavior
   requirements (FR-001–FR-019) describe observable game behavior with the original's numbers and

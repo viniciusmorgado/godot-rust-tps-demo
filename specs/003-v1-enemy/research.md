@@ -1,37 +1,37 @@
-# Research: Marco C — peça e robô vermelho (gdext 0.5.5)
+# Research: Milestone C — part and red robot (gdext 0.5.5)
 
-**Fase**: v1 — Raw Port. Assinaturas exatas do gdext 0.5.5 usadas pelos dois ports e decisões de
-tradução, com alternativas descartadas. Fontes: crate `~/.cargo/registry/src/*/godot-core-0.5.5/`
-e `godot-macros-0.5.5/`; bindings geradas em
-`oxide_godot_core/target/debug/build/godot-core-aea5c50e7fda9d57/out/` (único diretório
-`godot-core-*/out` em 2026-09-15; se houver outro, vale `ls -dt .../godot-core-*/out | head -1`).
+**Phase**: v1 — Raw Port. Exact gdext 0.5.5 signatures used by the two ports and translation
+decisions, with discarded alternatives. Sources: crate `~/.cargo/registry/src/*/godot-core-0.5.5/`
+and `godot-macros-0.5.5/`; bindings generated in
+`oxide_godot_core/target/debug/build/godot-core-aea5c50e7fda9d57/out/` (single
+`godot-core-*/out` directory on 2026-09-15; if there is another, `ls -dt .../godot-core-*/out | head -1` applies).
 
-**Método de confirmação**: todo o mapeamento foi escrito como módulo temporário
-(`zz_research.rs`, classes `ZzPart`/`ZzRedRobot`) dentro do crate, compilado com `cargo build`
-→ **0 erros, 0 warnings** após quatro correções que o compilador impôs (D3, D4, D12, D13 — registradas
-abaixo porque o input do comando as tinha diferente), e exercitado em headless por scripts `-s`
-(§E). Módulo e alteração temporária de visibilidade em `player.rs` revertidos (`git status` limpo).
+**Confirmation method**: the whole mapping was written as a temporary module
+(`zz_research.rs`, classes `ZzPart`/`ZzRedRobot`) inside the crate, compiled with `cargo build`
+→ **0 errors, 0 warnings** after four corrections imposed by the compiler (D3, D4, D12, D13 — recorded
+below because the command's input had them differently), and exercised headless via `-s` scripts
+(§E). Module and temporary visibility change in `player.rs` reverted (`git status` clean).
 
-## D1 — Estrutura e visibilidade
+## D1 — Structure and visibility
 
-- **Decisão**: `src/part.rs` (`Part: RigidBody3D`), `src/red_robot.rs` (`EnemyRobot: CharacterBody3D`);
-  `mod part;` e `mod red_robot;` em `lib.rs`. Em `part.rs`, `explode` é `#[func] pub(crate)` desde
-  o port 1 (`#[func]` porque `red_robot.gd` chama por nome até o port 2; `pub(crate)` para o
-  acesso tipado do port 2 — declarado já no port 1 para que o commit do robô não toque em
-  `part.rs`). Em `player.rs`, `add_camera_shake_trauma` passa a `pub(crate)` **no commit do robô**
-  (só a palavra de visibilidade; precedente do Marco B, D1).
-- **Nomes**: `Part` e `EnemyRobot` conferidos contra `out/classes/` **e contra os identificadores dos `.gd` remanescentes** (`grep -hoE '^(const|class_name|var) [A-Za-z_]+'`). O nome originalmente planejado, `RedRobot`, foi descartado em T024: `level.gd:6` declara `const RedRobot: PackedScene` e o GDScript rejeita o script quando uma classe nativa tem o mesmo nome (`Parse Error: The member "RedRobot" shadows a native class`) — o jogo inteiro deixava de carregar. Regra: o nome de uma classe registrada não pode coincidir com nenhuma constante, `class_name` ou variável de script dos `.gd` que ainda existem — não existem `part.rs` nem
-  `red_robot.rs` nas bindings; sem colisão.
-- **Alternativas descartadas**: acesso à peça via `call("explode")` (violaria FR-018);
-  `pub(crate)` em `player.rs` já no port 1 (misturaria stories).
+- **Decision**: `src/part.rs` (`Part: RigidBody3D`), `src/red_robot.rs` (`EnemyRobot: CharacterBody3D`);
+  `mod part;` and `mod red_robot;` in `lib.rs`. In `part.rs`, `explode` is `#[func] pub(crate)` since
+  port 1 (`#[func]` because `red_robot.gd` calls it by name until port 2; `pub(crate)` for the
+  typed access of port 2 — declared already in port 1 so that the robot's commit does not touch
+  `part.rs`). In `player.rs`, `add_camera_shake_trauma` becomes `pub(crate)` **in the robot's commit**
+  (only the visibility keyword; Milestone B precedent, D1).
+- **Names**: `Part` and `EnemyRobot` checked against `out/classes/` **and against the identifiers of the remaining `.gd` files** (`grep -hoE '^(const|class_name|var) [A-Za-z_]+'`). The originally planned name, `RedRobot`, was discarded in T024: `level.gd:6` declares `const RedRobot: PackedScene` and GDScript rejects the script when a native class has the same name (`Parse Error: The member "RedRobot" shadows a native class`) — the whole game stopped loading. Rule: the name of a registered class cannot coincide with any constant, `class_name` or script variable of the `.gd` files that still exist — there is no `part.rs` nor
+  `red_robot.rs` in the bindings; no collision.
+- **Discarded alternatives**: access to the part via `call("explode")` (would violate FR-018);
+  `pub(crate)` in `player.rs` already in port 1 (would mix stories).
 
-## D2 — `fade_value` com setter que aplica ao shader
+## D2 — `fade_value` with a setter that applies to the shader
 
-- **Decisão**:
+- **Decision**:
   ```rust
   #[export] #[var(set = set_fade_value)] fade_value: f32,   // default 0.0
   _mat: Option<Gd<Material>>,
-  // bloco #[godot_api] impl Part principal:
+  // main #[godot_api] impl Part block:
   #[func]
   fn set_fade_value(&mut self, value: f32) {
       self.fade_value = value;
@@ -41,21 +41,21 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
       }
   }
   ```
-  Em `process`, o `fade_value = pow(...)` do GDScript (que aciona o setter) vira
-  `self.set_fade_value(fade)` — chamada direta ao setter, não atribuição ao campo.
-- **Racional**: `#[var(set = ...)]` no bloco principal (godot-macros `lib.rs:184-215, 1257`);
+  In `process`, the GDScript's `fade_value = pow(...)` (which triggers the setter) becomes
+  `self.set_fade_value(fade)` — a direct call to the setter, not an assignment to the field.
+- **Rationale**: `#[var(set = ...)]` in the main block (godot-macros `lib.rs:184-215, 1257`);
   `Material::get_next_pass() -> Option<Gd<Material>>` (`material.rs:159`);
-  `ShaderMaterial::set_shader_parameter(param, &Variant)` (`shader_material.rs:169`). `_mat` é
-  campo próprio e `get_next_pass()` devolve um `Gd` novo — sem conflito de borrow. Tipos `f32`
-  (`float` do GDScript; alimenta shader e `powi`).
-- **Confirmado empiricamente (§E.1)**: `set("fade_value", 0.5)` e `set_indexed("fade_value", 0.25)`
-  (o caminho do `MultiplayerSynchronizer`, `red_robot.tscn:10419`) acionam o setter e o
-  `emission_cutout` do `next_pass` **duplicado** muda; o material original não muda.
-- **Correção imposta pelo compilador**: nenhuma aqui (o input já estava certo).
+  `ShaderMaterial::set_shader_parameter(param, &Variant)` (`shader_material.rs:169`). `_mat` is
+  an own field and `get_next_pass()` returns a new `Gd` — no borrow conflict. `f32` types
+  (GDScript `float`; feeds shader and `powi`).
+- **Confirmed empirically (§E.1)**: `set("fade_value", 0.5)` and `set_indexed("fade_value", 0.25)`
+  (the `MultiplayerSynchronizer` path, `red_robot.tscn:10419`) trigger the setter and the
+  `emission_cutout` of the **duplicated** `next_pass` changes; the original material does not change.
+- **Correction imposed by the compiler**: none here (the input was already right).
 
-## D3 — `ready`: duplicar material e `next_pass` (só fora de servidor dedicado)
+## D3 — `ready`: duplicate material and `next_pass` (only outside a dedicated server)
 
-- **Decisão**:
+- **Decision**:
   ```rust
   self.base_mut().set_process(false);
   if !Os::singleton().has_feature("dedicated_server") {
@@ -68,22 +68,22 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
       self._mat = Some(mat);
   }
   ```
-- **Racional**: `Os::has_feature(tag) -> bool` (`os.rs:890`); `Node::get_child(idx) -> Option<Gd<Node>>`
+- **Rationale**: `Os::has_feature(tag) -> bool` (`os.rs:890`); `Node::get_child(idx) -> Option<Gd<Node>>`
   (`node.rs:368`); `MeshInstance3D::get_mesh() -> Option<Gd<Mesh>>` (`mesh_instance_3d.rs:182`);
   `Mesh::surface_get_material(i) -> Option<Gd<Material>>` / `surface_set_material(i, &mat)`
   (`mesh.rs:245,235`); `Material::set_next_pass(&mat)` (`material.rs:150`).
-- **Correção imposta pelo compilador**: `Resource::duplicate()` (`resource.rs:336`, retorna
-  `Option<Gd<Resource>>`) está **deprecado** em 0.5.5 e gera warning — usar
-  `Gd::<T>::duplicate_resource() -> Gd<T>` (`obj/gd_duplicate.rs:160`), que já devolve o tipo
-  certo (sem `cast`). Alternativa descartada: `duplicate()` + `#[allow(deprecated)]` (warning
-  suprimido não é "0 warnings").
-- **Confirmado empiricamente (§E.1)**: `material duplicated=true`, `next_pass duplicated=true`,
-  `is_processing=false` após `ready`; `OS.has_feature("dedicated_server")` é **false** em
-  `--headless` (o ramo de duplicação roda na validação headless).
+- **Correction imposed by the compiler**: `Resource::duplicate()` (`resource.rs:336`, returns
+  `Option<Gd<Resource>>`) is **deprecated** in 0.5.5 and generates a warning — use
+  `Gd::<T>::duplicate_resource() -> Gd<T>` (`obj/gd_duplicate.rs:160`), which already returns the
+  right type (no `cast`). Discarded alternative: `duplicate()` + `#[allow(deprecated)]` (a suppressed
+  warning is not "0 warnings").
+- **Confirmed empirically (§E.1)**: `material duplicated=true`, `next_pass duplicated=true`,
+  `is_processing=false` after `ready`; `OS.has_feature("dedicated_server")` is **false** in
+  `--headless` (the duplication branch runs in the headless validation).
 
-## D4 — `explode()` da peça
+## D4 — The part's `explode()`
 
-- **Decisão**:
+- **Decision**:
   ```rust
   #[func]
   pub(crate) fn explode(&mut self) {
@@ -100,60 +100,60 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
           .connect_other(&*self, |this: &mut Part| this.base_mut().set_process(true));
   }
   ```
-- **Racional**: `public_visibility` → `set_visibility_public(bool)` (`multiplayer_synchronizer.rs:281`);
+- **Rationale**: `public_visibility` → `set_visibility_public(bool)` (`multiplayer_synchronizer.rs:281`);
   `freeze` → `set_freeze_enabled(bool)` (`rigid_body_3d.rs:717`); `set_linear_velocity`/
   `set_angular_velocity` (`:276,:294`); `randf() -> f64` (`godot::global`, `utilities.rs:812`);
-  `await create_timer(..).timeout` → `connect_other` com callable *linked* (padrão Marco A D6:
-  se a peça for liberada antes, o callable é invalidado). `$Col1`/`$Col2`/`$MultiplayerSynchronizer`
-  ficam como `get_node_as` no ponto de uso (o original também usa `$` inline, não `@onready`).
-- **`create_timer` retorna `Gd<SceneTreeTimer>` direto** (`scene_tree.rs:316`, sem `Option`) —
-  não usar `.unwrap()`.
+  `await create_timer(..).timeout` → `connect_other` with a *linked* callable (Milestone A D6 pattern:
+  if the part is freed before, the callable is invalidated). `$Col1`/`$Col2`/`$MultiplayerSynchronizer`
+  stay as `get_node_as` at the point of use (the original also uses `$` inline, not `@onready`).
+- **`create_timer` returns `Gd<SceneTreeTimer>` directly** (`scene_tree.rs:316`, no `Option`) —
+  do not use `.unwrap()`.
 
-## D5 — `process` e RPC `destroy`
+## D5 — `process` and `destroy` RPC
 
-- **Decisão**: `process(&mut self, delta: f64)`: `let fade = (self._disappearing_counter / self.disappearing_time).powi(2); self.set_fade_value(fade); self._disappearing_counter += delta as f32; if self._disappearing_counter >= self.disappearing_time - 0.2 { self.base_mut().rpc("destroy", &[]); self.base_mut().set_process(false); }`.
+- **Decision**: `process(&mut self, delta: f64)`: `let fade = (self._disappearing_counter / self.disappearing_time).powi(2); self.set_fade_value(fade); self._disappearing_counter += delta as f32; if self._disappearing_counter >= self.disappearing_time - 0.2 { self.base_mut().rpc("destroy", &[]); self.base_mut().set_process(false); }`.
   `#[rpc(authority, call_local, unreliable)] fn destroy`: `let mut puff: Gd<CpuParticles3D> = load::<PackedScene>("res://enemies/red_robot/parts/part_disappear_effect/part_disappear.tscn").instantiate_as::<CpuParticles3D>(); self.base().get_parent().unwrap().add_child(&puff); let origin = self.base().get_global_transform().origin; puff.set_global_position(origin); create_timer(0.2).signals().timeout().connect_other(&*self, |this| this.base_mut().queue_free());`
-- **Racional**: `pow(x, 2.0)` → `powi(2)` (mesmo valor); a instância é tipada como
-  `CpuParticles3D` (API base), **nunca** `PartDisappear` — o original tipa `puff` como
-  `CPUParticles3D` e só usa `global_transform.origin` (D11 do Marco B). `add_child` sem
-  `force_readable_name` (o original passa só um argumento). `preload` → `load` no ponto de uso.
-- **Correção imposta pelo compilador**: nenhuma.
+- **Rationale**: `pow(x, 2.0)` → `powi(2)` (same value); the instance is typed as
+  `CpuParticles3D` (base API), **never** `PartDisappear` — the original types `puff` as
+  `CPUParticles3D` and only uses `global_transform.origin` (Milestone B D11). `add_child` without
+  `force_readable_name` (the original passes only one argument). `preload` → `load` at the point of use.
+- **Correction imposed by the compiler**: none.
 
-## D6 — Sinal `exploded` e blocos `#[godot_api]`
+## D6 — `exploded` signal and `#[godot_api]` blocks
 
-- **Decisão**: `#[signal] fn exploded();` dentro do **único** `#[godot_api] impl EnemyRobot`
-  (junto com `#[func]`s e `#[rpc]`s); emissão `self.signals().exploded().emit();`.
-- **Racional**: `#[signal]` e `#[rpc]` não são suportados em blocos secundários
-  (godot-macros `lib.rs:1256`); `signals()` vem de `WithUserSignals` (`obj/traits.rs:606,639`,
-  `&mut self`). O sinal é registrado com o nome do método, então `robot.exploded.connect(...)`
-  em `level.gd:99` resolve por nome.
-- **Confirmado empiricamente (§E.2)**: `has_signal("exploded") == true`; conexão a partir de
-  GDScript e emissão recebida.
+- **Decision**: `#[signal] fn exploded();` inside the **single** `#[godot_api] impl EnemyRobot`
+  (together with the `#[func]`s and `#[rpc]`s); emission `self.signals().exploded().emit();`.
+- **Rationale**: `#[signal]` and `#[rpc]` are not supported in secondary blocks
+  (godot-macros `lib.rs:1256`); `signals()` comes from `WithUserSignals` (`obj/traits.rs:606,639`,
+  `&mut self`). The signal is registered with the method's name, so `robot.exploded.connect(...)`
+  in `level.gd:99` resolves by name.
+- **Confirmed empirically (§E.2)**: `has_signal("exploded") == true`; connection from
+  GDScript and emission received.
 
-## D7 — Enum `State` e exports do robô
+## D7 — `State` enum and the robot's exports
 
-- **Decisão**: `#[derive(GodotConvert, Var, Export, Clone, Copy, PartialEq, Debug)] #[godot(via = i64)] pub enum State { Idle, Approach, Aim, Shooting }`
+- **Decision**: `#[derive(GodotConvert, Var, Export, Clone, Copy, PartialEq, Debug)] #[godot(via = i64)] pub enum State { Idle, Approach, Aim, Shooting }`
   (0..3 = `IDLE..SHOOTING`); `#[export] #[init(val = State::Idle)] state: State`;
   `#[export] test_shoot: bool`, `#[export] target_position: Vector3`, `#[export] #[init(val = 5)] health: i32`,
   `#[export] dead: bool`, `#[export] #[init(val = AIM_PREPARE_TIME)] aim_preparing: f32`.
-  Internos: `#[init(val = SHOOT_WAIT)] shoot_countdown: f32`, `#[init(val = AIM_TIME)] aim_countdown: f32`,
+  Internal: `#[init(val = SHOOT_WAIT)] shoot_countdown: f32`, `#[init(val = AIM_TIME)] aim_countdown: f32`,
   `player: Option<Gd<Node3D>>`, `orientation: Transform3D`.
-- **Racional**: precedente D3 do Marco B. `health: int` → `i32` (comparação `== 0`,
-  replicado como `int`). `player: Node3D = null` → `Option<Gd<Node3D>>` (tipo da referência
-  preservado: pode ser um "Target", não um `Player`).
-- **Confirmado empiricamente (§E.2)**: os 6 exports registrados com os tipos certos e defaults
-  `false / (0,0,0) / 5 / 0 / false / 0.5`; `hint_string` de `state` = `Idle:0,Approach:1,Aim:2,Shooting:3`
-  (rótulos Rust no inspector — cosmético, mesmo caso do Marco B).
+- **Rationale**: Milestone B D3 precedent. `health: int` → `i32` (comparison `== 0`,
+  replicated as `int`). `player: Node3D = null` → `Option<Gd<Node3D>>` (type of the reference
+  preserved: it may be a "Target", not a `Player`).
+- **Confirmed empirically (§E.2)**: the 6 exports registered with the right types and defaults
+  `false / (0,0,0) / 5 / 0 / false / 0.5`; `hint_string` of `state` = `Idle:0,Approach:1,Aim:2,Shooting:3`
+  (Rust labels in the inspector — cosmetic, same case as Milestone B).
 
-## D8 — Constantes e referências de cena
+## D8 — Constants and scene references
 
-- Consts `f32`: `PLAYER_AIM_TOLERANCE_DEGREES: f32 = 15.0_f32.to_radians()` (`to_radians` é
-  `const fn` — compila), `SHOOT_WAIT = 6.0`, `AIM_TIME = 1.0`, `AIM_PREPARE_TIME = 0.5`,
+- `f32` consts: `PLAYER_AIM_TOLERANCE_DEGREES: f32 = 15.0_f32.to_radians()` (`to_radians` is a
+  `const fn` — compiles), `SHOOT_WAIT = 6.0`, `AIM_TIME = 1.0`, `AIM_PREPARE_TIME = 0.5`,
   `BLEND_AIM_SPEED = 0.05`.
-- `OnReady` (`#[init(node = ...)]`), caminhos completos a partir do robô (os `x.get_node(^"…")`
-  encadeados do original viram caminhos compostos, como no Marco B D5):
+- `OnReady` (`#[init(node = ...)]`), full paths from the robot (the original's chained
+  `x.get_node(^"…")` become composite paths, as in Milestone B D5):
 
-  | Campo | Tipo | Caminho |
+  | Field | Type | Path |
   |---|---|---|
   | `animation_tree` | `AnimationTree` | `AnimationTree` |
   | `shoot_animation` | `AnimationPlayer` | `ShootAnimation` |
@@ -164,53 +164,53 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
   | `collision_shape` | `CollisionShape3D` | `CollisionShape3D` |
   | `explosion_sound` / `hit_sound` | `AudioStreamPlayer3D` | `SoundEffects/Explosion`, `SoundEffects/Hit` |
   | `death` | `Node3D` | `Death` |
-  | `death_shield1` / `death_shield2` / `death_head` | **`Part`** (tipado) | `Death/PartShield1`, `Death/PartShield2`, `Death/PartHead` |
+  | `death_shield1` / `death_shield2` / `death_head` | **`Part`** (typed) | `Death/PartShield1`, `Death/PartShield2`, `Death/PartHead` |
   | `death_detach_spark1` / `2` | `CpuParticles3D` | `Death/DetachSpark1`, `Death/DetachSpark2` |
 
-  `LaserEmber` é buscado dentro de `shoot()` por `get_node_as::<CpuParticles3D>("RedRobotModel/Armature/Skeleton3D/RayFrom/LaserEmber")`
-  (o original usa `$...` inline, `red_robot.gd:124`). O original tipa as peças como
-  `RigidBody3D`; o port tipa como `Part` porque o port 1 já as tornou classe Rust e FR-018 exige
-  `explode()` tipado (`self.death_shield1.bind_mut().explode()`).
+  `LaserEmber` is looked up inside `shoot()` via `get_node_as::<CpuParticles3D>("RedRobotModel/Armature/Skeleton3D/RayFrom/LaserEmber")`
+  (the original uses `$...` inline, `red_robot.gd:124`). The original types the parts as
+  `RigidBody3D`; the port types them as `Part` because port 1 already made them a Rust class and FR-018 requires
+  a typed `explode()` (`self.death_shield1.bind_mut().explode()`).
 
-## D9 — Transformação inversa (`Vector3 * Transform3D`)
+## D9 — Inverse transformation (`Vector3 * Transform3D`)
 
-- **Decisão**: `let gt = self.base().get_global_transform(); let to_player_local = gt.basis.transposed() * (self.target_position - gt.origin);`
-  e, para o canhão, `let mt = self.ray_mesh.get_global_transform(); let to_cannon_local = mt.basis.transposed() * (self.target_position + Vector3::UP - mt.origin);`.
-- **Racional**: no Godot, `Vector3 * Transform3D` é `Transform3D::xform_inv` =
-  `basis.xform_inv(v - origin)` = **transposta** da base aplicada a `v − origin` — só coincide
-  com `affine_inverse() * v` quando a base é ortonormal (o `RayMesh` fica sob um esqueleto
-  animado com escala). gdext: `Basis::transposed()` (`basis.rs:373`), `impl Mul<Vector3> for Basis`
+- **Decision**: `let gt = self.base().get_global_transform(); let to_player_local = gt.basis.transposed() * (self.target_position - gt.origin);`
+  and, for the cannon, `let mt = self.ray_mesh.get_global_transform(); let to_cannon_local = mt.basis.transposed() * (self.target_position + Vector3::UP - mt.origin);`.
+- **Rationale**: in Godot, `Vector3 * Transform3D` is `Transform3D::xform_inv` =
+  `basis.xform_inv(v - origin)` = **transposed** basis applied to `v − origin` — it only coincides
+  with `affine_inverse() * v` when the basis is orthonormal (the `RayMesh` sits under an animated
+  skeleton with scale). gdext: `Basis::transposed()` (`basis.rs:373`), `impl Mul<Vector3> for Basis`
   (`basis.rs:595`).
-- **Confirmado empiricamente (§E.2)**, com base escalada: `v * t == transposed * (v − origin)`
-  = `(-4.664, -2.577, 10.043)`; `affine_inverse() * v` = `(4.808, -11.914, 5.848)` — diferente.
-- **Alternativa descartada**: `gt.affine_inverse() * v` — reproduziria outro valor sempre que
-  houver escala.
+- **Confirmed empirically (§E.2)**, with a scaled basis: `v * t == transposed * (v − origin)`
+  = `(-4.664, -2.577, 10.043)`; `affine_inverse() * v` = `(4.808, -11.914, 5.848)` — different.
+- **Discarded alternative**: `gt.affine_inverse() * v` — would reproduce a different value whenever
+  there is scale.
 
-## D10 — Trigonometria e eixos
+## D10 — Trigonometry and axes
 
-- `atan2(a, b)` do GDScript → `a.atan2(b)` (`f32::atan2(self, other)` = atan2(self, other) —
-  mesma ordem de argumentos): `to.x.atan2(to.z)`, `to.x.atan2(-to.z)`, `to.y.atan2(-to.z)`.
+- GDScript's `atan2(a, b)` → `a.atan2(b)` (`f32::atan2(self, other)` = atan2(self, other) —
+  same argument order): `to.x.atan2(to.z)`, `to.x.atan2(-to.z)`, `to.y.atan2(-to.z)`.
 - `rad_to_deg(x)` → `x.to_degrees()`; `clamp(x, 0, 1)`/`clampf` → `f32::clamp`.
 - `gt.basis.y` → `gt.basis.col_b()` (`basis.rs:487`); `absf` → `.abs()`;
-  `a.distance_to(b)` → `Vector3::distance_to` (existe em `vector_macros.rs`); `(a - b).length()`.
+  `a.distance_to(b)` → `Vector3::distance_to` (exists in `vector_macros.rs`); `(a - b).length()`.
 
 ## D11 — `AnimationTree`
 
 - `animation_tree["parameters/state/transition_request"] = "turn_left"` →
   `self.animation_tree.set("parameters/state/transition_request", &"turn_left".to_variant())`.
-- `animation_tree[param] = 1` com `param = "parameters/hit" + str(randi() % 3 + 1) + "/request"` →
+- `animation_tree[param] = 1` with `param = "parameters/hit" + str(randi() % 3 + 1) + "/request"` →
   `let param = format!("parameters/hit{}/request", randi() % 3 + 1); self.animation_tree.set(&param, &1.to_variant());`
-  (`randi() -> i64`; `1` = `AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE`, inteiro como no original).
+  (`randi() -> i64`; `1` = `AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE`, integer as in the original).
 - `animation_tree.get("parameters/aim/blend_position")` → `.get(..).to::<Vector2>()`;
-  `set("parameters/aiming/blend_amount", &x.to_variant())` com `x: f32`;
+  `set("parameters/aiming/blend_amount", &x.to_variant())` with `x: f32`;
   `$AnimationTree.active = true` → `self.animation_tree.set_active(true)` (`animation_mixer.rs:114`).
-- Root motion e o bloco final de física: idênticos ao Player (Marco B D8–D10), exceto que a base
-  final vai para **o próprio robô**: `self.base_mut().set_global_basis(basis)`.
+- Root motion and the final physics block: identical to the Player (Milestone B D8–D10), except that the final
+  basis goes to **the robot itself**: `self.base_mut().set_global_basis(basis)`.
 
-## D12 — Raycasts com exclusão efetiva
+## D12 — Raycasts with effective exclusion
 
-- **Decisão**: cada um dos três raycasts do original (`red_robot.gd:115,209,233`) é traduzido
-  **inline**, no ponto de uso, sem helper:
+- **Decision**: each of the original's three raycasts (`red_robot.gd:115,209,233`) is translated
+  **inline**, at the point of use, without a helper:
   ```rust
   let rid = self.base().get_rid();
   let params = PhysicsRayQueryParameters3D::create_ex(ray_origin, ray_to)
@@ -225,31 +225,31 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
       && col.get("collider").and_then(|v| v.try_to::<Gd<Object>>().ok())
           .map(|c| c.instance_id() == player.instance_id()).unwrap_or(false);
   ```
-- **Racional**: `[self]` no original é o RID do próprio `CharacterBody3D` — `CollisionObject3D::get_rid()`
-  (`collision_object_3d.rs:173`); a exclusão **é** efetiva (diferente do quirk do
-  `player_input.gd`, onde o `self` era um `MultiplayerSynchronizer` sem RID). `col.collider == player`
-  compara identidade de objeto → `instance_id()` (`obj/gd.rs:301`); `Gd<Object>` e `Gd<Node3D>`
-  são tipos diferentes, por isso não se usa `==` direto. `col.position` → `col.get("position").unwrap().to::<Vector3>()`.
-  `create_ex(..).done()` devolve `Option<Gd<PhysicsRayQueryParameters3D>>` (static, como no
-  Marco A D11).
-- **Correção imposta pelo compilador**: em 0.5.5 `Dictionary` é genérico (`Dictionary<K, V>`);
-  `intersect_ray` retorna **`VarDictionary`** (`= Dictionary<Variant, Variant>`,
-  `physics_direct_space_state_3d.rs:46`, `dictionary.rs:127`) — usar esse nome.
-- **Alternativa descartada**: helpers privados `intersect_ray(from, to)` / `collider_is(col, node)`
-  (compilados no rascunho) — funcionam, mas seriam extração de código repetido, ou seja,
-  refatoração (Princípio I). Ficam para a v2.
+- **Rationale**: `[self]` in the original is the RID of the `CharacterBody3D` itself — `CollisionObject3D::get_rid()`
+  (`collision_object_3d.rs:173`); the exclusion **is** effective (unlike the `player_input.gd`
+  quirk, where `self` was a `MultiplayerSynchronizer` without a RID). `col.collider == player`
+  compares object identity → `instance_id()` (`obj/gd.rs:301`); `Gd<Object>` and `Gd<Node3D>`
+  are different types, which is why `==` is not used directly. `col.position` → `col.get("position").unwrap().to::<Vector3>()`.
+  `create_ex(..).done()` returns `Option<Gd<PhysicsRayQueryParameters3D>>` (static, as in
+  Milestone A D11).
+- **Correction imposed by the compiler**: in 0.5.5 `Dictionary` is generic (`Dictionary<K, V>`);
+  `intersect_ray` returns **`VarDictionary`** (`= Dictionary<Variant, Variant>`,
+  `physics_direct_space_state_3d.rs:46`, `dictionary.rs:127`) — use that name.
+- **Discarded alternative**: private helpers `intersect_ray(from, to)` / `collider_is(col, node)`
+  (compiled in the draft) — they work, but they would be an extraction of repeated code, that is,
+  refactoring (Principle I). Left for v2.
 
-## D13 — `shoot()`: laser, `LaserEmber`, `Blast`, tremor com atraso
+## D13 — `shoot()`: laser, `LaserEmber`, `Blast`, delayed shake
 
 - `ray_dir = gt.basis.col_b()`; `max_dist: f32 = 1000.0`; `ray_origin.distance_to(position)`.
 - `_clip_ray(length)`: `if !Os::singleton().has_feature("dedicated_server") { self.ray_mesh.get_surface_override_material(0).unwrap().cast::<ShaderMaterial>().set_shader_parameter("clip", &(length + mesh_offset).to_variant()); }`
-  com `mesh_offset = self.ray_mesh.get_position().z` (`mesh_instance_3d.rs:258`).
+  with `mesh_offset = self.ray_mesh.get_position().z` (`mesh_instance_3d.rs:258`).
 - `LaserEmber`: `set_position(Vector3::new(0.0, 0.0, -max_dist / 2.0 - mesh_offset))`;
   `let mut e = get_emission_box_extents(); e.z = (max_dist - mesh_offset.abs()) / 2.0; set_emission_box_extents(e)`
-  (`cpu_particles_3d.rs:753,744` — o original escreve `.z` de uma propriedade `Vector3`, que é
-  ler/modificar/gravar).
+  (`cpu_particles_3d.rs:753,744` — the original writes `.z` of a `Vector3` property, which is
+  read/modify/write).
 - `Blast`: `let mut blast: Gd<Node3D> = load::<PackedScene>("res://enemies/red_robot/laser/impact_effect/impact_effect.tscn").instantiate_as::<Node3D>(); self.base().get_tree().get_root().unwrap().add_child(&blast); blast.set_global_position(position);`
-  — API base, nunca `Blast`.
+  — base API, never `Blast`.
 - `if col.collider == player and player is Player: await 0.1 s; player.add_camera_shake_trauma(13.0)` →
   ```rust
   if let Some(player) = self.player.clone() {
@@ -263,71 +263,71 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
       }
   }
   ```
-  O closure captura `Gd<Player>` por `move`; `Gd::clone()` é necessário porque o callable
-  pode ser chamado por `&Fn`. `add_camera_shake_trauma` precisa de `pub(crate)` em `player.rs`
-  (D1). `pass # Kill.` fica sem efeito (nenhum código).
-- **Correção imposta pelo compilador**: `body.get_name() == "Target".into()` é ambíguo
-  (`StringName: PartialEq<_>` tem várias impls) — usar `body.get_name() == StringName::from("Target")`.
+  The closure captures `Gd<Player>` by `move`; `Gd::clone()` is necessary because the callable
+  may be called via `&Fn`. `add_camera_shake_trauma` needs `pub(crate)` in `player.rs`
+  (D1). `pass # Kill.` stays without effect (no code).
+- **Correction imposed by the compiler**: `body.get_name() == "Target".into()` is ambiguous
+  (`StringName: PartialEq<_>` has several impls) — use `body.get_name() == StringName::from("Target")`.
 
-## D14 — Handlers de área e `hit`
+## D14 — Area handlers and `hit`
 
 - `_on_area_body_entered(body: Gd<Node3D>)`: `if body.clone().try_cast::<Player>().is_ok() || body.get_name() == StringName::from("Target") { self.player = Some(body); self.state = State::Approach; }`
-  (`clone()` necessário porque `try_cast` consome e `body` ainda é guardado).
+  (`clone()` necessary because `try_cast` consumes and `body` is still stored).
   `_on_area_body_exited(body)`: `if body.try_cast::<Player>().is_ok() { self.player = None; self.state = State::Idle; }`.
-- `hit` (`#[rpc(authority, call_local, unreliable)]`): tradução de `red_robot.gd:78-105`; os
+- `hit` (`#[rpc(authority, call_local, unreliable)]`): translation of `red_robot.gd:78-105`; the
   10 s → `create_timer(10.0).signals().timeout().connect_other(&*self, |this| this.base_mut().queue_free())`
-  só se `is_server()`; `self.model.set_visible(false)` / `self.death.set_visible(true)`
-  (`node_3d.rs:620`); peças por `self.death_shield1.bind_mut().explode()`.
-- `physics_process`: `let Some(player) = self.player.clone() else { ...; return; };` reproduz
-  `if not player: ... return` e dá um `Gd<Node3D>` para o resto do frame. Sem jogador:
-  `set_velocity(get_gravity() * delta)` **substitui** a velocidade (o original também).
+  only if `is_server()`; `self.model.set_visible(false)` / `self.death.set_visible(true)`
+  (`node_3d.rs:620`); parts via `self.death_shield1.bind_mut().explode()`.
+- `physics_process`: `let Some(player) = self.player.clone() else { ...; return; };` reproduces
+  `if not player: ... return` and yields a `Gd<Node3D>` for the rest of the frame. Without a player:
+  `set_velocity(get_gravity() * delta)` **replaces** the velocity (the original does too).
 
-## D15 — O que NÃO muda (quirks preservados, FR-027)
+## D15 — What does NOT change (quirks preserved, FR-027)
 
-`body.name == "Target"` (nenhum node com esse nome existe); `pass # Kill.`; `player: Node3D`
-(não `Player`); `aim_preparing`/`test_shoot` exportados sem replicação; `await` de 10 s dentro do
-RPC `hit`; puff instanciado no pai da peça (`Death`); `angular_velocity` com `randf()` por eixo
-(distribuição do original); `explode()` das peças chamado mesmo em peers não-servidor (retorna
-cedo). Candidatos ao backlog em §"Backlog v2 candidato".
+`body.name == "Target"` (no node with that name exists); `pass # Kill.`; `player: Node3D`
+(not `Player`); `aim_preparing`/`test_shoot` exported without replication; 10 s `await` inside the
+`hit` RPC; puff instantiated on the part's parent (`Death`); `angular_velocity` with `randf()` per axis
+(the original's distribution); the parts' `explode()` called even on non-server peers (returns
+early). Backlog candidates in §"Candidate v2 backlog".
 
-## §E — Verificação empírica (2026-09-15, headless, sem editor aberto)
+## §E — Empirical verification (2026-09-15, headless, no editor open)
 
-### E.1 Peça (`ZzPart` programática: `Model/MeshInstance3D` com `BoxMesh` + `StandardMaterial3D` cujo `next_pass` é um `ShaderMaterial` com `uniform float emission_cutout`)
+### E.1 Part (programmatic `ZzPart`: `Model/MeshInstance3D` with `BoxMesh` + `StandardMaterial3D` whose `next_pass` is a `ShaderMaterial` with `uniform float emission_cutout`)
 
 ```
 is_node_ready=true material duplicated=true next_pass duplicated=true is_processing=false
 set(): fade_value=0.5 emission_cutout(dup)=0.5 (original)=<null>      ← setter via Object.set
-set_indexed(): emission_cutout(dup)=0.25                                ← caminho do MultiplayerSynchronizer
+set_indexed(): emission_cutout(dup)=0.25                                ← MultiplayerSynchronizer path
 has explode=true destroy=true set_fade_value=true
 props lifetime/lifetime_random/disappearing_time/fade_value: type=3 (FLOAT) usage=6 (DEFAULT), defaults 3.0/3.0/0.5
-OS.has_feature("dedicated_server")=false em --headless
+OS.has_feature("dedicated_server")=false in --headless
 ```
 
-(Observação de método: os checks precisam rodar em `_process` do `SceneTree`, não em `_init` —
-`_ready` dos nodes só dispara depois que a árvore começa a processar.)
+(Method note: the checks need to run in the `SceneTree`'s `_process`, not in `_init` —
+the nodes' `_ready` only fires after the tree starts processing.)
 
-### E.2 Robô (`ZzRedRobot.new()`)
+### E.2 Robot (`ZzRedRobot.new()`)
 
 ```
-has_signal exploded=true; conexão GDScript por nome + emit_signal → recebido
+has_signal exploded=true; GDScript connection by name + emit_signal → received
 has_method: hit, play_shoot, shoot_check, resume_approach, _on_area_body_entered, _on_area_body_exited = true;
-            shoot, animate, _clip_ray = false (privados)
+            shoot, animate, _clip_ray = false (private)
 props: test_shoot BOOL false; target_position VECTOR3 (0,0,0); health INT 5; state INT 0 hint 'Idle:0,Approach:1,Aim:2,Shooting:3'; dead BOOL false; aim_preparing FLOAT 0.5
 set("state", 2) → 2
-xform_inv (base com escala): v*t = transposed*(v−origin) = (-4.664, -2.577, 10.043); affine_inverse*v = (4.808, -11.914, 5.848)
+xform_inv (basis with scale): v*t = transposed*(v−origin) = (-4.664, -2.577, 10.043); affine_inverse*v = (4.808, -11.914, 5.848)
 ```
 
-### E.3 Baseline (commit `4bb8f7f`, antes de qualquer port deste marco)
+### E.3 Baseline (commit `4bb8f7f`, before any port of this milestone)
 
-`cargo build` 0 warnings; import com `Initialize godot-rust` e 0 `ERROR`;
-`enemies/red_robot/red_robot.tscn` exit 124, grep de regressão vazio, 1 WARNING (HDR);
-`level/level.tscn` exit 124, grep vazio, 2 WARNINGs (HDR, Physics interpolation).
+`cargo build` 0 warnings; import with `Initialize godot-rust` and 0 `ERROR`;
+`enemies/red_robot/red_robot.tscn` exit 124, regression grep empty, 1 WARNING (HDR);
+`level/level.tscn` exit 124, grep empty, 2 WARNINGs (HDR, Physics interpolation).
 
-## Mapa por script (resumo para as tasks)
+## Map per script (summary for the tasks)
 
 ### 1. `part.gd` → `src/part.rs` — `Part: RigidBody3D`
 
-- Campos: `_mat: Option<Gd<Material>>`; `#[export] #[init(val = 3.0)] lifetime: f32`;
+- Fields: `_mat: Option<Gd<Material>>`; `#[export] #[init(val = 3.0)] lifetime: f32`;
   `#[export] #[init(val = 3.0)] lifetime_random: f32`; `#[export] #[init(val = 0.5)] disappearing_time: f32`;
   `#[export] #[var(set = set_fade_value)] fade_value: f32`; `_disappearing_counter: f32`.
 - `IRigidBody3D`: `ready` (D3), `process` (D5).
@@ -336,22 +336,22 @@ xform_inv (base com escala): v*t = transposed*(v−origin) = (-4.664, -2.577, 10
 
 ### 2. `red_robot.gd` → `src/red_robot.rs` — `EnemyRobot: CharacterBody3D`
 
-- Enum `State`, consts (D7–D8), 6 exports, 4 internos, 15 `OnReady` (D8).
+- `State` enum, consts (D7–D8), 6 exports, 4 internal, 15 `OnReady` (D8).
 - `ICharacterBody3D`: `ready`, `physics_process` (D14, D11).
-- `#[godot_api] impl EnemyRobot` único: `#[signal] exploded`, `#[func] resume_approach`,
+- Single `#[godot_api] impl EnemyRobot`: `#[signal] exploded`, `#[func] resume_approach`,
   `#[rpc] hit`, `#[rpc] play_shoot`, `#[func] shoot_check`, `#[func] _on_area_body_entered`,
   `#[func] _on_area_body_exited`.
-- `impl EnemyRobot` privado: `shoot` (D12–D13), `animate` (D9–D11), `_clip_ray` (D13); os três
-  raycasts inline (D12).
-- `player.rs`: `add_camera_shake_trauma` → `pub(crate)` (D1), no commit do robô.
+- Private `impl EnemyRobot`: `shoot` (D12–D13), `animate` (D9–D11), `_clip_ray` (D13); the three
+  inline raycasts (D12).
+- `player.rs`: `add_camera_shake_trauma` → `pub(crate)` (D1), in the robot's commit.
 
-## Backlog v2 candidato (registrar em `docs/v2-backlog.md` no commit do script correspondente)
+## Candidate v2 backlog (record in `docs/v2-backlog.md` in the corresponding script's commit)
 
-Itens 1–14 já existem. Novos:
+Items 1–14 already exist. New:
 
-| # | Origem | Melhoria | Motivação |
+| # | Origin | Improvement | Motivation |
 |---|---|---|---|
-| 15 | `enemies/red_robot/parts/part.gd` (port 1) | Instanciar o puff no pai do **robô** (ou na raiz) em vez do pai da peça (`Death`) | O puff nasce sob o robô, que é removido 10 s após a morte; hoje os tempos não se cruzam, mas a dependência é frágil |
-| 16 | `enemies/red_robot/red_robot.gd` (port 2) | Remover o ramo morto `body.name == "Target"` e tipar `player` como `Gd<Player>` | Nenhuma cena tem node `Target`; a referência genérica obriga `try_cast` em cada uso |
-| 17 | `enemies/red_robot/red_robot.gd` (port 2) | Substituir o `await` de 10 s dentro do RPC `hit` por timer/sinal fora do RPC | Lógica de remoção acoplada ao handler de dano |
-| 18 | `enemies/red_robot/red_robot.gd` (port 2) | Replicar `aim_preparing` (ou não exportá-lo) e remover `test_shoot` do inspector | Exportados mas fora da `SceneReplicationConfig`; `test_shoot` é gatilho interno do method track |
+| 15 | `enemies/red_robot/parts/part.gd` (port 1) | Instantiate the puff on the **robot's** parent (or on the root) instead of the part's parent (`Death`) | The puff is born under the robot, which is removed 10 s after death; today the timings do not cross, but the dependency is fragile |
+| 16 | `enemies/red_robot/red_robot.gd` (port 2) | Remove the dead branch `body.name == "Target"` and type `player` as `Gd<Player>` | No scene has a `Target` node; the generic reference forces a `try_cast` on each use |
+| 17 | `enemies/red_robot/red_robot.gd` (port 2) | Replace the 10 s `await` inside the `hit` RPC with a timer/signal outside the RPC | Removal logic coupled to the damage handler |
+| 18 | `enemies/red_robot/red_robot.gd` (port 2) | Replicate `aim_preparing` (or not export it) and remove `test_shoot` from the inspector | Exported but outside the `SceneReplicationConfig`; `test_shoot` is an internal trigger of the method track |

@@ -1,40 +1,40 @@
-# Contrato: `CameraNoiseShake` (port 4)
+# Contract: `CameraNoiseShake` (port 4)
 
-Superfície pública consumida por código que **permanece em GDScript**.
+Public surface consumed by code that **remains in GDScript**.
 
-- Classe registrada: `CameraNoiseShake` (nome livre — o original não tem `class_name`; nenhum
-  script referencia o tipo)
+- Registered class: `CameraNoiseShake` (free name — the original has no `class_name`; no
+  script references the type)
 - Base: `Camera3D`
-- Node na cena: `player.tscn` → `CameraBase/CameraRot/SpringArm3D/Camera3D` (l.630). É o node
-  apontado por `camera_camera` do `InputSynchronizer` (`player.tscn:350`), e por isso é alcançado
-  pelo GDScript como `player_input.camera_camera`.
+- Node in the scene: `player.tscn` → `CameraBase/CameraRot/SpringArm3D/Camera3D` (l.630). It is the node
+  pointed to by `camera_camera` of the `InputSynchronizer` (`player.tscn:350`), and is therefore reached
+  by GDScript as `player_input.camera_camera`.
 
-## Métodos (`#[func]`)
+## Methods (`#[func]`)
 
-| Assinatura Godot | Rust | Consumidor | Valores usados |
+| Godot signature | Rust | Consumer | Values used |
 |---|---|---|---|
-| `add_trauma(amount: float) -> void` | `fn add_trauma(&mut self, amount: f64)` | `player.gd:211` (`player_input.camera_camera.add_trauma(amount)`) | 0.35 (`player.gd:201`, atirar), 0.75 (`:206`, atingido), 13.0 (`red_robot.gd:133` → `player.gd:210`) |
+| `add_trauma(amount: float) -> void` | `fn add_trauma(&mut self, amount: f64)` | `player.gd:211` (`player_input.camera_camera.add_trauma(amount)`) | 0.35 (`player.gd:201`, shooting), 0.75 (`:206`, hit), 13.0 (`red_robot.gd:133` → `player.gd:210`) |
 
-## Propriedades expostas
+## Exposed properties
 
-Nenhuma. `trauma`, `time`, `start_rotation`, `noise`, `noise_seed` são internos; nenhum script os
-lê (conferido: `grep -rn 'trauma\|noise_seed\|start_rotation' oxide-godot --include=*.gd` só
-encontra o próprio `camera_noise_shake_effect.gd` e `add_camera_shake_trauma`/`add_trauma`).
+None. `trauma`, `time`, `start_rotation`, `noise`, `noise_seed` are internal; no script
+reads them (checked: `grep -rn 'trauma\|noise_seed\|start_rotation' oxide-godot --include=*.gd` only
+finds `camera_noise_shake_effect.gd` itself and `add_camera_shake_trauma`/`add_trauma`).
 
-## Virtuais implementados
+## Implemented virtuals
 
 `_ready`, `_process(delta)` — via `impl ICamera3D`.
 
-## Nota de tipagem estática
+## Static typing note
 
-`player_input.camera_camera` é tipado `Camera3D` para o analisador do GDScript, que não conhece
-`add_trauma` nesse tipo → warning `UNSAFE_METHOD_ACCESS`, exatamente como hoje (o script original
-também não tem `class_name`). Não é regressão.
+`player_input.camera_camera` is typed `Camera3D` for the GDScript analyzer, which does not know
+`add_trauma` on that type → warning `UNSAFE_METHOD_ACCESS`, exactly as today (the original script
+also has no `class_name`). Not a regression.
 
-## Verificação antes do commit
+## Verification before the commit
 
 ```bash
 cd oxide-godot
 grep -rn 'add_trauma\|add_camera_shake_trauma' --include=*.gd .
 ```
-Deve retornar apenas `player.gd:201,206,210,211` e `red_robot.gd:133`.
+Must return only `player.gd:201,206,210,211` and `red_robot.gd:133`.
