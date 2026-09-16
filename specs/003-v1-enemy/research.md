@@ -14,13 +14,13 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
 
 ## D1 — Estrutura e visibilidade
 
-- **Decisão**: `src/part.rs` (`Part: RigidBody3D`), `src/red_robot.rs` (`RedRobot: CharacterBody3D`);
+- **Decisão**: `src/part.rs` (`Part: RigidBody3D`), `src/red_robot.rs` (`EnemyRobot: CharacterBody3D`);
   `mod part;` e `mod red_robot;` em `lib.rs`. Em `part.rs`, `explode` é `#[func] pub(crate)` desde
   o port 1 (`#[func]` porque `red_robot.gd` chama por nome até o port 2; `pub(crate)` para o
   acesso tipado do port 2 — declarado já no port 1 para que o commit do robô não toque em
   `part.rs`). Em `player.rs`, `add_camera_shake_trauma` passa a `pub(crate)` **no commit do robô**
   (só a palavra de visibilidade; precedente do Marco B, D1).
-- **Nomes**: `Part` e `RedRobot` conferidos contra `out/classes/` — não existem `part.rs` nem
+- **Nomes**: `Part` e `EnemyRobot` conferidos contra `out/classes/` **e contra os identificadores dos `.gd` remanescentes** (`grep -hoE '^(const|class_name|var) [A-Za-z_]+'`). O nome originalmente planejado, `RedRobot`, foi descartado em T024: `level.gd:6` declara `const RedRobot: PackedScene` e o GDScript rejeita o script quando uma classe nativa tem o mesmo nome (`Parse Error: The member "RedRobot" shadows a native class`) — o jogo inteiro deixava de carregar. Regra: o nome de uma classe registrada não pode coincidir com nenhuma constante, `class_name` ou variável de script dos `.gd` que ainda existem — não existem `part.rs` nem
   `red_robot.rs` nas bindings; sem colisão.
 - **Alternativas descartadas**: acesso à peça via `call("explode")` (violaria FR-018);
   `pub(crate)` em `player.rs` já no port 1 (misturaria stories).
@@ -121,7 +121,7 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
 
 ## D6 — Sinal `exploded` e blocos `#[godot_api]`
 
-- **Decisão**: `#[signal] fn exploded();` dentro do **único** `#[godot_api] impl RedRobot`
+- **Decisão**: `#[signal] fn exploded();` dentro do **único** `#[godot_api] impl EnemyRobot`
   (junto com `#[func]`s e `#[rpc]`s); emissão `self.signals().exploded().emit();`.
 - **Racional**: `#[signal]` e `#[rpc]` não são suportados em blocos secundários
   (godot-macros `lib.rs:1256`); `signals()` vem de `WithUserSignals` (`obj/traits.rs:606,639`,
@@ -256,7 +256,7 @@ abaixo porque o input do comando as tinha diferente), e exercitado em headless p
       if hit_player {   // col.collider == player (D12, inline)
           if let Ok(player) = player.try_cast::<Player>() {
               self.base().get_tree().create_timer(0.1).signals().timeout()
-                  .connect_other(&*self, move |_this: &mut RedRobot| {
+                  .connect_other(&*self, move |_this: &mut EnemyRobot| {
                       player.clone().bind_mut().add_camera_shake_trauma(13.0);
                   });
           }
@@ -334,14 +334,14 @@ xform_inv (base com escala): v*t = transposed*(v−origin) = (-4.664, -2.577, 10
 - `#[godot_api] impl Part`: `#[func] set_fade_value` (D2), `#[func] pub(crate) explode` (D4),
   `#[rpc(authority, call_local, unreliable)] destroy` (D5).
 
-### 2. `red_robot.gd` → `src/red_robot.rs` — `RedRobot: CharacterBody3D`
+### 2. `red_robot.gd` → `src/red_robot.rs` — `EnemyRobot: CharacterBody3D`
 
 - Enum `State`, consts (D7–D8), 6 exports, 4 internos, 15 `OnReady` (D8).
 - `ICharacterBody3D`: `ready`, `physics_process` (D14, D11).
-- `#[godot_api] impl RedRobot` único: `#[signal] exploded`, `#[func] resume_approach`,
+- `#[godot_api] impl EnemyRobot` único: `#[signal] exploded`, `#[func] resume_approach`,
   `#[rpc] hit`, `#[rpc] play_shoot`, `#[func] shoot_check`, `#[func] _on_area_body_entered`,
   `#[func] _on_area_body_exited`.
-- `impl RedRobot` privado: `shoot` (D12–D13), `animate` (D9–D11), `_clip_ray` (D13); os três
+- `impl EnemyRobot` privado: `shoot` (D12–D13), `animate` (D9–D11), `_clip_ray` (D13); os três
   raycasts inline (D12).
 - `player.rs`: `add_camera_shake_trauma` → `pub(crate)` (D1), no commit do robô.
 

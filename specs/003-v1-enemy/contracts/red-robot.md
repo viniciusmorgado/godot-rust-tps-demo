@@ -1,13 +1,13 @@
-# Contrato: `RedRobot` (port 2)
+# Contrato: `EnemyRobot` (port 2)
 
 Superfície consumida por `level.gd` (permanece em GDScript), pela bala (Rust, duck typing) e
 pela cena `red_robot.tscn`.
 
-- Classe registrada: `RedRobot` (nome livre — sem `class_name`; nenhum script referencia o
-  tipo; `level.gd:97` tipa como `CharacterBody3D`). Conferido: não existe `RedRobot` no engine.
+- Classe registrada: `EnemyRobot` (nome livre — sem `class_name`; nenhum script referencia o
+  tipo; `level.gd:97` tipa como `CharacterBody3D`). Conferido: não existe `EnemyRobot` no engine.
 - Base: `CharacterBody3D`.
 - Node na cena: raiz de `enemies/red_robot/red_robot.tscn` (l.10584 antes do port 1; −1 depois).
-  Instanciado por `level.gd:97-100` (`RedRobot.instantiate()`, `robot.transform = ...`,
+  Instanciado por `level.gd:97-100` (`EnemyRobot.instantiate()`, `robot.transform = ...`,
   `robot.exploded.connect(_respawn_robot.bind(spawn_point))`, `spawned_nodes.add_child(robot, true)`)
   e replicado pelo `MultiplayerSpawner` do level.
 
@@ -15,7 +15,7 @@ pela cena `red_robot.tscn`.
 
 | Assinatura Godot | Rust | Consumidor |
 |---|---|---|
-| `signal exploded()` | `#[signal] fn exploded();` (bloco `#[godot_api] impl RedRobot` principal); emissão `self.signals().exploded().emit()` | `level.gd:99` — conexão por nome; `_respawn_robot` espera 15 s e spawna outro robô |
+| `signal exploded()` | `#[signal] fn exploded();` (bloco `#[godot_api] impl EnemyRobot` principal); emissão `self.signals().exploded().emit()` | `level.gd:99` — conexão por nome; `_respawn_robot` espera 15 s e spawna outro robô |
 
 ## Métodos e RPCs
 
@@ -59,11 +59,11 @@ robô); `Part::explode` (`pub(crate)` desde o port 1); `Blast` só por API base 
 
 ```bash
 cd oxide-godot
-grep -n 'exploded\|RedRobot' level/level.gd                                   # l.6, 97, 99 — sinal por nome
+grep -n 'exploded\|EnemyRobot' level/level.gd                                   # l.6, 97, 99 — sinal por nome
 grep -n '"method": &"shoot_check"\|"method": &"resume_approach"' enemies/red_robot/red_robot.tscn   # 2 linhas
 grep -n 'method="_on_area_body_entered"\|method="_on_area_body_exited"' enemies/red_robot/red_robot.tscn   # 2 linhas
 grep -n 'properties/[0-9]/path' enemies/red_robot/red_robot.tscn | head -5   # global_transform, health, state, target_position, dead
-grep -c 'type="RedRobot"' enemies/red_robot/red_robot.tscn                   # 1
+grep -c 'type="EnemyRobot"' enemies/red_robot/red_robot.tscn                   # 1
 grep -c 'ExtResource("1")' enemies/red_robot/red_robot.tscn                  # 0
 grep -rn 'has_method("hit")' ../oxide_godot_core/oxide_godot_lib/src/bullet.rs   # 1 — duck typing que chama hit
 ```

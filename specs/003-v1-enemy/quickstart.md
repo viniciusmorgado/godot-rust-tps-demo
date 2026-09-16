@@ -71,7 +71,7 @@ grep -rn '<script>.gd' oxide-godot/ --include='*.tscn' --include='*.gd'      # e
 # o(s) node(s) trocou(aram) de tipo e não tem(êm) mais script
 grep -c 'type="Part"' oxide-godot/enemies/red_robot/red_robot.tscn            # port 1: 3
 grep -c 'ExtResource("24")' oxide-godot/enemies/red_robot/red_robot.tscn      # port 1: 0
-grep -c 'type="RedRobot"' oxide-godot/enemies/red_robot/red_robot.tscn        # port 2: 1
+grep -c 'type="EnemyRobot"' oxide-godot/enemies/red_robot/red_robot.tscn        # port 2: 1
 grep -c 'ExtResource("1")' oxide-godot/enemies/red_robot/red_robot.tscn       # port 2: 0
 
 # os 5 .gd fora do marco não mudaram
@@ -126,7 +126,7 @@ Port part.gd → Part (RigidBody3D); red_robot.tscn: nodes Death/PartShield1, De
 ```
 
 ```
-Port red_robot.gd → RedRobot (CharacterBody3D); red_robot.tscn: node RedRobot type="CharacterBody3D"→"RedRobot"
+Port red_robot.gd → EnemyRobot (CharacterBody3D); red_robot.tscn: node EnemyRobot type="CharacterBody3D"→"EnemyRobot"
 
 - <notas>
 - player.rs: só visibilidade pub(crate) em add_camera_shake_trauma (acesso tipado do robô, FR-018); nenhuma lógica movida

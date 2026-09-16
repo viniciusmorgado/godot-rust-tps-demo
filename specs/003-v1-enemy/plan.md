@@ -77,7 +77,7 @@ commits, +1 arquivo Rust existente tocado só em visibilidade (`player.rs`).
 
 | Regra | Status | Evidência |
 |---|---|---|
-| Uma classe por script, mesma base | ✅ | `Part: RigidBody3D`, `RedRobot: CharacterBody3D` |
+| Uma classe por script, mesma base | ✅ | `Part: RigidBody3D`, `EnemyRobot: CharacterBody3D` |
 | Vínculo por troca de `type` na `.tscn`; nenhum `.gd` ponte | ✅ | Tabela "Edição das cenas" abaixo (port 1: 3 nodes + `ext_resource id="24"`; port 2: raiz + `id="1"`) |
 | Nomes de `#[func]`/RPC/sinal idênticos | ✅ | `explode`, `destroy`; `exploded`, `hit`, `play_shoot`, `shoot_check`, `resume_approach`, `_on_area_body_entered`, `_on_area_body_exited` — [contracts/](contracts/); probe §E.2 confirma `has_method`/`has_signal` |
 | Nomes de propriedades exportadas/replicadas idênticos (conferidos na `.tscn`) | ✅ | Peça: `red_robot.tscn:10419` `.:fade_value` → `#[export] #[var(set)]` (setter acionado por `set_indexed`, §E.1). Robô: l.33/36/39/42 `health`/`state`/`target_position`/`dead` → `#[export]`; `aim_preparing`/`test_shoot` exportados e não replicados, como no original |
@@ -105,7 +105,7 @@ specs/003-v1-enemy/
 ├── plan.md              # Este arquivo
 ├── spec.md              # Especificação (commit 4bb8f7f)
 ├── research.md          # Phase 0: assinaturas confirmadas por compilação + probes headless + baseline
-├── data-model.md        # Phase 1: Part e RedRobot (contrato, interno, máquina de estados)
+├── data-model.md        # Phase 1: Part e EnemyRobot (contrato, interno, máquina de estados)
 ├── quickstart.md        # Phase 1: comandos de validação, baseline, formato dos commits
 ├── contracts/
 │   ├── part.md          # explode, destroy, 4 exports; consumidor red_robot.gd:96-98; replicação l.10419
@@ -123,10 +123,10 @@ oxide_godot_core/oxide_godot_lib/src/
 ├── player.rs                   # port 2: `add_camera_shake_trauma` → pub(crate) (só visibilidade)
 ├── bullet.rs, door.rs          # inalterados
 ├── part.rs                     # struct Part,     base=RigidBody3D      (port 1)  NOVO
-└── red_robot.rs                # struct RedRobot, base=CharacterBody3D (port 2)  NOVO
+└── red_robot.rs                # struct EnemyRobot, base=CharacterBody3D (port 2)  NOVO
 
 oxide-godot/enemies/red_robot/
-├── red_robot.tscn              # port 1: Death/PartShield1|2, Death/PartHead → type="Part"; port 2: raiz → type="RedRobot"
+├── red_robot.tscn              # port 1: Death/PartShield1|2, Death/PartHead → type="Part"; port 2: raiz → type="EnemyRobot"
 ├── red_robot.gd (+ .uid)       # port 2: APAGAR
 └── parts/part.gd (+ .uid)      # port 1: APAGAR
 
@@ -134,7 +134,7 @@ docs/v2-backlog.md              # itens 15 (port 1), 16–18 (port 2)
 ```
 
 **Structure Decision**: um módulo Rust por script, sem módulo compartilhado (Princípio I).
-`Part` e `RedRobot` são nomes livres (sem `class_name`), conferidos sem colisão nas bindings.
+`Part` e `EnemyRobot` são nomes livres (sem `class_name`) — `RedRobot` foi descartado em T024 por colidir com `const RedRobot` em `level.gd:6` ("shadows a native class"; ver research D1), conferidos sem colisão nas bindings.
 `Part::explode` nasce `#[func] pub(crate)` no port 1 para que o commit do robô não toque em
 `part.rs`. Detalhes de cada classe em [research.md](research.md) §"Mapa por script".
 
@@ -146,7 +146,7 @@ docs/v2-backlog.md              # itens 15 (port 1), 16–18 (port 2)
 | 1 | `Death/PartShield2` (l.10885) | `RigidBody3D` → `Part` | l.10892 `script = ExtResource("24")` | idem (l.10886–10891; filhos l.10894+) | — |
 | 1 | `Death/PartHead` (l.10936) | `RigidBody3D` → `Part` | l.10944 `script = ExtResource("24")` | idem (l.10937–10943; filhos l.10946+) | — |
 | 1 | — | — | l.26 `[ext_resource type="Script" uid="uid://c3vo80hyj6w6c" path="res://enemies/red_robot/parts/part.gd" id="24"]` | todos os outros `ext_resource` | `parts/part.gd`, `parts/part.gd.uid` |
-| 2 | raiz `RedRobot` (l.10584 → **10583** após o port 1: só −1 do `ext_resource` l.26 — as 3 linhas `script` removidas ficam abaixo da raiz e não a deslocam) | `CharacterBody3D` → `RedRobot` | `script = ExtResource("1")` (l.10587 → 10583); l.3 `[ext_resource type="Script" uid="uid://bf14mo0lrrvjl" path="res://enemies/red_robot/red_robot.gd" id="1"]` | `collision_layer/mask = 3`; `MultiplayerSynchronizer` (`replication_config`); `AnimationTree`; `ShootAnimation` (method tracks); `PlayerDetectionArea`; as 2 `[connection …]` (fim do arquivo) | `red_robot.gd`, `red_robot.gd.uid` |
+| 2 | raiz `RedRobot` (l.10584 → **10583** após o port 1: só −1 do `ext_resource` l.26 — as 3 linhas `script` removidas ficam abaixo da raiz e não a deslocam) | `CharacterBody3D` → `EnemyRobot` | `script = ExtResource("1")` (l.10587 → 10583); l.3 `[ext_resource type="Script" uid="uid://bf14mo0lrrvjl" path="res://enemies/red_robot/red_robot.gd" id="1"]` | `collision_layer/mask = 3`; `MultiplayerSynchronizer` (`replication_config`); `AnimationTree`; `ShootAnimation` (method tracks); `PlayerDetectionArea`; as 2 `[connection …]` (fim do arquivo) | `red_robot.gd`, `red_robot.gd.uid` |
 
 Após o port 1, **todas** as linhas ≥ 26 deslocam −1 e as ≥ 10841 deslocam até −4; após o port 2,
 as ≥ 3 deslocam −1 de novo. Editar por `sed` só depois de `grep -n` na mesma sessão. Conferido:

@@ -19,7 +19,7 @@ Sem cena própria: 3 instâncias em `enemies/red_robot/red_robot.tscn` (`Death/P
 | `lifetime_random` | `float` | `f32` | `#[export]` | 3,0 | idem |
 | `disappearing_time` | `float` | `f32` | `#[export]` | 0,5 | idem |
 | `fade_value` | `float` | `f32` | `#[export] #[var(set = set_fade_value)]` | 0,0 | `red_robot.tscn:10419` (`.:fade_value`, replicado); setter aplica `emission_cutout` ao shader |
-| `explode()` | método | `#[func] pub(crate)` | — | — | `red_robot.gd:96-98` (por nome, até o port 2); `RedRobot` (tipado, port 2) |
+| `explode()` | método | `#[func] pub(crate)` | — | — | `red_robot.gd:96-98` (por nome, até o port 2); `EnemyRobot` (tipado, port 2) |
 | `destroy()` | RPC `call_local` | `#[rpc(authority, call_local, unreliable)]` | — | — | interno (`rpc("destroy")`) |
 
 ### Estado interno
@@ -45,9 +45,9 @@ Sem cena própria: 3 instâncias em `enemies/red_robot/red_robot.tscn` (`Death/P
 ### Relações
 
 - **Consome**: `part_disappear.tscn` (`PartDisappear`, Marco A) por API base (`CpuParticles3D`).
-- **É consumida por**: `red_robot.gd` (`explode()` por nome) → `RedRobot` (tipado, port 2).
+- **É consumida por**: `red_robot.gd` (`explode()` por nome) → `EnemyRobot` (tipado, port 2).
 
-## RedRobot (`enemies/red_robot/red_robot.gd` → `src/red_robot.rs`, base `CharacterBody3D`)
+## EnemyRobot (`enemies/red_robot/red_robot.gd` → `src/red_robot.rs`, base `CharacterBody3D`)
 
 ### Estado de contrato
 

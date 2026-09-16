@@ -14,7 +14,7 @@ pela cena `red_robot.tscn`. Nomes são contrato: copiar do original, nunca tradu
 
 | Assinatura Godot | Rust | Consumidor | Efeito |
 |---|---|---|---|
-| `explode() -> void` | `#[func] pub(crate) fn explode(&mut self)` | `red_robot.gd:96-98` (`death_shield1.explode()` etc., por nome); `RedRobot` tipado no port 2 | sync pública, `freeze = false`; servidor: colisões, velocidades, temporizador do fade |
+| `explode() -> void` | `#[func] pub(crate) fn explode(&mut self)` | `red_robot.gd:96-98` (`death_shield1.explode()` etc., por nome); `EnemyRobot` tipado no port 2 | sync pública, `freeze = false`; servidor: colisões, velocidades, temporizador do fade |
 | `destroy() -> void` (`@rpc("call_local")`) | `#[rpc(authority, call_local, unreliable)] fn destroy(&mut self)` | interno (`rpc("destroy")`) | puff no pai da peça; `queue_free` após 0,2 s |
 | `set_fade_value(value: float)` | `#[func] fn set_fade_value(&mut self, value: f32)` | ninguém (setter registrado de `fade_value`) | exposto por exigência do gdext |
 

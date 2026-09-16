@@ -138,7 +138,7 @@ O robô continua o mesmo inimigo: fica parado até detectar o jogador, vira e an
 ### Key Entities
 
 - **Part (contrato consumido por GDScript até o port 2 e pela cena)**: métodos `explode()` (chamado por nome por `red_robot.gd`), RPC `destroy()`; propriedades exportadas `lifetime`, `lifetime_random`, `disappearing_time`, `fade_value` (setter com efeito no shader; replicada); estado interno `_mat` (material duplicado), `_disappearing_counter`; sem cena própria — 3 instâncias em `red_robot.tscn`.
-- **RedRobot (contrato consumido por `level.gd`, pela bala e pela cena)**: sinal `exploded`; RPCs `hit`, `play_shoot`; métodos `shoot_check`, `resume_approach` (method tracks), `_on_area_body_entered`, `_on_area_body_exited` (conexões); propriedades exportadas `test_shoot`, `target_position`, `health`, `state` (enum), `dead`, `aim_preparing`; métodos internos `shoot`, `animate`, `_clip_ray` (não consumidos externamente — privados, como nos marcos anteriores).
+- **EnemyRobot (contrato consumido por `level.gd`, pela bala e pela cena)**: sinal `exploded`; RPCs `hit`, `play_shoot`; métodos `shoot_check`, `resume_approach` (method tracks), `_on_area_body_entered`, `_on_area_body_exited` (conexões); propriedades exportadas `test_shoot`, `target_position`, `health`, `state` (enum), `dead`, `aim_preparing`; métodos internos `shoot`, `animate`, `_clip_ray` (não consumidos externamente — privados, como nos marcos anteriores).
 - **Estado interno do robô**: `shoot_countdown`, `aim_countdown`, `player: Node3D`, `orientation`; 15 referências de cena listadas em FR-009.
 
 ## Success Criteria *(mandatory)*

@@ -43,6 +43,11 @@ Referência intocada do original em GDScript: `../oxide_godot_origins/` (fora do
 
 - Uma classe Rust por script `.gd`, com a **mesma base** do script (`CharacterBody3D`,
   `MultiplayerSynchronizer`, `Camera3D`, ...). `class_name Player` → `struct Player`.
+- O nome de uma classe registrada NÃO pode coincidir com nenhum identificador de script dos `.gd`
+  que ainda existem (`const`, `class_name`, `var` de topo) nem com classe do engine: o GDScript
+  rejeita o script inteiro ("The member X shadows a native class"). Conferir antes de nomear:
+  `grep -rhoE '^(const|class_name|var|@onready var|@export var) [A-Za-z_]+' oxide-godot --include='*.gd' | sort -u`
+  (caso real: `RedRobot` colidia com `const RedRobot` em `level.gd:6` → classe virou `EnemyRobot`).
 - Nomes de métodos expostos com `#[func]` iguais aos do GDScript (`_on_door_body_entered`,
   `hit`, `explode`, ...) para as `[connection]` das `.tscn`, `has_method()` e `.rpc()` continuarem válidos.
 - `@export var` → `#[export] var`; `@onready var x = $Path` → `#[init(node = "Path")] x: OnReady<Gd<T>>`;
