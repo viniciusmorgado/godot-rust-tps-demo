@@ -13,6 +13,7 @@ mod red_robot;
 mod flying_forklift;
 mod level;
 mod menu;
+mod main_scene;
 
 struct OxideGodot;
 
