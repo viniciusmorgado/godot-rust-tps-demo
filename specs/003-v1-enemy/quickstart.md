@@ -23,7 +23,7 @@ raiz do repositório (`oxide-godot/`, onde está este `specs/`).
   gravidade; as 3 peças rodam `ready` (duplicação de materiais).
 - `level/level.tscn`: exit 124, 0 `ERROR`, 2 `WARNING` benignos (`HDR output…`,
   `[Physics interpolation] Interpolated Camera3D…`).
-- `docs/upstream-bugs.md`: 1 entrada (não deve mudar neste marco); `docs/v2-backlog.md`: 14 itens.
+- `docs/upstream-bugs.md`: 1 entrada na baseline; passa a 2 na Phase 3b (correção conservadora da peça, FR-028–FR-032); `docs/v2-backlog.md`: 14 itens.
 
 Qualquer linha `ERROR`, `SCRIPT ERROR`, `Invalid call`, `Invalid get`, `Invalid set`,
 `Nonexistent`, `panicked` que não esteja nesta baseline é regressão do port.
@@ -144,7 +144,7 @@ find oxide-godot -name '*.gd.uid' -not -path '*/addons/*' | wc -l      # esperad
 git diff --stat 4bb8f7f -- 'oxide-godot/**/*.gd'                       # esperado: só 2 deleções (part.gd, red_robot.gd)
 git log --oneline 4bb8f7f..HEAD | grep -c '^[0-9a-f]* Port '           # esperado: 2
 ls oxide_godot_core/oxide_godot_lib/src/                               # lib.rs + 10 módulos (… player, bullet, door, part, red_robot)
-grep -c '^| 1 ' docs/upstream-bugs.md                                  # 1 (inalterado)
+grep -c '^| [12] ' docs/upstream-bugs.md                               # 2 (porta + peça)
 git diff --stat 4bb8f7f -- CLAUDE.md docs/upstream-bugs.md             # esperado: vazio
 grep -c '^| [0-9]' docs/v2-backlog.md                                  # 18
 # FR-018: nenhuma API customizada de GDScript

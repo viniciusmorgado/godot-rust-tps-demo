@@ -8,7 +8,7 @@
 abstração, refatoração, otimização, teste unitário ou infraestrutura. Se algo assim parecer
 necessário, vira entrada em `docs/v2-backlog.md`, não task. **Nenhuma correção de bug** está
 prevista: se um defeito objetivo do upstream surgir durante o port, PARAR e reportar — a cláusula
-exige declaração na spec antes de qualquer commit; `docs/upstream-bugs.md` fica com 1 entrada.
+exige declaração na spec antes de qualquer commit; a peça recebeu uma correção declarada (FR-028–FR-032, Phase 3b): `docs/upstream-bugs.md` fica com 2 entradas.
 
 **Tests**: não há testes automatizados nesta fase (plan.md "Testing"). A validação de cada story
 é o ciclo do quickstart (build → import headless → cena headless → verificações mecânicas →
@@ -38,7 +38,7 @@ oxide-godot/enemies/red_robot/red_robot.tscn       11.053 linhas; editada nas DU
 oxide-godot/enemies/red_robot/parts/part.gd + .uid       apagados no commit da US1
 oxide-godot/enemies/red_robot/red_robot.gd + .uid        apagados no commit da US2
 docs/v2-backlog.md                                 uma linha por melhoria percebida (itens 15–18)
-docs/upstream-bugs.md                              NÃO muda neste marco
+docs/upstream-bugs.md                              entrada #2 na Phase 3b (correção da peça)
 ../oxide_godot_origins/                            referência intocada do GDScript original
 ```
 
@@ -125,6 +125,23 @@ voo/queda/fade/puff das peças.
 - [x] T015 [US1] **Checkpoint do usuário (validação visual, plan.md "Validação visual" port 1)** — feito pelo usuário no jogo, comparando com `../oxide_godot_origins/`: matar um robô (5 tiros) → os dois escudos e a cabeça se soltam para cima com rotação aleatória, caem e quicam com física, ficam 3–6 s no chão, somem num fade (~0,3 s, brilho do `emission_cutout`) e terminam com o puff; cada peça some no seu próprio tempo, sem afetar as outras nem robôs vizinhos; console sem erro. O robô ainda é GDScript chamando `explode()` por nome. No editor, `red_robot.tscn`: os 3 nodes com tipo `Part`, sem script, `freeze` marcado, `MultiplayerSynchronizer` filho com `public_visibility` desmarcado. Divergência → commit `Fix port part.gd …`. Só seguir para a US2 com o OK explícito
 
 **Checkpoint**: 6 `.gd` restantes; `red_robot.tscn` com 3 nodes `Part`; jogo jogável.
+
+---
+
+## Phase 3b: User Story 1 — correção conservadora do bug do upstream na peça (FR-028–FR-032)
+
+**Goal**: emenda descoberta na revisão do port 1 (harness de paridade): o material duplicado era instalado no `Mesh` compartilhado pelos dois escudos; corrigir com override por instância. Commit próprio `Fix port part.gd …`; `9aee2b8` não é reescrito.
+
+- [ ] T032 [US1] Editar `oxide_godot_core/oxide_godot_lib/src/part.rs`, só em `ready()`: substituir a linha `mesh.surface_set_material(0, &mat);` por `mesh_inst.set_surface_override_material(0, &mat);` (`MeshInstance3D::set_surface_override_material(surface: i32, material: impl AsArg<Option<Gd<Material>>>)`, bindings `mesh_instance_3d.rs`; `mesh_inst` precisa ser `mut`), com as duas linhas de comentário **imediatamente acima**: `// upstream bug fix: part.gd instalava a cópia do material no recurso Mesh compartilhado pelos dois escudos` / `// (surface_set_material), então o último escudo a entrar "vencia" e o fade do outro nunca era renderizado; override por instância.` A leitura `mesh.surface_get_material(0)` (origem da cópia), a duplicação do `next_pass`, `self._mat = Some(mat)` e todo o resto do arquivo ficam iguais. Se `mesh` deixar de precisar de `mut`, remover o `mut` (0 warnings)
+- [ ] T033 [US1] Build: `cd oxide_godot_core && cargo build 2>&1 | tail -20` → 0 warnings
+- [ ] T034 [US1] Validação headless: import (`Initialize godot-rust`, sem `ERROR` novo); `timeout 20 /usr/bin/godot.x86_64 --headless --path . enemies/red_robot/red_robot.tscn` e `level/level.tscn` → grep de regressão vazio
+- [ ] T035 [US1] Verificação do resultado (FR-032), com script `SceneTree` descartável fora do repo (não commitar): instanciar `red_robot.tscn`, pegar `Death/PartShield1`, `Death/PartShield2`, `Death/PartHead`; para cada, `mi = get_node("Model").get_child(0)`: `mi.get_surface_override_material(0)` não nulo e distinto entre as 3 peças; `mi.mesh.surface_get_material(0)` igual entre os dois escudos (mesh compartilhado intocado) e sem `next_pass` duplicado por elas; `set_indexed("fade_value", 0.7)` em `PartShield1` muda `get_surface_override_material(0).next_pass.get_shader_parameter("emission_cutout")` de `PartShield1` para 0.7 e o de `PartShield2` continua 0.0. Reportar as saídas
+- [ ] T036 [US1] Verificações mecânicas: `git diff --stat` = só `part.rs` (≈ 3 +, 1 −) e `docs/upstream-bugs.md`; `grep -rn 'upstream bug fix' oxide_godot_core/oxide_godot_lib/src/` = 2 arquivos (door.rs, part.rs); `grep -n 'surface_set_material' part.rs` vazio; nenhum outro arquivo tocado
+- [ ] T037 [US1] Registrar em `docs/upstream-bugs.md` a entrada `2`: defeito "material dos escudos compartilhado — `part.gd:23-26` instalava a cópia com `mesh.surface_set_material` no `Mesh` compartilhado por `PartShield1`/`PartShield2`; o último escudo vencia, o fade do outro não era renderizado (verificado em headless no original)"; script/cena `enemies/red_robot/parts/part.gd:23-26` / `red_robot.tscn` (`Death/PartShield1`, `Death/PartShield2`, modelo ext_resource id="12"); spec `specs/003-v1-enemy` FR-028–FR-032; correção `src/part.rs ready()`: `set_surface_override_material(0, cópia)` no `MeshInstance3D` com comentário `// upstream bug fix`; commit = assunto do commit de T038
+- [ ] T038 [US1] Commit único na `main` (autor the repository author): `part.rs` + `docs/upstream-bugs.md`. Assunto: `Fix port part.gd → Part: surface override material per instance (upstream bug fix)`; corpo com a linha `- upstream bug fix: part.gd instalava a cópia do material no Mesh compartilhado pelos escudos (surface_set_material); agora override por instância (set_surface_override_material). Correção mínima; cena e modelos intocados; declarada na spec (FR-028–FR-032).` e `- docs/upstream-bugs.md: entrada #2.` Prefixo `Fix port` (não conta como commit `Port`)
+- [ ] T039 [US1] **Checkpoint do usuário**: no jogo, matar um robô e observar os **dois escudos** esmaecendo cada um no seu tempo (antes, um sumia sem fade); cabeça como antes. Só avançar para a US2 após OK
+
+**Checkpoint**: `docs/upstream-bugs.md` com 2 entradas; `part.rs` com o único `upstream bug fix` do marco.
 
 ---
 
@@ -262,5 +279,5 @@ previsto nas tasks (outro arquivo, outra visibilidade, uma correção), parar e 
   é corrigida em commit `Fix port …` na mesma story (nunca `Port …`, para
   `git log | grep -c '^[0-9a-f]* Port '` continuar = 2).
 - Arquivos que **nunca** mudam neste marco: `Cargo.toml`, `.gdextension`, `project.godot`,
-  `CLAUDE.md`, `docs/upstream-bugs.md`, os 5 `.gd` restantes, `specs/` (exceto o `[x]` em
+  `CLAUDE.md`, `docs/upstream-bugs.md` (exceto a entrada #2 da Phase 3b), os 5 `.gd` restantes, `specs/` (exceto o `[x]` em
   `tasks.md` ao final) e, em `player.rs`, qualquer coisa além da palavra `pub(crate)` de T016.

@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Fase**: v1 — Raw Port (Princípio I da constituição v1.3.0). Nenhuma abstração, refatoração ou otimização; melhorias percebidas vão para `docs/v2-backlog.md`. Nenhum bug do upstream é conhecido nos dois scripts deste marco; se um defeito objetivo for encontrado durante o port, a cláusula de correção conservadora se aplica (declarar em spec, isolar com comentário, mencionar no commit, registrar em `docs/upstream-bugs.md`) — caso contrário, nada muda.
+**Fase**: v1 — Raw Port (Princípio I da constituição v1.3.0). Nenhuma abstração, refatoração ou otimização; melhorias percebidas vão para `docs/v2-backlog.md`. Um defeito objetivo do upstream foi encontrado na revisão do port 1 (peça: material dos escudos compartilhado — ver "Correção conservadora de bug do upstream — peça") e é corrigido sob a cláusula de correção conservadora (declarar em spec, isolar com comentário, mencionar no commit, registrar em `docs/upstream-bugs.md`). Nenhum outro defeito é conhecido.
 
 **Input**: User description: "Portar para Rust o inimigo do Godot TPS Demo — a peça destacável (part.gd) e o robô vermelho (red_robot.gd) — mantendo o jogo jogável e idêntico ao original a cada script. Marco C de docs/port-order.md (itens 9 e 10)."
 
@@ -127,6 +127,14 @@ O robô continua o mesmo inimigo: fica parado até detectar o jogador, vira e an
 - **FR-026**: Um commit por script, na ordem 1 → 2; o jogo MUST ficar jogável após cada commit.
 - **FR-027**: Os 5 scripts fora do marco MUST permanecer byte a byte intactos; melhorias percebidas MUST ir para `docs/v2-backlog.md` no mesmo commit; nenhuma correção de bug é prevista — se um defeito objetivo surgir, MUST seguir os 4 requisitos da cláusula (spec, comentário, commit, `docs/upstream-bugs.md`) ou, em dúvida, ir para o backlog como melhoria.
 
+**Correção conservadora de bug do upstream — peça (Princípio I, v1.3.0)**
+
+- **FR-028**: O defeito: `part.gd:23-26` duplica o material da superfície 0 e o instala com `mesh.mesh.surface_set_material(0, _mat)` — no **recurso `Mesh`**, que é compartilhado por `Death/PartShield1` e `Death/PartShield2` (mesma cena de modelo, `red_robot.tscn` ext_resource id="12"). Resultado (verificado no original em headless): o segundo escudo a entrar duplica o material já instalado pelo primeiro e o reinstala no mesmo `Mesh`; o mesh passa a renderizar o material do escudo 2 para **ambos**; o `fade_value` do escudo 1 vai para um material que ninguém renderiza (o escudo 1 some sem fade) e o do escudo 2 esmaece os dois. A cabeça (`PartHead`) tem mesh próprio e não é afetada. Intenção inequívoca do código (cópia própria do material por peça, para o fade ser independente) contradita pelo resultado → **bug**.
+- **FR-029**: A correção MUST ser mínima: instalar a cópia como *override* de superfície na instância (`MeshInstance3D.set_surface_override_material(0, cópia)`) em vez de mutar o `Mesh` compartilhado. Nada mais muda: a duplicação do material e do `next_pass`, o setter de `fade_value`, `explode`, `process`, `destroy` e a cena ficam como estão. É PROIBIDO tornar o mesh `resource_local_to_scene`, editar `red_robot.tscn` ou os modelos, ou reestruturar a peça.
+- **FR-030**: A correção MUST estar isolada e identificável, com comentário `// upstream bug fix: ...` na linha imediatamente acima da chamada substituída, em commit próprio `Fix port part.gd …` (não reescrever o commit `9aee2b8`), cuja mensagem menciona a correção.
+- **FR-031**: `docs/upstream-bugs.md` MUST receber a entrada #2 (defeito, script/cena, correção aplicada, commit por assunto) no mesmo commit.
+- **FR-032**: Resultado esperado após a correção: os três `MeshInstance3D` das peças renderizam materiais distintos (override por instância; `get_surface_override_material(0)` distinto entre as peças e distinto do material do `Mesh`, que fica intocado), e o `emission_cutout` renderizado de cada peça acompanha o seu próprio `fade_value`.
+
 ### Key Entities
 
 - **Part (contrato consumido por GDScript até o port 2 e pela cena)**: métodos `explode()` (chamado por nome por `red_robot.gd`), RPC `destroy()`; propriedades exportadas `lifetime`, `lifetime_random`, `disappearing_time`, `fade_value` (setter com efeito no shader; replicada); estado interno `_mat` (material duplicado), `_disappearing_counter`; sem cena própria — 3 instâncias em `red_robot.tscn`.
@@ -143,12 +151,12 @@ O robô continua o mesmo inimigo: fica parado até detectar o jogador, vira e an
 - **SC-004**: Após cada um dos 2 commits o jogo é jogável de ponta a ponta.
 - **SC-005**: O histórico do marco tem exatamente 2 commits `Port …` e nenhum toca os 5 scripts fora de escopo.
 - **SC-006**: Build de debug sem nenhum warning novo em todos os commits.
-- **SC-007**: Nenhuma linha portada introduz abstração, refatoração, otimização ou correção; `docs/upstream-bugs.md` permanece com 1 entrada (salvo defeito objetivo declarado em emenda desta spec).
+- **SC-007**: Nenhuma linha portada introduz abstração, refatoração ou otimização; a única correção é a da peça (FR-028–FR-032), com os 4 requisitos da cláusula atendidos; `docs/upstream-bugs.md` passa a ter 2 entradas.
 - **SC-008**: `level.gd` continua recebendo `exploded` e respawnando; a bala continua acertando o robô via `hit`; `red_robot.gd` (até o port 2) continua chamando `explode()` nas peças — nenhum aviso de método/propriedade inexistente nos logs headless nem no editor.
 
 ## Assumptions
 
-- Fase v1 (constituição v1.3.0); nenhuma correção de bug prevista neste marco.
+- Fase v1 (constituição v1.3.0); uma correção conservadora de bug (peça, FR-028–FR-032), descoberta na revisão do port 1 e aplicada em commit `Fix port …` separado.
 - Validação visual (SC-002) pelo usuário; validação automatizada exclusivamente headless (`red_robot.tscn` isolada instancia o robô sem jogador: IDLE + gravidade; `level.tscn` exercita spawn e conexão de `exploded`). O revisor pode rodar um harness de paridade fora do repositório.
 - Validação single-player: o peer local é servidor e autoridade; ramos "cliente" (FR-003, FR-005, FR-012, FR-015) e "servidor dedicado" (FR-002, FR-016) são verificados por leitura de código.
 - Fora de escopo: `flying_forklift.gd`, `level.gd`, `menu.gd`, `main.gd`, `settings.gd`; qualquer melhoria (backlog v2); multiplayer real com dois peers.
