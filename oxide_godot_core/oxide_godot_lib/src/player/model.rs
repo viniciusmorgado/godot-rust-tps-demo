@@ -1,8 +1,3 @@
-// Temporary: this module is not wired into `player.rs`'s glue until commit 2 of this milestone
-// (`specs/008-v2-player-bullet-door`), so nothing outside `#[cfg(test)]` calls these items yet.
-// Removed in that commit.
-#![allow(dead_code)]
-
 //! gdext builtin math is pure only when its body does not go through `as_inner()` (the
 //! engine) — e.g. `Quaternion::slerp` and `Basis::looking_at` do (their real computation is
 //! delegated to the engine's own implementation via FFI); operators, `from_quaternion`,

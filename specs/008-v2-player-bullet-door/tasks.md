@@ -105,7 +105,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 2 — `player.rs` glue + `player_input.rs` getter visibility
 
-- [ ] T012 [US1] In `oxide_godot_core/oxide_godot_lib/src/player.rs`: change
+- [x] T012 [US1] In `oxide_godot_core/oxide_godot_lib/src/player.rs`: change
   `#[init(val = 100.0)] airborne_time: f32` to `#[init(val = 0.0)]` (backlog #10); remove the
   `crosshair: OnReady<Gd<TextureRect>>` field entirely (backlog #12, confirmed unused by grep);
   add `#[init(val = load("res://player/bullet/bullet.tscn"))] bullet_scene: Gd<PackedScene>`
@@ -115,7 +115,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   OnReady<Gd<CpuParticles3D>>` and the equivalent `muzzle_particle` for `.../MuzzleFlash`
   (same paths `player.rs:116-123` use today, resolved once instead of via `get_node_as` per
   shot).
-- [ ] T013 [US1] Rewrite `apply_input(&mut self, delta: f64)` per research.md R3's exact
+- [x] T013 [US1] Rewrite `apply_input(&mut self, delta: f64)` per research.md R3's exact
   sequence: (1) ONE `self.player_input.bind_mut()` acquisition building an `InputFrame` from
   every field/method it needs, THEN writing `jumping = false` back through the SAME guard
   before dropping it (FR-004/SC-003 — no second acquisition anywhere else in this function);
@@ -141,7 +141,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `move_and_slide()`; (8) `player_model.set_global_basis(self.orientation.basis)`; (9)
   `model::should_respawn` on `get_transform().origin.y` — if true, set `transform.origin =
   initial_position` AND zero `velocity` (backlog #11, the one added write vs. `v1`).
-- [ ] T014 [US1] Add ONE apply-step function (e.g. `fn apply_anim(&mut self, plan: AnimPlan)`)
+- [x] T014 [US1] Add ONE apply-step function (e.g. `fn apply_anim(&mut self, plan: AnimPlan)`)
   that sets `self.current_animation` to the matching `Animations` variant, then writes the
   `AnimationTree` parameters per data-model.md's pinned per-variant order: `JumpUp` →
   `TRANSITION_REQUEST = "jump_up"`; `JumpDown` → `TRANSITION_REQUEST = "jump_down"`; `Strafe` →
@@ -154,17 +154,17 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `&str` consts in `player.rs`. `jump`/`land`'s RPC handlers call this SAME function with the
   trivial `AnimPlan::JumpUp`/`JumpDown` variants (replacing their direct `self.animate(...)`
   calls) plus still play their own sound effect afterward.
-- [ ] T015 [US1] Rewrite `physics_process`'s non-authority (`else`) branch: build the
+- [x] T015 [US1] Rewrite `physics_process`'s non-authority (`else`) branch: build the
   `AnimPlan` from `self.current_animation` (replicated) — for `Strafe`, acquire
   `self.player_input.bind()` ONCE (read-only) for `get_aim_rotation()` ONLY in this case; for
   `JumpUp`/`JumpDown`/`Walk`, do not touch `player_input` at all; `self.motion` is read locally
   (already `Player`'s own replicated field). Call the T014 apply-step function with the result.
-- [ ] T016 [US1] In `oxide_godot_core/oxide_godot_lib/src/player_input.rs`, remove `#[func]`
+- [x] T016 [US1] In `oxide_godot_core/oxide_godot_lib/src/player_input.rs`, remove `#[func]`
   from `get_aim_rotation`, `get_camera_rotation_basis`, `get_camera_base_quaternion` (research.md
   R1 — confirmed by `grep -rn "get_aim_rotation\|get_camera_rotation_basis\|
   get_camera_base_quaternion" --include='*.gd' --include='*.tscn' .` returning zero matches;
   they stay `pub(crate)`, called only via typed `player_input.bind()...` from `player.rs`).
-- [ ] T017 [US1] Gates: `cargo build && cargo clippy && cargo test`. Headless:
+- [x] T017 [US1] Gates: `cargo build && cargo clippy && cargo test`. Headless:
   `/usr/bin/godot.x86_64 --headless --path oxide-godot/oxide-godot --import` then
   `--headless --path oxide-godot/oxide-godot main/main.tscn --quit-after 120` (no new errors vs.
   baseline). Grep (SC-002): `grep -n 'get_node_as\|load::<PackedScene>'

@@ -158,22 +158,6 @@ impl IMultiplayerSynchronizer for PlayerInputSynchronizer {
 
 #[godot_api]
 impl PlayerInputSynchronizer {
-    #[func]
-    pub(crate) fn get_aim_rotation(&self) -> f64 {
-        let tuning = PlayerInputTuning::default();
-        aim_rotation(self.camera_rot.get_rotation().x, &tuning)
-    }
-
-    #[func]
-    pub(crate) fn get_camera_base_quaternion(&self) -> Quaternion {
-        self.camera_base.get_global_transform().basis.get_quaternion()
-    }
-
-    #[func]
-    pub(crate) fn get_camera_rotation_basis(&self) -> Basis {
-        self.camera_rot.get_global_transform().basis
-    }
-
     #[rpc(authority, call_local, unreliable)]
     fn jump(&mut self) {
         self.jumping = true;
@@ -181,6 +165,22 @@ impl PlayerInputSynchronizer {
 }
 
 impl PlayerInputSynchronizer {
+    // These three lose `#[func]` in V2-C (specs/008-v2-player-bullet-door, research.md R1):
+    // nothing calls them by name (grep-confirmed empty across `.gd`/`.tscn`); `player.rs` calls
+    // them typed via `self.player_input.bind()...`.
+    pub(crate) fn get_aim_rotation(&self) -> f64 {
+        let tuning = PlayerInputTuning::default();
+        aim_rotation(self.camera_rot.get_rotation().x, &tuning)
+    }
+
+    pub(crate) fn get_camera_base_quaternion(&self) -> Quaternion {
+        self.camera_base.get_global_transform().basis.get_quaternion()
+    }
+
+    pub(crate) fn get_camera_rotation_basis(&self) -> Basis {
+        self.camera_rot.get_global_transform().basis
+    }
+
     fn rotate_camera(&mut self, mv: Vector2, tuning: &PlayerInputTuning) {
         self.camera_base.rotate_y(-mv.x);
         // After relative transforms, camera needs to be renormalized.

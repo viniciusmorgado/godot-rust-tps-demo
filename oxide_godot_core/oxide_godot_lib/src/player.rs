@@ -1,6 +1,6 @@
 use godot::classes::{
     AnimationTree, AudioStreamPlayer, CharacterBody3D, CpuParticles3D, ICharacterBody3D, Marker3D,
-    MultiplayerSynchronizer, Node3D, PackedScene, TextureRect, Timer,
+    MultiplayerSynchronizer, Node3D, PackedScene, Timer,
 };
 use godot::prelude::*;
 
@@ -18,18 +18,24 @@ pub enum Animations {
     Walk,
 }
 
-const MOTION_INTERPOLATE_SPEED: f32 = 10.0;
-const ROTATION_INTERPOLATE_SPEED: f32 = 10.0;
+const TRANSITION_REQUEST: &str = "parameters/state/transition_request";
+const AIM_ADD_AMOUNT: &str = "parameters/aim/add_amount";
+const STRAFE_BLEND: &str = "parameters/strafe/blend_position";
+const WALK_BLEND: &str = "parameters/walk/blend_position";
 
-const MIN_AIRBORNE_TIME: f32 = 0.1;
-const JUMP_SPEED: f32 = 5.0;
+const TRANSITION_JUMP_UP: &str = "jump_up";
+const TRANSITION_JUMP_DOWN: &str = "jump_down";
+const TRANSITION_STRAFE: &str = "strafe";
+const TRANSITION_WALK: &str = "walk";
 
 #[derive(GodotClass)]
 #[class(init, base=CharacterBody3D)]
 pub struct Player {
     base: Base<CharacterBody3D>,
 
-    #[init(val = 100.0)]
+    // Backlog #10: starts at 0 (not v1's 100.0) so the first floor contact after spawn never
+    // exceeds the land threshold and never fires a spurious `land` RPC/sound.
+    #[init(val = 0.0)]
     airborne_time: f32,
 
     orientation: Transform3D,
@@ -47,8 +53,10 @@ pub struct Player {
     player_model: OnReady<Gd<Node3D>>,
     #[init(node = "PlayerModel/Robot_Skeleton/Skeleton3D/GunBone/ShootFrom")]
     shoot_from: OnReady<Gd<Marker3D>>,
-    #[init(node = "Crosshair")]
-    crosshair: OnReady<Gd<TextureRect>>,
+    #[init(node = "PlayerModel/Robot_Skeleton/Skeleton3D/GunBone/ShootFrom/ShootParticle")]
+    shoot_particle: OnReady<Gd<CpuParticles3D>>,
+    #[init(node = "PlayerModel/Robot_Skeleton/Skeleton3D/GunBone/ShootFrom/MuzzleFlash")]
+    muzzle_particle: OnReady<Gd<CpuParticles3D>>,
     #[init(node = "FireCooldown")]
     fire_cooldown: OnReady<Gd<Timer>>,
 
@@ -58,6 +66,11 @@ pub struct Player {
     sound_effect_land: OnReady<Gd<AudioStreamPlayer>>,
     #[init(node = "SoundEffects/Shoot")]
     sound_effect_shoot: OnReady<Gd<AudioStreamPlayer>>,
+
+    // Backlog #28's hypothesis (half of it): the bullet scene RESOURCE is loaded once here
+    // instead of on every shot; a fresh instance is still created per shot below.
+    #[init(val = load("res://player/bullet/bullet.tscn"))]
+    bullet_scene: Gd<PackedScene>,
 
     #[export]
     #[var(set = set_player_id)]
@@ -85,8 +98,24 @@ impl ICharacterBody3D for Player {
         if self.base().get_multiplayer().unwrap().is_server() {
             self.apply_input(delta);
         } else {
-            let anim = self.current_animation;
-            self.animate(anim, delta);
+            // Non-authority: reproduce the replicated current_animation's AnimPlan from
+            // self.motion (Player's own replicated field); player_input is bound at most once,
+            // only when the target state is Strafe (the only case that needs aim_rotation).
+            let plan = match self.current_animation {
+                Animations::JumpUp => model::AnimPlan::JumpUp,
+                Animations::JumpDown => model::AnimPlan::JumpDown,
+                Animations::Strafe => {
+                    let aim_rotation = self.player_input.bind().get_aim_rotation();
+                    model::AnimPlan::Strafe {
+                        aim_rotation,
+                        blend_position: Vector2::new(self.motion.x, -self.motion.y),
+                    }
+                }
+                Animations::Walk => model::AnimPlan::Walk {
+                    blend_position: Vector2::new(self.motion.length(), 0.0),
+                },
+            };
+            self.apply_anim(plan);
         }
     }
 }
@@ -103,28 +132,22 @@ impl Player {
 
     #[rpc(authority, call_local, unreliable)]
     fn jump(&mut self) {
-        self.animate(Animations::JumpUp, 0.0);
+        self.apply_anim(model::AnimPlan::JumpUp);
         self.sound_effect_jump.play();
     }
 
     #[rpc(authority, call_local, unreliable)]
     fn land(&mut self) {
-        self.animate(Animations::JumpDown, 0.0);
+        self.apply_anim(model::AnimPlan::JumpDown);
         self.sound_effect_land.play();
     }
 
     #[rpc(authority, call_local, unreliable)]
     fn shoot(&mut self) {
-        let mut shoot_particle = self.base().get_node_as::<CpuParticles3D>(
-            "PlayerModel/Robot_Skeleton/Skeleton3D/GunBone/ShootFrom/ShootParticle",
-        );
-        shoot_particle.restart();
-        shoot_particle.set_emitting(true);
-        let mut muzzle_particle = self.base().get_node_as::<CpuParticles3D>(
-            "PlayerModel/Robot_Skeleton/Skeleton3D/GunBone/ShootFrom/MuzzleFlash",
-        );
-        muzzle_particle.restart();
-        muzzle_particle.set_emitting(true);
+        self.shoot_particle.restart();
+        self.shoot_particle.set_emitting(true);
+        self.muzzle_particle.restart();
+        self.muzzle_particle.set_emitting(true);
         self.fire_cooldown.start();
         self.sound_effect_shoot.play();
         self.add_camera_shake_trauma(0.35);
@@ -143,111 +166,117 @@ impl Player {
 }
 
 impl Player {
-    fn animate(&mut self, anim: Animations, _delta: f64) {
-        self.current_animation = anim;
+    /// The one apply-step for `AnimPlan`: sets `current_animation` and writes the
+    /// `AnimationTree` parameters, in the exact per-variant order `v1`'s `animate()` used.
+    fn apply_anim(&mut self, plan: model::AnimPlan) {
+        self.current_animation = match plan {
+            model::AnimPlan::JumpUp => Animations::JumpUp,
+            model::AnimPlan::JumpDown => Animations::JumpDown,
+            model::AnimPlan::Strafe { .. } => Animations::Strafe,
+            model::AnimPlan::Walk { .. } => Animations::Walk,
+        };
 
-        if anim == Animations::JumpUp {
-            self.animation_tree
-                .set("parameters/state/transition_request", &"jump_up".to_variant());
-        } else if anim == Animations::JumpDown {
-            self.animation_tree
-                .set("parameters/state/transition_request", &"jump_down".to_variant());
-        } else if anim == Animations::Strafe {
-            self.animation_tree
-                .set("parameters/state/transition_request", &"strafe".to_variant());
-            // Change aim according to camera rotation.
-            let aim = self.player_input.bind().get_aim_rotation();
-            self.animation_tree
-                .set("parameters/aim/add_amount", &aim.to_variant());
-            // The animation's forward/backward axis is reversed.
-            self.animation_tree.set(
-                "parameters/strafe/blend_position",
-                &Vector2::new(self.motion.x, -self.motion.y).to_variant(),
-            );
-        } else if anim == Animations::Walk {
-            // Aim to zero (no aiming while walking).
-            self.animation_tree
-                .set("parameters/aim/add_amount", &0.to_variant());
-            // Change state to walk.
-            self.animation_tree
-                .set("parameters/state/transition_request", &"walk".to_variant());
-            // Blend position for walk speed based checked motion.
-            self.animation_tree.set(
-                "parameters/walk/blend_position",
-                &Vector2::new(self.motion.length(), 0.0).to_variant(),
-            );
+        match plan {
+            model::AnimPlan::JumpUp => {
+                self.animation_tree.set(TRANSITION_REQUEST, &TRANSITION_JUMP_UP.to_variant());
+            }
+            model::AnimPlan::JumpDown => {
+                self.animation_tree.set(TRANSITION_REQUEST, &TRANSITION_JUMP_DOWN.to_variant());
+            }
+            model::AnimPlan::Strafe { aim_rotation, blend_position } => {
+                self.animation_tree.set(TRANSITION_REQUEST, &TRANSITION_STRAFE.to_variant());
+                // Change aim according to camera rotation.
+                self.animation_tree.set(AIM_ADD_AMOUNT, &aim_rotation.to_variant());
+                // The animation's forward/backward axis is reversed.
+                self.animation_tree.set(STRAFE_BLEND, &blend_position.to_variant());
+            }
+            model::AnimPlan::Walk { blend_position } => {
+                // Aim to zero (no aiming while walking).
+                self.animation_tree.set(AIM_ADD_AMOUNT, &0.to_variant());
+                self.animation_tree.set(TRANSITION_REQUEST, &TRANSITION_WALK.to_variant());
+                // Blend position for walk speed based checked motion.
+                self.animation_tree.set(WALK_BLEND, &blend_position.to_variant());
+            }
         }
     }
 
     fn apply_input(&mut self, delta: f64) {
-        let input_motion = self.player_input.bind().motion;
-        self.motion = self
-            .motion
-            .lerp(input_motion, MOTION_INTERPOLATE_SPEED * delta as f32);
+        let dt = delta as f32;
+        let tuning = model::PlayerTuning::default();
 
-        let camera_basis: Basis = self.player_input.bind().get_camera_rotation_basis();
-        let mut camera_z: Vector3 = camera_basis.col_c();
-        let mut camera_x: Vector3 = camera_basis.col_a();
+        // (1) ONE player_input acquisition: build the InputFrame, clear `jumping`, drop the
+        // guard before anything else touches player_input.
+        let frame = {
+            let mut input = self.player_input.bind_mut();
+            let frame = model::InputFrame {
+                motion: input.motion,
+                aiming: input.aiming,
+                shooting: input.shooting,
+                jumping: input.jumping,
+                shoot_target: input.shoot_target,
+                camera_rotation_basis: input.get_camera_rotation_basis(),
+                camera_base_quaternion: input.get_camera_base_quaternion(),
+                aim_rotation: input.get_aim_rotation(),
+            };
+            input.jumping = false;
+            frame
+        };
 
-        camera_z.y = 0.0;
-        camera_z = camera_z.normalized();
-        camera_x.y = 0.0;
-        camera_x = camera_x.normalized();
+        // (2) motion lerp.
+        self.motion = model::lerp_motion(self.motion, frame.motion, dt, &tuning);
 
-        // Jump/in-air logic.
-        self.airborne_time += delta as f32;
-        if self.base().is_on_floor() {
-            if self.airborne_time > 0.5 {
-                self.base_mut().rpc("land", &[]);
-            }
-            self.airborne_time = 0.0;
-        }
+        // (3) flattened camera axes.
+        let (camera_x, camera_z) = model::flatten_camera_axes(frame.camera_rotation_basis);
 
-        let mut on_air: bool = self.airborne_time > MIN_AIRBORNE_TIME;
-
-        if !on_air && self.player_input.bind().jumping {
+        // (4) airborne step (engine read: is_on_floor()).
+        let outcome = model::airborne_step(
+            self.airborne_time,
+            dt,
+            self.base().is_on_floor(),
+            frame.jumping,
+            &tuning,
+        );
+        self.airborne_time = outcome.airborne_time;
+        if let Some(jump_velocity_y) = outcome.jump_velocity_y {
             let mut velocity = self.base().get_velocity();
-            velocity.y = JUMP_SPEED;
+            velocity.y = jump_velocity_y;
             self.base_mut().set_velocity(velocity);
-            on_air = true;
-            // Increase airborne time so next frame on_air is still true
-            self.airborne_time = MIN_AIRBORNE_TIME;
+        }
+        // `land` and `jump` are independent — both may fire in the same call.
+        if outcome.land {
+            self.base_mut().rpc("land", &[]);
+        }
+        if outcome.jump {
             self.base_mut().rpc("jump", &[]);
         }
 
-        self.player_input.bind_mut().jumping = false;
-
-        if on_air {
-            if self.base().get_velocity().y > 0.0 {
-                self.animate(Animations::JumpUp, delta);
-            } else {
-                self.animate(Animations::JumpDown, delta);
-            }
-        } else if self.player_input.bind().aiming {
+        // (5) branch.
+        if outcome.on_air {
+            let velocity_y = self.base().get_velocity().y;
+            let plan = model::anim_plan(true, velocity_y, false, self.motion, 0.0);
+            self.apply_anim(plan);
+            // root_motion is NOT reassigned while airborne (v1's own field-persistence).
+        } else if frame.aiming {
             // Convert orientation to quaternions for interpolating rotation.
             let q_from: Quaternion = self.orientation.basis.get_quaternion();
-            let q_to: Quaternion = self.player_input.bind().get_camera_base_quaternion();
-            // Interpolate current rotation with desired one.
-            self.orientation.basis = Basis::from_quaternion(
-                q_from.slerp(q_to, delta as f32 * ROTATION_INTERPOLATE_SPEED),
-            );
+            let q_to: Quaternion = frame.camera_base_quaternion;
+            self.orientation.basis =
+                Basis::from_quaternion(q_from.slerp(q_to, dt * tuning.rotation_interpolate_speed));
 
-            // Change state to strafe.
-            self.animate(Animations::Strafe, delta);
+            let plan = model::anim_plan(false, 0.0, true, self.motion, frame.aim_rotation);
+            self.apply_anim(plan);
 
             self.root_motion = Transform3D::new(
                 Basis::from_quaternion(self.animation_tree.get_root_motion_rotation()),
                 self.animation_tree.get_root_motion_position(),
             );
 
-            if self.player_input.bind().shooting && self.fire_cooldown.get_time_left() == 0.0 {
+            if frame.shooting && self.fire_cooldown.get_time_left() == 0.0 {
                 let shoot_origin: Vector3 = self.shoot_from.get_global_transform().origin;
-                let shoot_target: Vector3 = self.player_input.bind().shoot_target;
-                let shoot_dir: Vector3 = (shoot_target - shoot_origin).normalized();
+                let shoot_dir: Vector3 = (frame.shoot_target - shoot_origin).normalized();
 
                 let mut bullet: Gd<CharacterBody3D> =
-                    load::<PackedScene>("res://player/bullet/bullet.tscn")
-                        .instantiate_as::<CharacterBody3D>();
+                    self.bullet_scene.instantiate_as::<CharacterBody3D>();
                 self.base()
                     .get_parent()
                     .unwrap()
@@ -262,18 +291,17 @@ impl Player {
             }
         } else {
             // Not in air or aiming, idle.
-            // Convert orientation to quaternions for interpolating rotation.
-            let target: Vector3 = camera_x * self.motion.x + camera_z * self.motion.y;
-            if target.length() > 0.001 {
+            let walk_target = model::walk_target(camera_x, camera_z, self.motion);
+            if let Some(target) = walk_target {
                 let q_from: Quaternion = self.orientation.basis.get_quaternion();
                 let q_to: Quaternion = Basis::looking_at(target).get_quaternion();
-                // Interpolate current rotation with desired one.
                 self.orientation.basis = Basis::from_quaternion(
-                    q_from.slerp(q_to, delta as f32 * ROTATION_INTERPOLATE_SPEED),
+                    q_from.slerp(q_to, dt * tuning.rotation_interpolate_speed),
                 );
             }
 
-            self.animate(Animations::Walk, delta);
+            let plan = model::anim_plan(false, 0.0, false, self.motion, 0.0);
+            self.apply_anim(plan);
 
             self.root_motion = Transform3D::new(
                 Basis::from_quaternion(self.animation_tree.get_root_motion_rotation()),
@@ -281,31 +309,28 @@ impl Player {
             );
         }
 
-        // Apply root motion to orientation.
-        self.orientation = self.orientation * self.root_motion;
+        // (6) integrate root motion.
+        let velocity_in = self.base().get_velocity();
+        let gravity = self.base().get_gravity();
+        let (new_orientation, new_velocity) =
+            model::integrate_root_motion(self.orientation, self.root_motion, dt, gravity, velocity_in);
+        self.orientation = new_orientation;
 
-        let h_velocity: Vector3 = self.orientation.origin / delta as f32;
-        let mut velocity = self.base().get_velocity();
-        velocity.x = h_velocity.x;
-        velocity.z = h_velocity.z;
-        velocity += self.base().get_gravity() * delta as f32;
-        self.base_mut().set_velocity(velocity);
+        // (7)
+        self.base_mut().set_velocity(new_velocity);
         self.base_mut().set_up_direction(Vector3::UP);
         self.base_mut().move_and_slide();
 
-        // Clear accumulated root motion displacement (was applied to speed).
-        self.orientation.origin = Vector3::ZERO;
-        // Orthonormalize orientation.
-        self.orientation = self.orientation.orthonormalized();
-
+        // (8)
         let basis = self.orientation.basis;
         self.player_model.set_global_basis(basis);
 
-        // If we're below -40, respawn (teleport to the initial position).
-        if self.base().get_transform().origin.y < -40.0 {
+        // (9) Backlog #11: respawn also zeroes velocity (v1 only reset the transform origin).
+        if model::should_respawn(self.base().get_transform().origin.y, &tuning) {
             let mut transform = self.base().get_transform();
             transform.origin = self.initial_position;
             self.base_mut().set_transform(transform);
+            self.base_mut().set_velocity(Vector3::ZERO);
         }
     }
 }
