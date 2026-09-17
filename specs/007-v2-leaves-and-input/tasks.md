@@ -178,11 +178,11 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 3 — `camera_noise_shake.rs`
 
-- [ ] T021 [P] [US2] Add `mod model;` to `oxide_godot_core/oxide_godot_lib/src/
+- [x] T021 [P] [US2] Add `mod model;` to `oxide_godot_core/oxide_godot_lib/src/
   camera_noise_shake.rs`. Create `camera_noise_shake/model.rs` with `CameraShakeTuning`
   (`speed: f32 = 1.0`, `decay_rate: f32 = 1.5`, `max_yaw: f32 = 0.05`, `max_pitch: f32 = 0.05`,
   `max_roll: f32 = 0.1`, `max_trauma: f32 = 1.2`) and its `impl Default`.
-- [ ] T022 [US2] In the same file, add: `decay(trauma: f32, dt: f32, tuning:
+- [x] T022 [US2] In the same file, add: `decay(trauma: f32, dt: f32, tuning:
   &CameraShakeTuning) -> f32` (`(trauma - tuning.decay_rate * dt).max(0.0)` — reproduces
   `camera_noise_shake.rs:59-62`); `advance_time(time: f64, dt: f64, tuning:
   &CameraShakeTuning) -> f64` (`time + dt * tuning.speed as f64 * 5000.0` — reproduces the exact
@@ -193,13 +193,13 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   tuning.max_yaw * shake * samples[0], z: tuning.max_roll * shake * samples[2] }` — v1's exact
   non-alphabetical mapping, `camera_noise_shake.rs:69-74`); `add_trauma(current: f32, amount:
   f32, tuning: &CameraShakeTuning) -> f32` (`(current + amount).min(tuning.max_trauma)`).
-- [ ] T023 [US2] Add `#[cfg(test)] mod tests`: `decay` floors at `0.0` and subtracts
+- [x] T023 [US2] Add `#[cfg(test)] mod tests`: `decay` floors at `0.0` and subtracts
   `decay_rate * dt` otherwise; `advance_time` reproduces the `× 5000.0` formula for a known
   `(time, dt, speed)` triple; `shake` returns `trauma²`; `offsets` with 3 DISTINCT sample values
   (e.g. `[0.1, 0.2, 0.3]`) asserts `x` uses `samples[1]`, `y` uses `samples[0]`, `z` uses
   `samples[2]` — so a swapped axis fails (spec US2 scenario 4); `add_trauma` clamps at
   `max_trauma` when `current + amount` would exceed it, and adds normally otherwise.
-- [ ] T024 [US2] In `camera_noise_shake.rs`, replace the single `noise: Gd<FastNoiseLite>` field
+- [x] T024 [US2] In `camera_noise_shake.rs`, replace the single `noise: Gd<FastNoiseLite>` field
   with three: `noise_yaw`, `noise_pitch`, `noise_roll` (`#[init(val = FastNoiseLite::new_gd())]`
   each). In `ready()`, seed each exactly once — `noise_yaw.set_seed(self.noise_seed)`,
   `noise_pitch.set_seed(self.noise_seed.wrapping_add(1))`,
@@ -216,7 +216,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   self.start_rotation + offset); }`. `add_trauma(&mut self, amount: f64)` loses `#[func]`
   (confirmed unused by name — FR-013), becomes a plain `pub(crate) fn` in a non-`#[godot_api]`
   `impl CameraNoiseShake` block, calling `model::add_trauma`.
-- [ ] T025 [US2] Gates + headless (no new errors). Commit: `camera_noise_shake: extract
+- [x] T025 [US2] Gates + headless (no new errors). Commit: `camera_noise_shake: extract
   CameraShakeTuning/decay/shake/offsets into camera_noise_shake/model.rs; 3 pre-seeded
   FastNoiseLite instances`.
 
