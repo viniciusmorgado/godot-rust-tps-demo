@@ -317,13 +317,13 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T038 [US4] Fill in the harness's case (d): instantiate `part_disappear.tscn` directly,
+- [x] T038 [US4] Fill in the harness's case (d): instantiate `part_disappear.tscn` directly,
   count `process_frame` awaits until `is_instance_valid()` on the captured handle is `false`;
   same for `impact_effect.tscn` (the scene hosting `Blast`). Dump both frame counts.
-- [ ] T039 [US4] Copy the updated harness to `../oxide-godot-v1/oxide-godot/`. Run case (d) on
+- [x] T039 [US4] Copy the updated harness to `../oxide-godot-v1/oxide-godot/`. Run case (d) on
   both trees, diff. Verification: identical frame counts (the async rewrite must not change
   timing).
-- [ ] T040 🛑 **STOP — user visual checkpoint 3**. Ask the user to confirm: killing a robot still
+- [x] T040 🛑 **STOP — user visual checkpoint 3**. Ask the user to confirm: killing a robot still
   makes its parts puff and vanish on the same schedule; a laser impact's blast still plays and
   vanishes when its animation finishes. Do not proceed to Phase 5 until confirmed.
 
