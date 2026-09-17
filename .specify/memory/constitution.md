@@ -1,51 +1,39 @@
 <!--
 SYNC IMPACT REPORT
 
-Version change: 1.3.2 → 1.4.0 (MINOR — one new principle added; the rules of an existing phase
-(v2) are materially expanded. Nothing about v1 is removed or redefined; v1 stays the historical
-record on branches `main`/`v1`.)
+Version change: 1.4.0 → 1.4.1 (PATCH — clarification of a factual claim in Principle III;
+no rule added, removed or redefined. Obligations on implementers are unchanged: the same
+things were already forbidden/required, this only fixes WHY builtin math is treated as pure.)
 
 Principles:
-  I. Three-Phase Port (v1 → v2 → v3) — the "v2 — Idiomatic Rust" block keeps its original three
-     descriptive bullets and gains five new mandatory rules: the two inseparable pillars
-     (type-system idioms + FFI reduction via Principle III), the "done together" completion
-     rule, behavioral parity against `v1`, preservation of the replicated/exported surface, and
-     the engine-API-gap protocol (`// api-gap(godot-<version>): ...` + `docs/api-gaps.md`).
-     "Phase governance rules" gains one bullet: during v2 the backlog (`docs/v2-backlog.md`) is
-     CONSUMED, not just written — each spec states which items it closes/defers.
-  II. Verifiable Port Cycle — "Bottom-up port order" is scoped: stated as the v1 order, with a
-     new bullet for the v2+ "infrastructure first" order (motivating case: `Settings`, root of 5
-     consumers). The `Settings` dynamic-access exception is clarified as v1-only and explicitly
-     lifted for v2: typed `Gd<Settings>` access becomes mandatory and dynamic access is forbidden
-     except where gdext exposes no typed alternative (today: `.rpc("name")`), which must be
-     listed as a residual case in the touching spec. All other subsections (binding by type,
-     preservation of property names, mandatory build, headless validation, rule/operation
-     separation) are unchanged in substance.
-  III. Interface vs. Implementation (v2 and later) — NEW. Engine virtual-trait impls and
-     `#[godot_api] impl X` blocks are glue only; domain logic lives in pure, engine-free Rust
-     covered by `cargo test`; snapshot → pure step → apply per frame/event; no per-frame/per-event
-     node or resource lookups; mandatory `cargo build` + `cargo clippy` (no warnings) + `cargo
-     test` gates; tuning constants belong to the type, not the module.
+  III. Interface vs. Implementation (v2 and later) — third bullet's closing sentence corrected.
+     It previously justified admitting gdext's math builtins into pure code with "they never
+     cross the FFI and need no engine" — true of the TYPES, false of some of their METHODS
+     (e.g. `Quaternion::slerp`'s body is `self.as_inner().slerp(..)`; `Basis::looking_at` is a
+     generated builtin dispatched through `sys::builtin_method_table()`; both panic under
+     `cargo test` with "Godot engine not available"). Replaced with a method-level rule: builtin
+     math TYPES and their Rust-implemented methods (operators, `from_quaternion`,
+     `get_quaternion`, `from_euler`, `orthonormalized`, vector `lerp`, ...) are pure and stay in
+     the model; a method whose body goes through `as_inner()` or that is generated under the
+     bindings' `out/builtin_classes/**` calls the engine and belongs in glue, with the pure step
+     instead returning the data the decision needs. The practical check is the unit test itself.
 
-Sections:
-  Governance — "Compliance review" gains one sentence: v2 reviews must additionally verify
-  Principle III (glue-only trait/API impls, tested pure logic, no per-frame lookups, no dynamic
-  access outside listed residual cases), evidenced behavioral parity with `v1`, and that
-  `docs/v2-backlog.md` items claimed closed by a spec are actually marked done there.
-  Versioning line updated: 1.3.2 → 1.4.0, Last Amended unchanged (2026-09-16, same day as 1.3.2), Ratified
-  unchanged (2026-09-15).
+Sections: none changed (Governance, versioning policy and the version line's Ratified date are
+  untouched; only "Last Amended" advances).
+
+Motivating case: found while implementing milestone V2-C (`specs/008-v2-player-bullet-door`).
+  `player/model.rs`'s `walk_target` was drafted to return `Option<Basis>` via `Basis::looking_at`
+  and a shared `slerp_toward` using `Quaternion::slerp`; both panicked under `cargo test`. Fixed
+  by returning `Option<Vector3>` from the pure step and dropping `slerp_toward` entirely, moving
+  both engine calls to glue (commits `dbdcf63`, `c3e8d8b`). `research.md` R2 carries the two
+  amendments with the exact source citations; `CLAUDE.md`'s "Port conventions (v2)" already
+  records the same rule in operational form (commit `cebb383`) — no follow-up edit needed there.
 
 Templates checked:
-  - .specify/templates/plan-template.md: its "Constitution Check" gate reads
-    "[Gates determined based on constitution file]" — it is resolved dynamically from the live
-    constitution at plan time, not hardcoded, so a v2 plan will pick up the three build gates and
-    Principle III checks automatically. No static edit required by this amendment, and none made
-    (template source files are out of scope for this command).
+  - .specify/templates/plan-template.md: its "Constitution Check" gate resolves dynamically from
+    the live constitution at plan time; no static edit required, and none made.
 
-Follow-up required outside this command (NOT executed here, per scope restriction):
-  - CLAUDE.md needs a follow-up edit to add the `cargo clippy` / `cargo test` commands to the
-    work cycle and to document the `// api-gap(godot-<version>): <symbol> — <reason>; replace
-    when the binding ships it` comment convention introduced by Principle I / III.
+Follow-up required outside this command: none.
 
 Deferred TODOs: none — no placeholder token left unresolved.
 -->
@@ -131,7 +119,7 @@ Starting in v2, every Rust class enforces a hard separation between engine-facin
 
 - `#[godot_api] impl I<Base> for X` (engine virtual trait: `INode3D`, `ICharacterBody3D`, ...) contains ONLY lifecycle callbacks (`init`, `ready`, `process`, `physics_process`, `input`, ...), and each callback delegates: it reads engine state, calls the model, writes the result back. No domain logic (no state machines, no math, no decisions) inside the trait impl.
 - `#[godot_api] impl X` contains ONLY the API exposed to the engine/scenes: `#[func]`, `#[signal]`, `#[rpc]`, `#[constant]`, property setters. These are thin and delegate as well.
-- Domain logic lives in plain `impl X` blocks (no macro), free functions, or dedicated modules, in PURE Rust: it MUST NOT use `Gd<T>`, engine singletons (`Input`, `Os`, `RenderingServer`, ...), or engine-backed builtins (`Variant`, `GString`, `StringName`, `VarDictionary`, `VarArray`, `Callable`). It MAY use gdext's pure-Rust math builtins (`Vector2/3`, `Basis`, `Quaternion`, `Transform3D`, `Color`, ...) — they never cross the FFI and need no engine.
+- Domain logic lives in plain `impl X` blocks (no macro), free functions, or dedicated modules, in PURE Rust: it MUST NOT use `Gd<T>`, engine singletons (`Input`, `Os`, `RenderingServer`, ...), or engine-backed builtins (`Variant`, `GString`, `StringName`, `VarDictionary`, `VarArray`, `Callable`). It MAY use gdext's builtin math types (`Vector2/3`, `Basis`, `Quaternion`, `Transform3D`, `Color`, ...) and those of their methods that are implemented in Rust (operators, `from_quaternion`, `get_quaternion`, `from_euler`, `orthonormalized`, vector `lerp`, ...). A builtin method whose body goes through `as_inner()` or that is generated under the bindings' `out/builtin_classes/**` (e.g. `Quaternion::slerp*`, `Basis::looking_at`) calls the engine and belongs in glue: the pure step returns the data the decision needs (a target vector, a weight) and the glue makes the engine call. The practical check is the unit test itself — an engine-backed method panics with 'Godot engine not available' under `cargo test`.
 - Pure logic MUST be covered by unit tests (`#[cfg(test)]`, plain `#[test]`) that run with `cargo test` and no Godot binary. A user story that extracts pure logic without tests is incomplete.
 - Per-frame and per-event shape: engine state is read ONCE into a snapshot, the pure step runs, results are applied ONCE. References to nodes and resources are resolved once (`OnReady`, `OnEditor`, preloaded `Gd<PackedScene>`), never with `get_node_as`, `get_parent().cast()` or `load(...)` inside `process`/`physics_process` or inside handlers that fire per event (shots, hits, explosions).
 - Mandatory gates (extending Principle II's build gate): `cargo build`, `cargo clippy` with no warnings, and `cargo test` green — all three before validation or commit.
@@ -150,4 +138,4 @@ This constitution takes precedence over any other practice, convention, document
 
 **Compliance review**: every spec, plan and task MUST explicitly declare the phase (v1, v2 or v3) it belongs to, per Principle I. Planning and code reviews MUST verify that the work respects the restrictions of the declared phase — in particular, that no abstraction, refactoring or optimization is introduced during v1. Reviews MUST likewise verify compliance with Principle II (Verifiable Port Cycle) in every GDScript script port. Work that violates the current phase must be rejected or redirected to the correct phase's backlog. Port reviews MUST further confirm that the dependency order was respected, that no exported or replicated property name was changed, and that noticed improvements were recorded in `docs/v2-backlog.md`. Reviews MUST confirm that every bug fix in v1 meets the four requirements of Principle I (spec, isolation in code, commit, `docs/upstream-bugs.md`) and that no improvement was introduced under the label of a fix. v2 reviews MUST additionally verify compliance with Principle III (Interface vs. Implementation) — that `I<Base>` trait impls and `#[godot_api] impl X` blocks contain only glue, that pure logic carries unit tests, that no per-frame or per-event node/resource lookup was introduced, and that no dynamic access appears outside the residual cases listed in the touching spec — that behavioral parity with `v1` was evidenced (headless validation, parity harness run on both branches, user visual checkpoints), and that every `docs/v2-backlog.md` item a spec claims to close was actually closed and marked done in that file.
 
-**Version**: 1.4.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-16
+**Version**: 1.4.1 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-17
