@@ -254,21 +254,21 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T030 [US2] Fill in the harness's case (b): `seed(12345)` before instancing `player.tscn`
+- [x] T030 [US2] Fill in the harness's case (b): `seed(12345)` before instancing `player.tscn`
   (so `CameraNoiseShake::noise_seed`'s `randi()` at `ready` matches on both trees), then
   `player.rpc("add_camera_shake_trauma", 0.75)` (the existing `Player::add_camera_shake_trauma`
   `#[rpc]`, unchanged by this milestone — research.md R9), dump the camera's `.rotation` for 30
   `process_frame`s.
-- [ ] T031 [US3] Fill in the harness's case (c): instantiate the scene that hosts `DebugLabel`
+- [x] T031 [US3] Fill in the harness's case (c): instantiate the scene that hosts `DebugLabel`
   (`level.tscn` or `main_scene.tscn` — whichever the running project actually attaches it to;
   confirm via grep for `type="DebugLabel"`), force `set_visible(true)` bypassing the toggle
   action, wait one `process_frame`, dump `.text`.
-- [ ] T032 [US2] [US3] Copy the updated harness to `../oxide-godot-v1/oxide-godot/`. Run cases
+- [x] T032 [US2] [US3] Copy the updated harness to `../oxide-godot-v1/oxide-godot/`. Run cases
   (b) and (c) on both trees, diff — (b) expects identical rotation dumps (bounded by the
   FastNoiseLite bit-identical assumption, Edge Cases); (c) expects identical text with the
   `VRAM:` line stripped from both sides before diffing (present on `v2` only, by design —
   SC-004, not a parity requirement).
-- [ ] T033 🛑 **STOP — user visual checkpoint 2**. Ask the user to confirm: shooting/getting hit
+- [x] T033 🛑 **STOP — user visual checkpoint 2**. Ask the user to confirm: shooting/getting hit
   produces camera shake as before; the debug overlay (its toggle key) shows FPS / VSync /
   Memory / VRAM / Online (/ Multiplayer ID when online) and stops updating while hidden,
   refreshing immediately on the frame it's shown again. Do not proceed to Phase 4 until
