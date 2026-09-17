@@ -152,18 +152,18 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T018 [US1] From `contracts/zz_leaves_parity.gd`, write `oxide-godot/oxide-godot/
+- [x] T018 [US1] From `contracts/zz_leaves_parity.gd`, write `oxide-godot/oxide-godot/
   zz_leaves_parity.tscn` + `.gd` (root `Node`, `--case=` cmdline dispatch). Fill in case (a) with
   the corrected press/release sequence (hold-then-late-release → `Idle`; tap → `Toggled`; press
   while toggled → `Held`; release with accumulated > 0.4s → `Idle`; jump; shoot with the target
   NOT behind the player's own collider — Edge Cases' one excluded scenario), plus the
   fall-to-black window (teleport below `y = -32` and dump alpha across the ramp, teleport back
   above `-17` and dump the decay).
-- [ ] T019 [US1] Copy the harness files into `../oxide-godot-v1/oxide-godot/`. Run case (a) on
+- [x] T019 [US1] Copy the harness files into `../oxide-godot-v1/oxide-godot/`. Run case (a) on
   both trees per quickstart.md §4 (`XDG_DATA_HOME=/tmp/parity-v1` / `/tmp/parity-v2`), `diff` the
   two dumps. Verification: identical (the self-hit raycast scenario is avoided by construction,
   per Edge Cases).
-- [ ] T020 [US1] 🛑 **STOP — user visual checkpoint 1** (spec.md SC-007's US1 half). Ask the user
+- [x] T020 [US1] 🛑 **STOP — user visual checkpoint 1** (spec.md SC-007's US1 half). Ask the user
   to run the game and confirm: move, aim by holding, aim by tapping (toggle), jump, shoot at a
   target and see the crosshair target track correctly, fall off the map and watch the screen
   fade to black and back. Do not proceed to Phase 3 until confirmed.
