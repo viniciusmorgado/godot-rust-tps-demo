@@ -222,13 +222,13 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 4 — `debug_label.rs`
 
-- [ ] T026 [P] [US3] In `oxide_godot_core/oxide_godot_lib/src/debug_label.rs`, add an inline
+- [x] T026 [P] [US3] In `oxide_godot_core/oxide_godot_lib/src/debug_label.rs`, add an inline
   `mod pure { ... }` (Principle III's distinct-`mod` requirement, no separate file per research.md
   R8) with `DebugStats { fps: f64, vsync_enabled: bool, ram_bytes: u64, vram_bytes: u64,
   multiplayer_id: Option<i64> }`, `compose(stats: &DebugStats) -> String`, and
   `format_godot_float(v: f64) -> String` (`let s = format!("{v}"); if s.contains('.') { s } else
   { format!("{s}.0") }`).
-- [ ] T027 [US3] `compose` builds, in order: `"FPS: " + format_godot_float(stats.fps)`;
+- [x] T027 [US3] `compose` builds, in order: `"FPS: " + format_godot_float(stats.fps)`;
   `"\nVSync: " + "Enabled"/"Disabled"`; `"\nMemory: " + format!("{:3.2}", stats.ram_bytes as f64
   / 1_048_576.0) + " MiB"`; **NEW** `"\nVRAM: " + format!("{:3.2}", stats.vram_bytes as f64 /
   1_048_576.0) + " MiB"` (FR-016, backlog #26, placed right below Memory); `"\nOnline: " +
@@ -237,7 +237,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   (`fps: 60.0`) composes `"FPS: 60.0"` (not `"FPS: 60"`); the VRAM line appears immediately after
   Memory and before Online; `multiplayer_id: None` composes `"Online: No"` with no ID line;
   `multiplayer_id: Some(id)` composes `"Online: Yes\nMultiplayer ID: {id}"`.
-- [ ] T028 [US3] Rewrite `process(&mut self, _delta: f64)`: check `is_action_just_pressed
+- [x] T028 [US3] Rewrite `process(&mut self, _delta: f64)`: check `is_action_just_pressed
   ("toggle_debug")` and flip visibility exactly as `debug_label.rs:14-17` do today; THEN, only if
   `self.base().is_visible()` (backlog #4 — currently text is rebuilt unconditionally every
   frame), build one `DebugStats` (`Engine::singleton().get_frames_per_second()`,
@@ -248,7 +248,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `debug_label.rs:36-46`), call `pure::compose`, and `set_text` — on the SAME frame visibility
   turns on (the toggle check and the visible-branch build are sequential in one `process` call,
   not split across frames).
-- [ ] T029 [US3] Gates + headless. Grep (SC-004): confirm `compose`'s VRAM line exists (code
+- [x] T029 [US3] Gates + headless. Grep (SC-004): confirm `compose`'s VRAM line exists (code
   review, since headless can't visually confirm text). Commit: `debug_label: DebugStats/compose
   pure mod, VRAM line, hidden-frame skip (closes backlog #4, #26)`.
 
