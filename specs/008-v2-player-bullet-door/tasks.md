@@ -270,7 +270,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T030 [US2] Fill in the harness's case (b): instantiate `bullet.tscn` aimed at a wall a
+- [x] T030 [US2] Fill in the harness's case (b): instantiate `bullet.tscn` aimed at a wall a
   short known distance from the harness floor, count frames until its `AnimationPlayer`'s
   current animation becomes `"explode"`; instantiate `enemies/red_robot/red_robot.tscn`
   (confirmed by reading `red_robot.rs`'s field list that its `ready()` has no `Settings`/level
@@ -280,12 +280,12 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   with the wall, and dump whether the explode animation's local playback position reset twice
   within that one frame (the documented `v1`-vs-`v2` divergence for backlog #13 — NOT asserted
   equal).
-- [ ] T031 [US3] Fill in the harness's case (c): instantiate `door/door.tscn`, move a scripted
+- [x] T031 [US3] Fill in the harness's case (c): instantiate `door/door.tscn`, move a scripted
   `player.tscn` body into its `Area3D`, dump whether `DoorModel2/AnimationPlayer` is playing
   `"doorsimple_opening"`; on a FRESH `door.tscn` instance, move an `EnemyRobot` body through the
   same `Area3D`, dump the same check (expect: not playing) — capture stderr separately to
   confirm no new warning/error line appears on either branch.
-- [ ] T032 [US2] [US3] Copy the updated harness to `../oxide-godot-v1/oxide-godot/`. Run cases
+- [x] T032 [US2] [US3] Copy the updated harness to `../oxide-godot-v1/oxide-godot/`. Run cases
   (b) and (c) on both trees, diff — (b)'s `wall_frames` and `robot_health_before/after` must
   match exactly; the same-tick case is reported, not asserted equal; (c)'s `player_opens`/
   `robot_opens` must match exactly on both branches, and neither `.stderr` capture may show a
