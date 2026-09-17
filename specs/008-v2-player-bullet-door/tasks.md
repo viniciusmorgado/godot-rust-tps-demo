@@ -176,7 +176,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T018 [US1] From `contracts/zz_player_parity.gd`, write `oxide-godot/oxide-godot/
+- [x] T018 [US1] From `contracts/zz_player_parity.gd`, write `oxide-godot/oxide-godot/
   zz_player_parity.tscn` + `.gd` (root `Node`, `--case=` cmdline dispatch, `_make_floor()`
   helper). Fill in case (a): instance `player.tscn` above the harness-built floor, scripted
   `move_*`/`aim`/`jump`/`shoot` sequence (`Input.action_press`/`release` +
@@ -184,7 +184,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   of buffer before being observable), dump per frame `global_position`, `velocity`,
   `current_animation`, `PlayerModel`'s global basis; include a scripted teleport to `y < -40`
   partway through to exercise the respawn branch (backlog #11).
-- [ ] T019 [US1] Copy the harness files into `../oxide-godot-v1/oxide-godot/`. Run case (a) on
+- [x] T019 [US1] Copy the harness files into `../oxide-godot-v1/oxide-godot/`. Run case (a) on
   both trees per quickstart.md §4 (`XDG_DATA_HOME=/tmp/parity-v1` / `/tmp/parity-v2`,
   `--fixed-fps 60`), diff the two dumps EXCLUDING frames 0–1 (backlog #10) and the frame(s)
   immediately after the scripted below-`-40` teleport (backlog #11). Verification: identical
