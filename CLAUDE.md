@@ -74,7 +74,11 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
   functions, no macro, with a `#[cfg(test)] mod tests` beside it. Pure code MAY use gdext's
   engine enums (`WindowMode`, `Msaa`, `Scaling3DMode`, ...) and math builtins (`Vector3`,
   `Transform3D`, ...) — both are FFI-free value types — but MUST NOT use `Gd<T>`, an engine
-  singleton, or `Variant`/`GString`/`StringName`.
+  singleton, or `Variant`/`GString`/`StringName`. gdext builtin math is pure only when its body
+  does not go through `as_inner()` or a generated `out/builtin_classes/**` method — operators,
+  `from_quaternion`, `get_quaternion`, `from_euler`, `orthonormalized`, `Transform3D` mul are
+  glam-based and pure; `Quaternion::slerp*`, `Basis::looking_at` need the engine and stay in
+  glue. A `#[test]` calling an engine-backed method panics with "Godot engine not available".
 - **Engine API gaps**: isolate the workaround behind one typed value, with the comment
   `// api-gap(godot-<version>): <symbol> — <reason>; replace when the binding ships it` at the
   exact spot, and an entry in `docs/api-gaps.md` (symbol, introducing version, workaround,

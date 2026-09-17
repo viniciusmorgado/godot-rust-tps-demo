@@ -290,7 +290,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   match exactly; the same-tick case is reported, not asserted equal; (c)'s `player_opens`/
   `robot_opens` must match exactly on both branches, and neither `.stderr` capture may show a
   new line.
-- [ ] T033 🛑 **STOP — user visual checkpoint 2**. Ask the user to confirm: shooting a wall and
+- [x] T033 🛑 **STOP — user visual checkpoint 2**. Ask the user to confirm: shooting a wall and
   a robot still explodes/damages as before; walking into the door still opens it; trying to walk
   a robot into a door does not open it. Do not proceed to Phase 4 until confirmed.
 
@@ -300,7 +300,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ## Phase 4: Polish
 
-- [ ] T034 Update `docs/v2-backlog.md`: mark items **#2, #10, #11, #12, #13, #14** done, each
+- [x] T034 Update `docs/v2-backlog.md`: mark items **#2, #10, #11, #12, #13, #14** done, each
   citing the commit that closed it (T011 introduces the pure math but T017's commit is where
   #10/#11/#12 actually take effect in `player.rs`; #2/#13 close at T025's commit; #14 closes at
   T029's commit); annotate **#28**'s existing open row with the user's checkpoint-1 observation
