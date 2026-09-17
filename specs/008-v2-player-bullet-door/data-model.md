@@ -184,8 +184,9 @@ mod pure {
 Reproduces `bullet.rs:43-47`. Glue's `physics_process`: call `step`, RPC `explode` if the second
 element is `true`; run `move_and_collide` UNCONDITIONALLY afterward (v1 never skips this on the
 expiry frame — spec US2 scenario 1); on a collision, resolve `HitTarget` and `rpc_hit()`,
-disable the collision shape, and RPC `explode` ONLY IF the state coming out of `step` was still
-`Flying` (backlog #13 — FR-014's one new gate). `BULLET_VELOCITY` becomes an associated const
+disable the collision shape, RPC `explode` ONLY IF the state coming out of `step` was still
+`Flying` (backlog #13 — FR-014's one new gate), and then set the state to `Exploded`
+unconditionally (v1's trailing `self.hit = true`, `bullet.rs:57`) so later frames return early. `BULLET_VELOCITY` becomes an associated const
 `Bullet::VELOCITY: f32 = 20.0` (simpler than a `BulletTuning` struct for a single value only
 ever read by glue, per research.md R6's recommendation — `step` never needs it).
 
