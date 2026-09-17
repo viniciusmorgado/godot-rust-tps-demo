@@ -14,11 +14,11 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ## Phase 1: Setup
 
-- [ ] T001 Add the `v1` worktree: `git worktree add ../oxide-godot-v1 v1`, then
+- [x] T001 Add the `v1` worktree: `git worktree add ../oxide-godot-v1 v1`, then
   `cd ../oxide-godot-v1/oxide_godot_core && cargo build` and
   `cd ../oxide-godot-v1/oxide-godot && /usr/bin/godot.x86_64 --headless --import --path .`.
   Verification: worktree builds clean, extension loads.
-- [ ] T002 On `v2` at `43c4e57`, confirm the baseline gate: from `oxide_godot_core/`,
+- [x] T002 On `v2` at `43c4e57`, confirm the baseline gate: from `oxide_godot_core/`,
   `cargo build && cargo clippy && cargo test`. Verification: zero warnings, **41 tests pass**
   (spec.md Context — this is the number SC-001's "≥ 56 total" is measured against).
 
@@ -307,17 +307,17 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   from T020 (hitch changed / unchanged / not tested) — the row stays `open`, only gains a note.
   Commit: `docs/v2-backlog.md: close #2, #10, #11, #12, #13, #14 citing this milestone's
   commits; annotate #28 with the checkpoint observation`.
-- [ ] T035 Final harness run: all 3 cases (a/b/c) on both trees (`XDG_DATA_HOME` split,
+- [x] T035 Final harness run: all 3 cases (a/b/c) on both trees (`XDG_DATA_HOME` split,
   `--fixed-fps 60`, per quickstart.md §4), diff each. Report the diffs and the documented
   divergences (SC-006).
-- [ ] T036 Remove the harness from both trees:
+- [x] T036 Remove the harness from both trees:
   `oxide-godot/oxide-godot/zz_player_parity.{tscn,gd,gd.uid}` and the `v1` worktree's copies;
   `git worktree remove ../oxide-godot-v1`; `git worktree prune`. Verification: `git status`
   clean on `v2`, `git worktree list` shows only the main checkout.
-- [ ] T037 Full gates + headless recipe one more time (`cargo build && cargo clippy && cargo
+- [x] T037 Full gates + headless recipe one more time (`cargo build && cargo clippy && cargo
   test`; `--headless --import`; `--headless main/main.tscn --quit-after 120`; `--headless
   level/level.tscn --quit-after 120`). Report the final test count (SC-001: expect ≥ 56).
-- [ ] T038 Re-grep the residual dynamic-access list: `grep -n '\.rpc(' oxide_godot_core/
+- [x] T038 Re-grep the residual dynamic-access list: `grep -n '\.rpc(' oxide_godot_core/
   oxide_godot_lib/src/player.rs oxide_godot_core/oxide_godot_lib/src/bullet.rs
   oxide_godot_core/oxide_godot_lib/src/hittable.rs` should show only `jump`/`land`/`shoot`
   (`player.rs`), `explode` (`bullet.rs`), and `hit` (`hittable.rs`) — all permanent, all
