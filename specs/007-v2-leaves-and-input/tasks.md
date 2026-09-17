@@ -338,16 +338,16 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   T029, #4 is T029, #5 is T037); leave **#6** open with its existing deferral reason (unchanged —
   this milestone does not touch it). Commit: `docs/v2-backlog.md: close #4, #5, #7, #8, #9, #26
   citing this milestone's commits; #6 stays open`.
-- [ ] T042 Final harness run: all 4 cases (a/b/c/d) on both trees (`XDG_DATA_HOME` split per
+- [x] T042 Final harness run: all 4 cases (a/b/c/d) on both trees (`XDG_DATA_HOME` split per
   quickstart.md §4), diff each. Report the diffs (SC-006).
-- [ ] T043 Remove the harness from both trees:
+- [x] T043 Remove the harness from both trees:
   `oxide-godot/oxide-godot/zz_leaves_parity.{tscn,gd,gd.uid}` and the `v1` worktree's copies;
   `git worktree remove ../oxide-godot-v1`; `git worktree prune`. Verification: `git status` clean
   on `v2`, `git worktree list` shows only the main checkout.
-- [ ] T044 Full gates + headless recipe one more time (`cargo build && cargo clippy && cargo
+- [x] T044 Full gates + headless recipe one more time (`cargo build && cargo clippy && cargo
   test`; `--headless --import`; `--headless main.tscn`/`level.tscn`). Report the final test count
   (SC-001: expect ≥ 29, i.e. 17 + at least 12 new).
-- [ ] T045 Re-grep the residual dynamic-access list: `grep -n '\.rpc(' oxide_godot_core/
+- [x] T045 Re-grep the residual dynamic-access list: `grep -n '\.rpc(' oxide_godot_core/
   oxide_godot_lib/src/player_input.rs` should show only `jump` (permanent, FR-010); confirm by
   grep that none of T003–T037 introduced a new `.call(`/`.get(`/`has_method`/`has_signal`/
   `call_deferred`/`from_object_method` site anywhere in the 5 touched modules or `player.rs`.
