@@ -84,6 +84,15 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
   the same scratch scene headless on both trees with a SEPARATE `XDG_DATA_HOME` per tree (both
   checkouts share the project's `user://` directory otherwise and overwrite each other's
   output), then diff the results.
+- **Await-style sequences**: replace nested `connect_other` signal chains with one `async` block
+  spawned from the lifecycle callback via `godot::task::spawn`. Capture `Gd<Self>` (never
+  `&mut self`) at spawn time; after every `.await`, check `is_instance_valid()` on that handle and
+  return early if the node was freed, before calling `bind_mut()` again. Use
+  `TypedSignal::to_future()` when the signal's emitter is guaranteed to outlive the wait (e.g. a
+  `SceneTreeTimer`, owned by the `SceneTree`); use `to_fallible_future()` — treating `Err` as the
+  same early return — whenever the emitter's own lifetime isn't otherwise guaranteed (e.g. a
+  child node that can be freed independently). No feature flag is required
+  (`godot::task`/`TypedSignal::to_future`/`to_fallible_future` are unconditional in gdext 0.5.5).
 
 ## API notes (gdext 0.5.5)
 

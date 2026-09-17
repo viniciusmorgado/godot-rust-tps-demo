@@ -284,7 +284,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 5 — `part_disappear.rs` + `blast.rs` + `CLAUDE.md`
 
-- [ ] T034 [P] [US4] Rewrite `oxide_godot_core/oxide_godot_lib/src/part_disappear.rs`'s `ready()`:
+- [x] T034 [P] [US4] Rewrite `oxide_godot_core/oxide_godot_lib/src/part_disappear.rs`'s `ready()`:
   replace the two nested `connect_other` closures (`part_disappear.rs:16-32`) with one `async`
   block spawned via `godot::task::spawn`, capturing `Gd<Self>` (not `&mut self`) at spawn time:
   `self.mini_blasts.set_emitting(true)` (unchanged, before the spawn); inside the task, `await
@@ -294,7 +294,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `set_emitting(true)` + read `get_lifetime()`; `await create_timer(lifetime *
   2.0).signals().timeout().to_future::<()>()`, check validity again, then `bind_mut()` and
   `queue_free()`. Same two delays, same two engine actions, as `part_disappear.rs:14-32` today.
-- [ ] T035 [P] [US4] Rewrite `oxide_godot_core/oxide_godot_lib/src/blast.rs`'s `ready()`: replace
+- [x] T035 [P] [US4] Rewrite `oxide_godot_core/oxide_godot_lib/src/blast.rs`'s `ready()`: replace
   the `connect_other` on `animation_finished` (`blast.rs:21-26`) with one `async` block spawned
   via `godot::task::spawn`, capturing `Gd<Self>`; `await
   animation_player.signals().animation_finished().to_fallible_future::<StringName>()` (the child
@@ -303,11 +303,11 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   return); on `Ok(_)`, check `this.is_instance_valid()` and `bind_mut().queue_free()`. Leave
   `self.camera` and `process`'s per-frame `look_at` exactly as they are (already resolved once —
   FR-022, no change needed).
-- [ ] T036 [US4] Add the paragraph from research.md R7 verbatim to `CLAUDE.md`'s "Port
+- [x] T036 [US4] Add the paragraph from research.md R7 verbatim to `CLAUDE.md`'s "Port
   conventions (v2)" section, as a new bullet after "Parity harness" (FR-021): the `Gd<Self>`
   capture rule, the `is_instance_valid()` guard after every `.await`, and the
   `to_future`/`to_fallible_future` choice criterion (emitter outlives the wait vs. not).
-- [ ] T037 [US4] Gates + headless (`level.tscn`; a robot's death and the laser impact aren't
+- [x] T037 [US4] Gates + headless (`level.tscn`; a robot's death and the laser impact aren't
   scriptable from a headless run, so this only confirms no new errors on scene load — the
   harness in T038/T039 covers timing). Grep (SC-003): `grep -rn connect_other
   oxide_godot_core/oxide_godot_lib/src/part_disappear.rs

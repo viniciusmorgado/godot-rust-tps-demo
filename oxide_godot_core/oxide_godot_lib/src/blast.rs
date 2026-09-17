@@ -17,13 +17,25 @@ pub struct Blast {
 impl INode3D for Blast {
     fn ready(&mut self) {
         self.camera = self.base().get_tree().get_root().unwrap().get_camera_3d();
-        // await $AnimationPlayer.animation_finished
-        self.animation_player
-            .signals()
-            .animation_finished()
-            .connect_other(&*self, |this: &mut Blast, _anim_name: StringName| {
-                this.base_mut().queue_free();
-            });
+
+        // await $AnimationPlayer.animation_finished — one async block instead of connect_other
+        // (backlog #5). The child AnimationPlayer is freed together with this node, so its
+        // emitter is NOT guaranteed to outlive the wait if something frees Blast early: the
+        // fallible future is required here (research.md R7), unlike part_disappear.rs's
+        // SceneTreeTimer waits, whose emitter the SceneTree itself keeps alive.
+        let mut this = self.to_gd();
+        let animation_player = self.animation_player.clone();
+        godot::task::spawn(async move {
+            let result = animation_player
+                .signals()
+                .animation_finished()
+                .to_fallible_future()
+                .await;
+            if result.is_err() || !this.is_instance_valid() {
+                return;
+            }
+            this.queue_free();
+        });
     }
 
     fn process(&mut self, _delta: f64) {
