@@ -189,7 +189,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `--fixed-fps 60`), diff the two dumps EXCLUDING frames 0–1 (backlog #10) and the frame(s)
   immediately after the scripted below-`-40` teleport (backlog #11). Verification: identical
   outside those documented exclusions.
-- [ ] T020 [US1] 🛑 **STOP — user visual checkpoint 1** (spec.md SC-007's US1 half). Ask the
+- [x] T020 [US1] 🛑 **STOP — user visual checkpoint 1** (spec.md SC-007's US1 half). Ask the
   user to run the game and confirm: walking, strafing while aiming, jumping, landing (with its
   sound), shooting, and falling below the map then respawning with no lingering fall velocity
   and no spurious landing sound at spawn. Also ask the user to NOTE — without any code change in
@@ -206,7 +206,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 3 — `hittable.rs` + `bullet.rs`
 
-- [ ] T021 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/hittable.rs` (new file) with
+- [x] T021 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/hittable.rs` (new file) with
   `pub enum HitTarget { Player(Gd<crate::player::Player>), Robot(Gd<crate::red_robot::
   EnemyRobot>) }`, `pub fn resolve(node: Gd<Node3D>) -> Option<HitTarget>` (two `try_cast`s,
   order irrelevant — a node cannot satisfy both), and `impl HitTarget { pub fn rpc_hit(&mut
@@ -214,18 +214,18 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `Deref` to the shared `Node` ancestor — no need to upcast explicitly). Add `mod hittable;` to
   `oxide_godot_core/oxide_godot_lib/src/lib.rs`. No tests (glue, research.md R5 — no pure
   decision beyond what `try_cast` itself guarantees).
-- [ ] T022 [US2] In `oxide_godot_core/oxide_godot_lib/src/bullet.rs`, add an inline
+- [x] T022 [US2] In `oxide_godot_core/oxide_godot_lib/src/bullet.rs`, add an inline
   `mod pure { ... }` with `#[derive(Clone, Copy, Debug, PartialEq)] pub enum BulletState {
   Flying { time_alive: f32 }, Exploded }` and `pub fn step(state: BulletState, dt: f32) ->
   (BulletState, bool)` (the `bool` is "explode now due to expiry"): decrement `time_alive`; if
   it drops below `0.0`, return `(BulletState::Exploded, true)`; else `(BulletState::Flying {
   time_alive }, false)`; `BulletState::Exploded` in → `(BulletState::Exploded, false)` (no-op),
   reproducing `bullet.rs:43-47`.
-- [ ] T023 [US2] Add `#[cfg(test)] mod tests` inside `mod pure`: `time_alive` decrements by
+- [x] T023 [US2] Add `#[cfg(test)] mod tests` inside `mod pure`: `time_alive` decrements by
   `dt` and stays `Flying` while `≥ 0.0`; crossing below `0.0` transitions to `Exploded` and
   returns `true`; an `Exploded` state fed back into `step` stays `Exploded` and returns `false`
   (no re-trigger).
-- [ ] T024 [US2] Replace `hit: bool`/`time_alive: f32` with `state: pure::BulletState`
+- [x] T024 [US2] Replace `hit: bool`/`time_alive: f32` with `state: pure::BulletState`
   (`#[init(val = pure::BulletState::Flying { time_alive: 5.0 })]`, matching
   `bullet.rs:15-16`'s literal); replace `const BULLET_VELOCITY: f32 = 20.0` with `impl Bullet {
   pub const VELOCITY: f32 = 20.0; }`. Rewrite `physics_process`: if `self.state` is
@@ -243,7 +243,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   (`bullet.rs:57`); without it a non-expired bullet that collided would keep flying, colliding
   and RPC-ing `hit` on every later frame. `destroy` keeps its exact `#[func]`
   (`bullet.tscn:103`'s method-call track).
-- [ ] T025 [US2] Gates + headless. Grep (SC-004): `grep -n has_method
+- [x] T025 [US2] Gates + headless. Grep (SC-004): `grep -n has_method
   oxide_godot_core/oxide_godot_lib/src/bullet.rs` → no matches. Commit: `hittable: crate-level
   HitTarget dispatch; bullet: BulletState, no double explode (closes backlog #2, #13)`.
 
