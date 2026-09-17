@@ -249,23 +249,23 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 4 — `door.rs`
 
-- [ ] T026 [US3] In `oxide_godot_core/oxide_godot_lib/src/door.rs`, add an inline
+- [x] T026 [US3] In `oxide_godot_core/oxide_godot_lib/src/door.rs`, add an inline
   `mod pure { ... }` with `#[derive(Clone, Copy, Debug, PartialEq)] pub enum DoorState {
   Closed, Open }` and `pub fn on_body(state: DoorState, is_player: bool) -> (DoorState, bool)`
   (the `bool` is "play the open animation now"): `(Closed, true) → (Open, true)`; every other
   combination (`(Closed, false)`, `(Open, _)`) → `(state unchanged, false)` — reproducing
   `door.rs:26-29`.
-- [ ] T027 [US3] Add `#[cfg(test)] mod tests` inside `mod pure`: `Closed` + player body →
+- [x] T027 [US3] Add `#[cfg(test)] mod tests` inside `mod pure`: `Closed` + player body →
   `Open`, play `true`; `Closed` + non-player body → unchanged, play `false`; `Open` + player
   body → unchanged (`Open`), play `false` (no re-trigger).
-- [ ] T028 [US3] Replace `open: bool` with `state: pure::DoorState` (`#[init(val =
+- [x] T028 [US3] Replace `open: bool` with `state: pure::DoorState` (`#[init(val =
   pure::DoorState::Closed)]`). Rewrite `_on_door_body_entered(&mut self, body: Gd<Node3D>)`
   KEEPING its exact `Gd<Node3D>` parameter (FR-018 — do NOT type it as `Gd<Player>`): its first
   statement is `body.try_cast::<Player>().is_ok()`, fed into `pure::on_body(self.state,
   is_player)`; if the returned `bool` is `true`, play `"doorsimple_opening"` on
   `animation_player` exactly as `door.rs:27` does; store the new state. `door.tscn`'s
   `[connection]` at line 35 is NOT edited.
-- [ ] T029 [US3] Gates + headless. Commit: `door: DoorState, pure on_body decision (closes
+- [x] T029 [US3] Gates + headless. Commit: `door: DoorState, pure on_body decision (closes
   backlog #14 in revised form)`.
 
 ### Harness + checkpoint
