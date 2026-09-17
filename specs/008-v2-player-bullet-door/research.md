@@ -99,7 +99,7 @@ pub fn slerp_toward(current: Basis, target: Quaternion, dt: f32, speed: f32) -> 
 // v1: player.rs:226-231 (aiming) and the equivalent basis-to-quaternion form at :266-271
 // (walking) — shared: Basis::from_quaternion(current.get_quaternion().slerp(target, dt*speed))
 
-pub fn walk_target(camera_x: Vector3, camera_z: Vector3, motion: Vector2) -> Option<Basis>
+pub fn walk_target(camera_x: Vector3, camera_z: Vector3, motion: Vector2) -> Option<Vector3>  // see the amendment below: looking_at is glue
 // v1: player.rs:264-267 — target = camera_x*motion.x + camera_z*motion.y;
 // Some(Basis::looking_at(target)) if target.length() > 0.001, else None (orientation unchanged)
 
@@ -148,6 +148,17 @@ and the same category V2-B's `player_input/model.rs` already builds on. `v1`'s o
 `player.rs:226-297` directly) — extracting them into functions that take the same types as
 plain parameters changes nothing about their purity, only where they are called from.
 
+**Amendment (found at implementation, commit 1)**: `Basis::looking_at` is NOT pure Rust. It is
+a generated builtin method (`out/builtin_classes/basis.rs:219-227`) dispatched through
+`sys::builtin_method_table()` (FFI) and panics under `cargo test` ("Godot engine not
+available"). `from_quaternion`, `slerp`, `orthonormalized`, `Basis`/`Transform3D` operators and
+`get_quaternion` live in `godot-core/src/builtin/**` and are pure (verified by the passing
+tests). Consequence: `walk_target` returns the target `Vector3` (the `> 0.001` decision, pure,
+tested) and the `looking_at` call moves to glue. General rule for later milestones (to be added
+to `CLAUDE.md` in this milestone's docs commit): builtin math implemented in
+`godot-core/src/builtin/**` is pure; anything generated under `out/builtin_classes/**` needs
+the engine.
+
 ## R3 — Glue frame shape for `apply_input`
 
 **Decision**: the exact sequence, preserved frame-for-frame:
@@ -176,7 +187,8 @@ plain parameters changes nothing about their purity, only where they are called 
      BEFORE the root motion read, so the read reflects the newly-requested state's motion,
      not the previous frame's; this ordering is preserved exactly); if `frame.shooting` and
      `fire_cooldown.get_time_left() == 0.0`, spawn a bullet (R4) and RPC `shoot`.
-   - **Not airborne, not aiming**: `walk_target` → `slerp_toward` if `Some`; `anim_plan` →
+   - **Not airborne, not aiming**: `walk_target` → if `Some(target)`, `Basis::looking_at(target)`
+     (glue — engine call) → `slerp_toward`; `anim_plan` →
      `Walk`; apply; THEN read root motion and reassign `self.root_motion` (same ordering note).
 6. `integrate_root_motion` (engine reads ONCE here: `get_gravity()`, and `get_velocity()` for
    the value threaded from step 4/5) → new `self.orientation`, new velocity x/z.

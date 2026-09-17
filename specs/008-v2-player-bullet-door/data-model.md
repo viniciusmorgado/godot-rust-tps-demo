@@ -82,9 +82,15 @@ pub fn slerp_toward(current: Basis, target: Quaternion, dt: f32, speed: f32) -> 
 // v1: player.rs:226-231 (aiming) / :266-271 (walking), same shared formula:
 // Basis::from_quaternion(current.get_quaternion().slerp(target, dt * speed))
 
-pub fn walk_target(camera_x: Vector3, camera_z: Vector3, motion: Vector2) -> Option<Basis>;
+pub fn walk_target(camera_x: Vector3, camera_z: Vector3, motion: Vector2) -> Option<Vector3>;
 // v1: player.rs:264-267 — target = camera_x*motion.x + camera_z*motion.y;
-// Some(Basis::looking_at(target)) if target.length() > 0.001, else None (no rotation this frame)
+// Some(target) if target.length() > 0.001, else None (no rotation this frame).
+// The `Basis::looking_at(target)` call itself is GLUE (player.rs): it is a generated builtin
+// METHOD that goes through the engine (`out/builtin_classes/basis.rs:219-227`,
+// `builtin_method_table`) and panics in `cargo test` — discovered during implementation.
+// Rule: math under `godot-core/src/builtin/**` (operators, `from_quaternion`, `slerp`,
+// `orthonormalized`, `Transform3D` mul) is pure; anything generated under
+// `out/builtin_classes/**` needs the engine and stays in glue.
 ```
 
 ### Root motion and respawn
