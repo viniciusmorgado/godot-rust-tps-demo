@@ -95,7 +95,7 @@ pub fn flatten_camera_axes(basis: Basis) -> (Vector3, Vector3)
 // v1: player.rs:187-193 — (x, z) = (col_a, col_c) with .y = 0.0, both .normalized()
 // returns (camera_x, camera_z) in that order
 
-pub fn slerp_toward(current: Basis, target: Quaternion, dt: f32, speed: f32) -> Basis
+pub fn slerp_toward(...)  // DROPPED at implementation — Quaternion::slerp is engine-backed (see amendment below); the slerp stays in glue
 // v1: player.rs:226-231 (aiming) and the equivalent basis-to-quaternion form at :266-271
 // (walking) — shared: Basis::from_quaternion(current.get_quaternion().slerp(target, dt*speed))
 
@@ -154,10 +154,18 @@ a generated builtin method (`out/builtin_classes/basis.rs:219-227`) dispatched t
 available"). `from_quaternion`, `slerp`, `orthonormalized`, `Basis`/`Transform3D` operators and
 `get_quaternion` live in `godot-core/src/builtin/**` and are pure (verified by the passing
 tests). Consequence: `walk_target` returns the target `Vector3` (the `> 0.001` decision, pure,
-tested) and the `looking_at` call moves to glue. General rule for later milestones (to be added
-to `CLAUDE.md` in this milestone's docs commit): builtin math implemented in
-`godot-core/src/builtin/**` is pure; anything generated under `out/builtin_classes/**` needs
-the engine.
+tested) and the `looking_at` call moves to glue.
+
+**Second amendment (same commit)**: `Quaternion::slerp` is ALSO engine-backed — its body is
+`self.as_inner().slerp(to, weight)` (`godot-core/src/builtin/quaternion.rs:203-208`); only the
+normalization assert is Rust. So `slerp_toward` is dropped from the pure model (it had no
+decision logic) and both orientation updates stay in glue as v1 wrote them. General rule for
+later milestones (to be added to `CLAUDE.md` in this milestone's docs commit): a builtin math
+method is pure only if it does not go through `as_inner()` — glam-based operators,
+`from_quaternion`, `get_quaternion`, `from_euler`, `orthonormalized`, `Transform3D` mul are
+pure; `Quaternion::slerp*`, `Basis::looking_at` and everything generated under
+`out/builtin_classes/**` need the engine. The practical check is a `#[test]`: engine-backed
+methods panic with "Godot engine not available".
 
 ## R3 — Glue frame shape for `apply_input`
 
@@ -180,15 +188,15 @@ the engine.
      `current_animation`, via ONE apply-step function shared with the `jump`/`land` RPC
      handlers' direct calls). `root_motion` is NOT reassigned (v1 does not touch it in this
      branch — R2's note on field persistence).
-   - **Not airborne, aiming**: `slerp_toward` (target = `frame.camera_base_quaternion`) →
+   - **Not airborne, aiming**: `q_from.slerp(frame.camera_base_quaternion, dt·speed)` in glue (engine call) →
      `self.orientation.basis`; `anim_plan` → `Strafe`; apply; THEN read
      `animation_tree.get_root_motion_rotation()/position()` and reassign `self.root_motion`
      (v1's own order: `animate()` — which sets the AnimationTree's transition request — runs
      BEFORE the root motion read, so the read reflects the newly-requested state's motion,
      not the previous frame's; this ordering is preserved exactly); if `frame.shooting` and
      `fire_cooldown.get_time_left() == 0.0`, spawn a bullet (R4) and RPC `shoot`.
-   - **Not airborne, not aiming**: `walk_target` → if `Some(target)`, `Basis::looking_at(target)`
-     (glue — engine call) → `slerp_toward`; `anim_plan` →
+   - **Not airborne, not aiming**: `walk_target` → if `Some(target)`, `Basis::looking_at(target)
+     .get_quaternion()` → `q_from.slerp(q_to, dt·speed)` (both glue — engine calls); `anim_plan` →
      `Walk`; apply; THEN read root motion and reassign `self.root_motion` (same ordering note).
 6. `integrate_root_motion` (engine reads ONCE here: `get_gravity()`, and `get_velocity()` for
    the value threaded from step 4/5) → new `self.orientation`, new velocity x/z.

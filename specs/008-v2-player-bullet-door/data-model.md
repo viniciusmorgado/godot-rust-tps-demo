@@ -78,9 +78,13 @@ pub fn lerp_motion(current: Vector2, target: Vector2, dt: f32, tuning: &PlayerTu
 pub fn flatten_camera_axes(basis: Basis) -> (Vector3, Vector3);
 // v1: player.rs:187-193 — returns (camera_x, camera_z), each with .y = 0.0, normalized()
 
-pub fn slerp_toward(current: Basis, target: Quaternion, dt: f32, speed: f32) -> Basis;
-// v1: player.rs:226-231 (aiming) / :266-271 (walking), same shared formula:
-// Basis::from_quaternion(current.get_quaternion().slerp(target, dt * speed))
+// (REMOVED at implementation) `slerp_toward` — `Quaternion::slerp` delegates to the engine via
+// `as_inner()` (`godot-core/src/builtin/quaternion.rs:203-208`), so it cannot run under
+// `cargo test` and carries no decision logic. The two orientation updates stay in GLUE
+// (`player.rs`), exactly v1's lines 226-231 / 266-271:
+//   Basis::from_quaternion(q_from.slerp(q_to, dt * tuning.rotation_interpolate_speed))
+// with q_to = frame.camera_base_quaternion (aiming) or
+// Basis::looking_at(target).get_quaternion() (walking, when `walk_target` is Some).
 
 pub fn walk_target(camera_x: Vector3, camera_z: Vector3, motion: Vector2) -> Option<Vector3>;
 // v1: player.rs:264-267 — target = camera_x*motion.x + camera_z*motion.y;
@@ -88,9 +92,12 @@ pub fn walk_target(camera_x: Vector3, camera_z: Vector3, motion: Vector2) -> Opt
 // The `Basis::looking_at(target)` call itself is GLUE (player.rs): it is a generated builtin
 // METHOD that goes through the engine (`out/builtin_classes/basis.rs:219-227`,
 // `builtin_method_table`) and panics in `cargo test` — discovered during implementation.
-// Rule: math under `godot-core/src/builtin/**` (operators, `from_quaternion`, `slerp`,
-// `orthonormalized`, `Transform3D` mul) is pure; anything generated under
-// `out/builtin_classes/**` needs the engine and stays in glue.
+// Rule: a gdext builtin math method is pure only when its body does NOT go through
+// `as_inner()` (engine): operators, `from_quaternion`, `get_quaternion`, `from_euler`,
+// `orthonormalized`, `Transform3D` mul are glam-based and pure; `Quaternion::slerp`,
+// `Basis::looking_at` and everything generated under `out/builtin_classes/**` need the engine
+// and stay in glue. A `#[test]` calling an engine-backed method panics with "Godot engine not
+// available" — that is the practical check.
 ```
 
 ### Root motion and respawn
