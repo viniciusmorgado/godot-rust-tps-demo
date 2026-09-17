@@ -7,6 +7,8 @@ use godot::prelude::*;
 use crate::camera_noise_shake::CameraNoiseShake;
 use crate::player_input::PlayerInputSynchronizer;
 
+mod model;
+
 #[derive(GodotConvert, Var, Export, Clone, Copy, PartialEq, Debug)]
 #[godot(via = i64)]
 pub enum Animations {

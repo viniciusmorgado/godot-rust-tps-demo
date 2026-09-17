@@ -32,19 +32,19 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 1 — `player/model.rs` (pure)
 
-- [ ] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/player.rs`, add `mod model;`
+- [x] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/player.rs`, add `mod model;`
   (matching `settings.rs`'s `mod graphics;` / `player_input.rs`'s `mod model;`). Create
   `oxide_godot_core/oxide_godot_lib/src/player/model.rs` with `PlayerTuning` (`#[derive(Clone,
   Copy, Debug)]`, 6 `f32` fields per data-model.md: `motion_interpolate_speed=10.0`,
   `rotation_interpolate_speed=10.0`, `min_airborne_time=0.1`, `jump_speed=5.0`,
   `land_threshold=0.5`, `respawn_below_y=-40.0`) and its `impl Default` with exactly these v1
   literals (`player.rs:19,20,22,23` + the two inline literals at `:198`/`:303`).
-- [ ] T004 [P] [US1] In the same file, add `InputFrame` (`motion: Vector2, aiming: bool,
+- [x] T004 [P] [US1] In the same file, add `InputFrame` (`motion: Vector2, aiming: bool,
   shooting: bool, jumping: bool, shoot_target: Vector3, camera_rotation_basis: Basis,
   camera_base_quaternion: Quaternion, aim_rotation: f64`, `#[derive(Clone, Copy, Debug)]`) and
   `AirborneOutcome` (`airborne_time: f32, on_air: bool, land: bool, jump: bool,
   jump_velocity_y: Option<f32>`, `#[derive(Clone, Copy, Debug, PartialEq)]`).
-- [ ] T005 [US1] Add `airborne_step(airborne_time: f32, dt: f32, is_on_floor: bool,
+- [x] T005 [US1] Add `airborne_step(airborne_time: f32, dt: f32, is_on_floor: bool,
   jump_pressed: bool, tuning: &PlayerTuning) -> AirborneOutcome` — the LITERAL transcription of
   `player.rs:196-214` in v1's exact order (data-model.md's 4-step derivation): (1)
   `airborne_time += dt`; (2) if `is_on_floor`: `land = airborne_time > tuning.land_threshold`,
@@ -54,7 +54,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `airborne_time = tuning.min_airborne_time`. `land` and `jump` MUST be independent `bool`
   fields (NOT an enum/Option that forces mutual exclusion) — a frame can set both. Depends on
   T003, T004.
-- [ ] T006 [US1] In the same file, add: `lerp_motion(current: Vector2, target: Vector2, dt: f32,
+- [x] T006 [US1] In the same file, add: `lerp_motion(current: Vector2, target: Vector2, dt: f32,
   tuning: &PlayerTuning) -> Vector2` (`current.lerp(target, tuning.motion_interpolate_speed *
   dt)` — `player.rs:182-184`); `flatten_camera_axes(basis: Basis) -> (Vector3, Vector3)`
   (returns `(camera_x, camera_z)` = `(basis.col_a(), basis.col_c())`, each with `.y = 0.0` then
@@ -64,7 +64,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   Vector3, camera_z: Vector3, motion: Vector2) -> Option<Basis>` (`target = camera_x*motion.x +
   camera_z*motion.y`; `Some(Basis::looking_at(target))` if `target.length() > 0.001`, else
   `None` — `player.rs:264-267`).
-- [ ] T007 [US1] In the same file, add: `integrate_root_motion(orientation: Transform3D,
+- [x] T007 [US1] In the same file, add: `integrate_root_motion(orientation: Transform3D,
   root_motion: Transform3D, dt: f32, gravity: Vector3, velocity_in: Vector3) -> (Transform3D,
   Vector3)` (`orientation *= root_motion`; `h = orientation.origin / dt`; `velocity.x/z =
   h.x/h.z` off `velocity_in`; `velocity += gravity * dt`; `orientation.origin = Vector3::ZERO`;
@@ -77,7 +77,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   0.0` else `JumpDown`; grounded+aiming → `Strafe { aim_rotation, blend_position:
   Vector2::new(motion.x, -motion.y) }`; grounded+not aiming → `Walk { blend_position:
   Vector2::new(motion.length(), 0.0) }` — `player.rs:218-234`/`:261-274`).
-- [ ] T008 [US1] Add `#[cfg(test)] mod tests` to `player/model.rs` covering `airborne_step`: (a)
+- [x] T008 [US1] Add `#[cfg(test)] mod tests` to `player/model.rs` covering `airborne_step`: (a)
   landing after exceeding the `0.5` s threshold → `land: true`, `airborne_time` reset to `0`;
   (b) floor contact at or under the threshold → `land: false`; (c) jumping while grounded (not
   on_air) → `jump: true`, `jump_velocity_y: Some(tuning.jump_speed)`, `airborne_time ==
@@ -87,18 +87,18 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `AirborneOutcome` (spec Scenario 4 — this test MUST fail if the implementation collapses the
   two into a mutually-exclusive enum); (f) the exact accumulate→check→reset order (a case where
   reordering would change the observable `land`/`on_air` result).
-- [ ] T009 [US1] Add to the same `mod tests`: `lerp_motion` moves partway toward the target
+- [x] T009 [US1] Add to the same `mod tests`: `lerp_motion` moves partway toward the target
   (not equal to either endpoint) for a mid-range `dt`; `flatten_camera_axes` zeroes `.y` and
   normalizes both returned vectors; `slerp_toward` moves the basis's quaternion toward (not
   equal to) the target for a mid-range `dt*speed`; `walk_target` returns `None` for a motion
   vector whose flattened length is `≤ 0.001` and `Some` (matching `Basis::looking_at`) above it.
-- [ ] T010 [US1] Add to the same `mod tests`: `integrate_root_motion` — horizontal velocity
+- [x] T010 [US1] Add to the same `mod tests`: `integrate_root_motion` — horizontal velocity
   equals `root_motion.origin / dt`, gravity added, returned orientation's origin is
   `Vector3::ZERO` and its basis is orthonormal; `should_respawn` true below `-40.0`, false at or
   above; `anim_plan` covers all 4 branches with their exact payloads (`Strafe`'s
   `Vector2::new(motion.x, -motion.y)`, `Walk`'s `Vector2::new(motion.length(), 0.0)`, and both
   `JumpUp`/`JumpDown` selected correctly by the sign of `velocity_y`).
-- [ ] T011 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
+- [x] T011 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
   (zero warnings; all T008–T010 tests pass; ≥ 12 new tests in this file per spec SC-001).
   Commit: `player: extract PlayerTuning, InputFrame, AirborneOutcome, AnimPlan and pure
   motion/orientation/root-motion math into player/model.rs`.
