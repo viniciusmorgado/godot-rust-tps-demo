@@ -333,7 +333,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ## Phase 5: Polish
 
-- [ ] T041 Update `docs/v2-backlog.md`: mark items **#4, #5, #7, #8, #9, #26** done, each citing
+- [x] T041 Update `docs/v2-backlog.md`: mark items **#4, #5, #7, #8, #9, #26** done, each citing
   the commit that closed it (T009/T017 for #8/#9, T017 for #7, T025/T029 for nothing new — #26 is
   T029, #4 is T029, #5 is T037); leave **#6** open with its existing deferral reason (unchanged —
   this milestone does not touch it). Commit: `docs/v2-backlog.md: close #4, #5, #7, #8, #9, #26
