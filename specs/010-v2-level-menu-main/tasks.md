@@ -88,10 +88,10 @@ killing a robot brings a fresh one back ~15 s later, forklifts show one of three
 
 ### Implementation for User Story 2 — commit 3: `flying_forklift.rs`
 
-- [ ] T020 [P] [US2] In `oxide_godot_core/oxide_godot_lib/src/flying_forklift.rs`, add an inline `mod pure { pub fn pick_model(r: f64, count: usize) -> usize { (r * count as f64).floor() as usize } #[cfg(test)] mod tests { ... } }` transcribing `:30`'s formula exactly (research.md R5), with tests at `r = 0.0` (index 0), `r` just below `1.0` (last index), and `count = 1` (always index 0) — ≥ 3 tests (matches `bullet.rs`/`door.rs`'s inline-`mod pure` precedent)
-- [ ] T021 [US2] In `flying_forklift.rs`'s `ready()`, remove the per-instance `randomize()` call (`:27`) (FR-010, Acceptance Scenario 7)
-- [ ] T022 [US2] In `flying_forklift.rs`'s `ready()`, replace the model-pick line (`:30`, `(randf() * child_count as f64).floor() as usize`) with `pure::pick_model(randf(), child_count)` — RNG sampled in glue, the visibility-toggle loop (`:31-33`) unchanged, driven by the pure function's returned index
-- [ ] T023 [US2] Gates + headless (`level/level.tscn --quit-after 120` — instantiates a `FlyingForklift`, or `level/forklift/flying_forklift.tscn` standalone if it validates independently; `main/main.tscn --quit-after 120`); commit with message `flying_forklift: pick_model, redundant randomize() removed; closes backlog #19 (forklift half)` (research.md R9); stage only `flying_forklift.rs`
+- [X] T020 [P] [US2] In `oxide_godot_core/oxide_godot_lib/src/flying_forklift.rs`, add an inline `mod pure { pub fn pick_model(r: f64, count: usize) -> usize { (r * count as f64).floor() as usize } #[cfg(test)] mod tests { ... } }` transcribing `:30`'s formula exactly (research.md R5), with tests at `r = 0.0` (index 0), `r` just below `1.0` (last index), and `count = 1` (always index 0) — ≥ 3 tests (matches `bullet.rs`/`door.rs`'s inline-`mod pure` precedent)
+- [X] T021 [US2] In `flying_forklift.rs`'s `ready()`, remove the per-instance `randomize()` call (`:27`) (FR-010, Acceptance Scenario 7)
+- [X] T022 [US2] In `flying_forklift.rs`'s `ready()`, replace the model-pick line (`:30`, `(randf() * child_count as f64).floor() as usize`) with `pure::pick_model(randf(), child_count)` — RNG sampled in glue, the visibility-toggle loop (`:31-33`) unchanged, driven by the pure function's returned index
+- [X] T023 [US2] Gates + headless (`level/level.tscn --quit-after 120` — instantiates a `FlyingForklift`, or `level/forklift/flying_forklift.tscn` standalone if it validates independently; `main/main.tscn --quit-after 120`); commit with message `flying_forklift: pick_model, redundant randomize() removed; closes backlog #19 (forklift half)` (research.md R9); stage only `flying_forklift.rs`
 
 ### Parity harness for User Story 2 — cases (b)/(c)/(d)
 
