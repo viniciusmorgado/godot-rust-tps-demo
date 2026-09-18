@@ -140,7 +140,7 @@ round-trips (open Settings, change a row, Apply, reopen — the row shows the ne
 
 ### Parity harness for User Story 3 — case (a)
 
-- [ ] T047 [US3] Run T003's copied `zz_settings_parity.gd`/`.tscn` unchanged on both trees, `XDG_DATA_HOME=/tmp/parity-v1` / `/tmp/parity-v2`, `--fixed-fps 60`; diff `settings.ini` bytes + applied engine state → identical, per V2-A's own original pass/fail criteria; report the actual diff output
+- [X] T047 [US3] Run T003's copied `zz_settings_parity.gd`/`.tscn` unchanged on both trees, `XDG_DATA_HOME=/tmp/parity-v1` / `/tmp/parity-v2`, `--fixed-fps 60`; diff `settings.ini` bytes + applied engine state → identical, per V2-A's own original pass/fail criteria; report the actual diff output
 
 - [ ] T048 🛑 **STOP — checkpoint 2 (user visual)**: open Settings; change EVERY row (display mode, vsync, max FPS, resolution scale, scale filter, TAA, MSAA, screen-space AA, shadow mapping, GI type, GI quality, SSAO, SSIL, bloom, volumetric fog); press Apply; reopen Settings — every row shows exactly the change that was just made; F11 toggles fullscreen; headless auto-host still works. Wait for the user's explicit confirmation before starting Phase 5.
 
