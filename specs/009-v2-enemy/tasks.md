@@ -382,17 +382,17 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 - [x] T037 Commit T035+T036: `docs: close backlog #15, #16, #17, #18 citing this milestone's
   commits; annotate #28 with the robot-laser half; add #31 (reset counters on Approach entry);
   correct docs/v2-catalog.md's stale pure-builtins claim to the 1.4.1 rule`.
-- [ ] T038 Final harness run: both cases (a)/(b) on both trees (`XDG_DATA_HOME` split,
+- [x] T038 Final harness run: both cases (a)/(b) on both trees (`XDG_DATA_HOME` split,
   `--fixed-fps 60`, per quickstart.md §4), diff each. Report the diffs and the documented
   divergences (SC-006 — only #15's puff-parent path).
-- [ ] T039 Remove the harness from both trees: `oxide-godot/oxide-godot/
+- [x] T039 Remove the harness from both trees: `oxide-godot/oxide-godot/
   zz_enemy_parity.{tscn,gd,gd.uid}` and the `v1` worktree's copies; `git worktree remove
   ../oxide-godot-v1`; `git worktree prune`. Verification: `git status` clean on `v2`,
   `git worktree list` shows only the main checkout.
-- [ ] T040 Full gates + headless recipe one more time (`cargo build && cargo clippy && cargo
+- [x] T040 Full gates + headless recipe one more time (`cargo build && cargo clippy && cargo
   test`; `--headless --import`; `--headless main/main.tscn --quit-after 120`; `--headless
   level/level.tscn --quit-after 120`). Report the final test count (SC-001: expect ≥ 77).
-- [ ] T041 Re-grep the residual dynamic-access list: `grep -n '\.rpc(' oxide_godot_core/
+- [x] T041 Re-grep the residual dynamic-access list: `grep -n '\.rpc(' oxide_godot_core/
   oxide_godot_lib/src/red_robot.rs oxide_godot_core/oxide_godot_lib/src/part.rs` should show
   only `play_shoot` (`red_robot.rs`) and `destroy` (`part.rs`) — both permanent, pre-existing.
   Confirm `hit` is reached exclusively through `hittable.rs`'s `HitTarget::rpc_hit()` (V2-C,
