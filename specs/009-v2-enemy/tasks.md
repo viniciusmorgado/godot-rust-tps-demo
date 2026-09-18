@@ -236,7 +236,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T022 [US1] From `contracts/zz_enemy_parity.gd`, write `oxide-godot/oxide-godot/
+- [x] T022 [US1] From `contracts/zz_enemy_parity.gd`, write `oxide-godot/oxide-godot/
   zz_enemy_parity.tscn` + `.gd` (root `Node`, `--case=` cmdline dispatch, `_make_floor()`
   helper). Fill in case (a): instance `red_robot.tscn` on the harness floor, instance
   `player.tscn` and teleport it into `PlayerDetectionArea`'s volume (no collision-mask override
@@ -245,14 +245,14 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `animation_tree.get("parameters/aim/blend_position")`, and the frame `ShootAnimation`'s
   `current_animation` becomes `"shoot"`; then teleport the player back OUT of the area and dump
   the `Idle` transition too.
-- [ ] T023 [US1] Fill in case (b): a bare `red_robot.tscn` (no player needed), `robot.rpc("hit")`
+- [x] T023 [US1] Fill in case (b): a bare `red_robot.tscn` (no player needed), `robot.rpc("hit")`
   called 5 times a few frames apart; dump `dead`, `Death`'s visibility, the `exploded` signal
   fire count (must be exactly 1), and the frame `is_instance_valid(robot)` first turns `false`
   (poll with a generous timeout, ~600 frames @60fps expected for the 10 s delay). `part.rs`
   itself is still `v1`-shaped at this point (commit 3 hasn't landed) — this case exercises US1's
   `hit`/death sequence only; part-level dumps (`fade_value`, puff path) are added in T033 once
   `part.rs` is remodeled.
-- [ ] T024 [US1] Copy the harness files into `../oxide-godot-v1/oxide-godot/`. Run cases (a) and
+- [x] T024 [US1] Copy the harness files into `../oxide-godot-v1/oxide-godot/`. Run cases (a) and
   (b) on both trees per quickstart.md §4 (`XDG_DATA_HOME=/tmp/parity-v1` / `/tmp/parity-v2`,
   `--fixed-fps 60`). Verification: (a) identical dumps on both trees (no backlog item in this
   commit changes any OBSERVABLE trace — #16/#18 are unobservable by construction); (b)
