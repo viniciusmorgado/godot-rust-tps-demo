@@ -5,10 +5,6 @@
 //! verified against the gdext 0.5.5 source (research.md R1). Nothing in this module calls the
 //! engine.
 
-// Temporary: this module is wired into red_robot.rs's glue in the next commit. Remove once
-// physics_process/shoot/hit consume everything here.
-#![allow(dead_code)]
-
 use godot::prelude::*;
 
 use super::State;
@@ -58,11 +54,16 @@ pub struct RobotCounters {
 }
 
 /// One physics frame's snapshot of what `step` needs beyond the counters/state themselves.
+/// `has_player` was in the original sketch but turned out redundant once implemented: `step`
+/// only ever consults `angle_to_player` inside the `Approach` branch (where a player is always
+/// present by construction — glue's no-player branch returns before `step` is ever called), and
+/// never treats `angle_to_player.is_some()` as a general "is a player tracked" proxy elsewhere
+/// (in `Aim`/`Shooting` it is deliberately `None` regardless of whether a player exists).
 #[derive(Clone, Copy, Debug)]
 pub struct RobotInputs {
-    pub has_player: bool,
-    /// `None` iff `!has_player`. Radians — `atan2` of the transposed-basis-local target vector
-    /// (glue computes the vector, `angle_to_player` below turns it into this angle).
+    /// Radians — `atan2` of the transposed-basis-local target vector (glue computes the
+    /// vector, `angle_to_player` below turns it into this angle). Only meaningful/consulted in
+    /// the `Approach` branch.
     pub angle_to_player: Option<f32>,
     /// `Some(...)` only on a frame glue actually raycasted (research.md R3 — glue only raycasts
     /// when the relevant countdown predicate says it's about to expire, exactly mirroring
@@ -349,7 +350,6 @@ mod tests {
 
     fn inputs(angle: Option<f32>, sees: Option<bool>) -> RobotInputs {
         RobotInputs {
-            has_player: angle.is_some(),
             angle_to_player: angle,
             sees_player: sees,
         }

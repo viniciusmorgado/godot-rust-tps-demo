@@ -138,7 +138,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 2 — `red_robot.rs` glue
 
-- [ ] T015 [US1] In `oxide_godot_core/oxide_godot_lib/src/red_robot.rs`: change `player:
+- [x] T015 [US1] In `oxide_godot_core/oxide_godot_lib/src/red_robot.rs`: change `player:
   Option<Gd<Node3D>>` to `player: Option<Gd<Player>>` (backlog #16, part 1); remove `#[export]`
   from `aim_preparing: f32` and `test_shoot: bool`, keeping both as plain `#[var]` fields
   (backlog #18 — confirmed no scene stores an override for either); keep `shoot_countdown`/
@@ -151,13 +151,13 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   LaserEmber")] laser_ember: OnReady<Gd<CpuParticles3D>>` (was `get_node_as` per shot); add
   `rid: Rid` captured once in `ready()` via `self.base().get_rid()` (was re-read at all three
   raycast call sites).
-- [ ] T016 [US1] Add ONE helper `fn raycast_to(&self, from: Vector3, to: Vector3) ->
+- [x] T016 [US1] Add ONE helper `fn raycast_to(&self, from: Vector3, to: Vector3) ->
   Option<RayHit>` (`RayHit { position: Vector3, collider: Option<Gd<Object>> }`, data-model.md)
   building `PhysicsRayQueryParameters3D::create_ex(from, to).collision_mask(0xFFFFFFFF)
   .exclude(&array![self.rid]).done()` and calling `intersect_ray` ONCE, replacing the three
   duplicated blocks at `red_robot.rs:162-172`/`:210-220`/`:349-359`. Returns `None` for an
   empty result `VarDictionary` (matches every `!col.is_empty()` guard in `v1`).
-- [ ] T017 [US1] Rewrite `physics_process(&mut self, delta: f64)` per research.md R3/R5's exact
+- [x] T017 [US1] Rewrite `physics_process(&mut self, delta: f64)` per research.md R3/R5's exact
   sequence: (1) `if self.dead { return }` (unchanged, first); (2) non-server: call `animate`'s
   glue equivalent (T017 continues to own this — build the `AnimPlan`-equivalent from replicated
   state and `return`, mirroring `red_robot.rs:118-121`); (3) `if self.test_shoot { self.shoot();
@@ -186,7 +186,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `model::integrate_root_motion` (T010's twin) fed the `AnimationTree`'s root-motion
   position/rotation; (12) `set_velocity`/`set_up_direction(Vector3::UP)`/`move_and_slide()`;
   (13) clear `orientation.origin`, orthonormalize, `set_global_basis`.
-- [ ] T018 [US1] Rewrite `shoot(&mut self)`: use T016's `raycast_to` helper (was the inline
+- [x] T018 [US1] Rewrite `shoot(&mut self)`: use T016's `raycast_to` helper (was the inline
   `PhysicsRayQueryParameters3D` block at `:349-359`); on a hit, `max_dist =
   ray_origin.distance_to(result.position)`, else `1000.0` (unchanged); laser-clip via
   `self.is_dedicated_server` (T015, no fresh `has_feature` call); ember placement via
@@ -199,7 +199,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   0.1).signals().timeout().to_future().await`, then `is_instance_valid()` on BOTH before calling
   `player.bind_mut().add_camera_shake_trauma(13.0)` — NOT routed through `HitTarget`
   (spec FR-011/Acceptance Scenario 10's justification).
-- [ ] T019 [US1] Rewrite `hit(&mut self)` in `v1`'s exact order (data-model.md/research.md R5):
+- [x] T019 [US1] Rewrite `hit(&mut self)` in `v1`'s exact order (data-model.md/research.md R5):
   `if self.dead { return }` (unchanged, first); on EVERY live hit, BEFORE the decrement: pick
   the random hit-reaction animation parameter (`randi() % 3 + 1`, RNG stays in glue) and play
   the hit sound (unchanged); call `model::hit_step(self.health)`, store the new `self.health`;
@@ -210,7 +210,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   .is_server()`, unchanged) — a `godot::task::spawn` block awaiting `create_timer(10.0)
   .signals().timeout().to_future()`, then `is_instance_valid()` before `queue_free()` (backlog
   #17, replacing the `connect_other` chain at `:305-308`).
-- [ ] T020 [US1] Rewrite `_on_area_body_entered(&mut self, body: Gd<Node3D>)`: remove the dead
+- [x] T020 [US1] Rewrite `_on_area_body_entered(&mut self, body: Gd<Node3D>)`: remove the dead
   `|| body.get_name() == "Target"` branch (backlog #16, part 2 — confirmed unreachable, no
   `.tscn` has a `"Target"` node); the surviving condition is `body.clone()
   .try_cast::<Player>().is_ok()`, and on success store the TYPED cast result into
@@ -221,7 +221,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   replacing its inline `AIM_PREPARE_TIME`/`SHOOT_WAIT` literals — its own `#[func]` signature is
   unchanged. `shoot_check`, `#[signal] exploded`, RPCs `hit`/`play_shoot` keep their exact
   signatures/attributes throughout.
-- [ ] T021 [US1] Gates: `cargo build && cargo clippy && cargo test`. Headless:
+- [x] T021 [US1] Gates: `cargo build && cargo clippy && cargo test`. Headless:
   `/usr/bin/godot.x86_64 --headless --path oxide-godot/oxide-godot --import` then
   `--headless --path oxide-godot/oxide-godot main/main.tscn --quit-after 120` and
   `level/level.tscn --quit-after 120` (no new errors vs. baseline). Grep (SC-002): `grep -c
