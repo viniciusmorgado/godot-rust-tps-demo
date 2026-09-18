@@ -473,7 +473,7 @@ checkpoint (2).
   actual diff output in the completion note — never write "identical" without the diff.**
   Delete the `zz_*` files from both trees. Commit (R11 row 5): `blast: bridge + SyncIn/SyncOut
   pair (look_at gated by real change), animation_finished → Remove; tradeoffs entries (b), (c)`.
-- [ ] T033 [US4] 🛑 **STOP — user visual checkpoint (2)** (spec.md SC-005). Ask the user to run
+- [x] T033 [US4] 🛑 **STOP — user visual checkpoint (2)** (spec.md SC-005). Ask the user to run
   the game, let a robot's laser hit walls and the player while moving the camera, and confirm:
   every laser impact blast faces the camera as it moves and disappears when its animation ends;
   a bullet explosion (unaffected by this milestone — `bullet.tscn:514` is a plain `Node3D`) still
