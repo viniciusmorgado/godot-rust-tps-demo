@@ -22,19 +22,21 @@ the same code: v2 and v3 are two independent reference templates, and v1 is kept
 
 | | v1 — raw port | v2 — idiomatic Rust | v3 — ECS |
 |---|---|---|---|
-| **Branch** | `main` | `v2` (branched from the end of v1) | `v3` (branched from v2) |
-| **Goal** | Make the original game run entirely in Rust with identical behavior, script by script | Remodel the code around Rust's type system and idioms, plus the infrastructure a real project needs | Rebuild the v2 design on top of `bevy_ecs`, with ECS driving the Godot nodes |
-| **Approach** | Direct translation of each GDScript file into one gdext class with the same base node; no abstractions, no optimizations — "Rust that still reads like GDScript" | Typed access everywhere (no dynamic `get`/`call`), proper structs and enums for state, a signal-driven scene manager, shared helpers where duplication existed, performance and readability passes | Components and systems for gameplay state; Godot nodes as the presentation/physics layer synchronized from the ECS world |
-| **Godot ↔ Rust boundary** | Whatever the original did dynamically stays dynamic (`has_method`, `has_signal`, `rpc("name")`, autoload reached by path); node types swapped in the scenes | Typed `Gd<T>` references between classes, typed signals, typed autoload | ECS world owned by a Rust singleton; nodes read/write components |
-| **Upstream behavior** | Preserved, including quirks; only objective upstream bugs fixed, minimally (3 so far, see `docs/upstream-bugs.md`) | Quirks reviewed one by one from `docs/v2-backlog.md` (26 items) | Inherits v2 |
+| **Branch** | `main` (mirrored on branch `v1`) | `v2` (branched from the end of v1) | `v3` (to be branched from v2) |
+| **Goal** | Make the original game run entirely in Rust with identical behavior, script by script | Remodel the code around Rust's type system and idioms, and separate engine glue from testable game logic | Rebuild the v2 design on top of `bevy_ecs`, with ECS driving the Godot nodes |
+| **Approach** | Direct translation of each GDScript file into one gdext class with the same base node; no abstractions, no optimizations — "Rust that still reads like GDScript" | Two inseparable pillars: (1) the type system does the validating — enums with data instead of loose flags and counters, typed config parsed once (*parse, don't validate*), typed signals and references; (2) *interface vs. implementation* — the engine-facing trait impls and `#[godot_api]` blocks are thin glue, and the game logic lives in plain Rust modules with no engine types, unit-tested without running Godot | Components and systems for gameplay state; Godot nodes as the presentation/physics layer synchronized from the ECS world |
+| **Godot ↔ Rust boundary** | Whatever the original did dynamically stays dynamic (`has_method`, `has_signal`, `rpc("name")`, autoload reached by path); node types swapped in the scenes | Typed `Gd<T>` everywhere, typed signals, typed autoload; nodes and resources resolved once (`OnReady`/`OnEditor`/preloaded scenes), per-frame work as *snapshot → pure step → apply*; the only by-name calls left are `rpc("name")` (gdext has no typed RPC) | ECS world owned by a Rust singleton; nodes read/write components |
+| **Verification** | `cargo build` with no warnings, headless runs of every scene, and a scratch-scene parity harness run on the original GDScript project and on the port, outputs diffed | The same, plus `cargo clippy` and `cargo test` as mandatory gates (133 unit tests on the pure logic), a parity harness run against the `v1` branch after every user story, and a visual checkpoint before each milestone advances | Inherits v2 |
+| **Upstream behavior** | Preserved, including quirks; only three objective upstream bugs fixed, minimally (see [`docs/upstream-bugs.md`](docs/upstream-bugs.md)) | Parity with v1 by default; each deviation is a reviewed backlog item (`docs/v2-backlog.md` on the `v2` branch), and the `v2` README lists the baseline bugs it fixed | Inherits v2 |
 | **Intended use** | Historical reference, benchmark baseline, example of a raw port | Reference template for Godot + Rust projects without ECS | Reference template for Godot + Rust projects with ECS |
-| **Status** | **Complete** — 15/15 scripts ported, 0 `.gd` left, game playable end to end | Not started | Not started |
+| **Status** | **Complete** — 15/15 scripts ported, 0 `.gd` left, game playable end to end | **Complete** — all 15 modules remodeled over five milestones, 133 unit tests (see the [`v2` branch](https://github.com/viniciusmorgado/godot-rust-tps-demo/tree/v2)) | Not started |
 
 > **Note:** for real projects, take examples only from **v2** and **v3**. v1 deliberately keeps
 > GDScript idioms, dynamic calls and upstream quirks so that behavior could be compared script by
 > script; it is a baseline, not a template.
 
-Rules for each phase are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+The rules of each phase are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md)
+(this branch carries the version in force when v1 closed; the `v2` branch carries the amended one).
 
 ## Layout
 
