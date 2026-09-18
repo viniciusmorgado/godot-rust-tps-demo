@@ -187,9 +187,10 @@ entity registered, both schedules run every tick without error.
    (and its unregistration push) while the schedule is in progress — and the entity is despawned
    by the sync layer; no gameplay system frees a node.
 9. **Given** a timer component with a duration, **When** it is stepped with the frame delta,
-   **Then** it reports expiry exactly once, on the first step at which the accumulated elapsed
-   time reaches the duration, and never again unless reset — unit-tested at the exact boundary
-   (elapsed equal to the duration expires), one step before it (does not), and across a
+   **Then** it reports expiry exactly once, on the first step at which the countdown
+   (`time_left -= dt`, the engine's `SceneTreeTimer` arithmetic) reaches zero or below, and never
+   again unless reset — unit-tested at the exact boundary
+   (a countdown reaching exactly zero expires), one step before it (does not), and across a
    second step after expiry (does not fire twice).
 10. **Given** the milestone's closing commit, **When** `CLAUDE.md` is read, **Then** it has a
     "Port conventions (v3)" section (crate pin `bevy_ecs = { version = "0.19",
@@ -367,7 +368,7 @@ vanish when their animation ends.
 - **Frame delta vs. timer boundaries.** At `--fixed-fps 60` with a 0.2 s timer, 12 steps of
   `1/60` accumulate to a value that may sit a rounding error either side of 0.2. The timer
   component uses the engine's `delta` as `f64` and expires on the first step at which
-  accumulated elapsed ≥ duration; the harness records the actual expiry frame on both trees and
+  `time_left -= dt` reaches ≤ 0 (the engine's own arithmetic); the harness records the actual expiry frame on both trees and
   the difference, if any, goes to the "Measured timing differences" table rather than being
   argued away.
 - **A door body enters twice in one physics step** (two `body_entered` for the same body, or
@@ -603,7 +604,13 @@ frame-level deviation from `v2` in this milestone.
 
 | Case | Signal / timer | `v2` frame | `v3` frame | Delta | Cause |
 |---|---|---|---|---|---|
-| (to be measured) | | | | | |
+| (b) `part_disappear` | `puff_tree_exited` RAW stamp (the `lifetime * 2.0` free) | F225 | F224 | −1 frame on `v3` | v2's `godot::task` future resumes via `call_deferred`, flushed in the NEXT iteration's physics phase, so its `queue_free()` runs one iteration after the timer fired; v3's `SyncOut` `queue_free()`s in the frame the tick timer expired. The observer lines (state at frame start) are identical on both trees — `puff_in_tree` false from F225 on both — so the difference is not observable in-game. Measured in commit `932f651`. |
+
+Cases (a) `door` (commit `ac09b56`) and (c) `blast` (commit `3c6deb9`) produced EMPTY diffs, full
+and RAW: the door plays at F61 on both trees, the blast leaves the tree at F63 on both with the
+`LightRays` basis identical every frame. The puff's 0.2 s `emitting` transition is not stamped by
+a RAW line; the observer saw `puff_emitting=true` from F44 on both trees. The harness outputs are
+quoted in the three commit messages.
 
 Candidates the harness must settle explicitly, whatever the outcome: the `part_disappear` 0.2 s
 expiry frame and the `lifetime * 2.0` free frame (tick timer stepped in `EcsWorld.process` vs a

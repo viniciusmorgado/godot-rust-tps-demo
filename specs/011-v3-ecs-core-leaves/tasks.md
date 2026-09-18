@@ -60,7 +60,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
 - [x] T004 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` (data-model.md
   "Events"): `pub enum InboundEvent { Register { id: InstanceId, handles: Handles, initial:
   Initial }, Unregister { id: InstanceId }, DoorBodyEntered { id: InstanceId, is_player: bool },
-  BlastAnimationFinished { id: InstanceId } }`; `pub enum Initial { Door, Puff { lifetime: f32 },
+  BlastAnimationFinished { id: InstanceId } }`; `pub enum Initial { Door, Puff { lifetime: f64 },
   Blast }` (`#[derive(Clone, Copy, Debug, PartialEq)]`); and the message
   `#[derive(Message, Clone, Copy)] pub struct DoorBodyEntered { pub entity: Entity, pub is_player:
   bool }` (`bevy_ecs::message::Message`, the drain writes it AFTER resolving `id → Entity`).
@@ -336,13 +336,14 @@ visual checkpoint (1).
   declare `mod system;` in `part_disappear.rs` (data-model.md "Components and markers"):
   `#[derive(Component, Clone, Copy, Debug, PartialEq)] pub enum DisappearPhase {
   WaitingToEmit(Timer), Emitting(Timer) }`, `#[derive(Component, Clone, Copy)] pub struct
-  Lifetime(pub f32);`, `#[derive(Debug, PartialEq)] pub enum Transition { None, StartEmitting,
+  Lifetime(pub f64);`, `#[derive(Debug, PartialEq)] pub enum Transition { None, StartEmitting,
   Finished }`, `impl DisappearPhase { pub const EMIT_DELAY: f64 = 0.2; /* v2
-  part_disappear.rs:26 */ pub const LIFETIME_FACTOR: f32 = 2.0; /* v2 part_disappear.rs:37 */
+  part_disappear.rs:26 */ pub const LIFETIME_FACTOR: f64 = 2.0; /* v2 part_disappear.rs:37 */
   pub fn start() -> Self { WaitingToEmit(Timer::new(Self::EMIT_DELAY)) } pub fn step(&mut self,
-  dt: f64, lifetime: f32) -> Transition }` — `step`: `WaitingToEmit(t)` → if `t.step(dt)` then
-  `*self = Emitting(Timer::new((lifetime * Self::LIFETIME_FACTOR) as f64))` (f32 multiply THEN
-  widen, as v2 passes the `f32` product to `create_timer(f64)`) and return `StartEmitting`, else
+  dt: f64, lifetime: f64) -> Transition }` — `step`: `WaitingToEmit(t)` → if `t.step(dt)` then
+  `*self = Emitting(Timer::new(lifetime * Self::LIFETIME_FACTOR))` (`CpuParticles3D::get_lifetime()`
+  returns `f64` in the generated bindings, `cpu_particles_3d.rs:308`, so v2's `lifetime * 2.0`
+  was an `f64` product — `f64` throughout reproduces it exactly; Session 2 correction) and return `StartEmitting`, else
   `None`; `Emitting(t)` → if `t.step(dt)` then `Finished` else `None`. System `pub fn
   advance(dt: Res<FrameDelta>, mut puffs: Query<(Entity, &mut DisappearPhase, &Lifetime)>, mut
   commands: Commands)` — per entity `match phase.step(dt.0, lifetime.0) { StartEmitting =>
@@ -355,7 +356,7 @@ visual checkpoint (1).
   present, in that order, never skipping), `waiting_expires_on_step_13_at_sixty_hz_and_starts_emitting_once`
   (`StartEmitting` absent after 12 runs, present after the 13th, and — after removing the marker
   by hand as `sync_out_puff` would — absent again after run 14), `emitting_expires_after_lifetime_times_two_and_finishes_once`
-  (from `Emitting(Timer::new((1.5_f32 * 2.0) as f64))`, `Remove` appears on the step the
+  (from `Emitting(Timer::new(1.5_f64 * 2.0))`, `Remove` appears on the step the
   subtractive timer reaches ≤ 0 for 3.0 s at 1/60 — step 181 per data-model.md — and not
   before), `no_double_fire_past_the_end` (10 more runs after `Finished`: no second
   `StartEmitting`, `Remove` count stays one). Depends on T022. Verification: four tests pass.
@@ -485,7 +486,7 @@ checkpoint (2).
 
 ## Phase 6: Polish
 
-- [ ] T034 [P] Add the section "Port conventions (v3)" to `CLAUDE.md` after "Port conventions
+- [x] T034 [P] Add the section "Port conventions (v3)" to `CLAUDE.md` after "Port conventions
   (v2)" (FR-013, scenario 10 of US1): the crate pin `bevy_ecs = { version = "0.19",
   default-features = false, features = ["std"] }` in `[workspace.dependencies]` and why the
   three excluded features stay off (constitution 1.5.1); autoload registration through
@@ -499,7 +500,7 @@ checkpoint (2).
   the v2 section's "Await-style sequences" bullet: "In v3 gameplay modules these awaits become
   timer components stepped by the frame schedule (see Port conventions (v3)); v2 modules keep the
   async pattern." Verification: `grep -c 'Port conventions (v3)' CLAUDE.md` = 1.
-- [ ] T035 [P] Fill the "Measured timing differences" table in
+- [x] T035 [P] Fill the "Measured timing differences" table in
   `specs/011-v3-ecs-core-leaves/spec.md` (FR-030) from the three RAW diffs pasted in T021, T027,
   T032: one row per differing RAW event (case, signal/timer, `v2` frame, `v3` frame, delta,
   cause — e.g. "v2's `godot::task` future resumes via `call_deferred`, flushed in the next
@@ -507,11 +508,11 @@ checkpoint (2).
   `(to be measured)` row. If all three RAW diffs were empty, replace it with a single row
   `| none | — | — | — | 0 | three empty diffs on 2026-XX-XX (outputs quoted in tasks T021/T027/T032) |`.
   Verification: no `(to be measured)` left in spec.md.
-- [ ] T036 Confirm `docs/v3-tradeoffs.md` has the header + rows (a), (b), (c), (d) with the final
+- [x] T036 Confirm `docs/v3-tradeoffs.md` has the header + rows (a), (b), (c), (d) with the final
   wording (`grep -c '^| ' docs/v3-tradeoffs.md` ≥ 5) and that `docs/v2-backlog.md` row #30 still
   reads `open — deferred` (unchanged; no v3 backlog file exists: `ls docs/ | grep v3-backlog`
   returns nothing).
-- [ ] T037 Run quickstart.md §5's SC-006 grep list verbatim and paste every output: no
+- [x] T037 Run quickstart.md §5's SC-006 grep list verbatim and paste every output: no
   `fn process`/`fn physics_process` in `door.rs`/`part_disappear.rs`/`blast.rs`; `run_schedule`/
   `.run(&mut` only in `ecs.rs`; no `godot::task::spawn` in the three modules; no
   `get_autoload_by_name`/`/root/EcsWorld` in Rust (or only typed uses); `git diff 08bc3bd --
@@ -519,7 +520,7 @@ checkpoint (2).
   red_robot}* | wc -l` = 0; `grep -n 'Gd<' ecs/markers.rs door/system.rs part_disappear/system.rs`
   returns nothing (components and gameplay systems hold no engine handle). Report the residual
   dynamic-access list for the three modules: none.
-- [ ] T038 Final gates + headless recipe one more time (`cargo build && cargo clippy && cargo
+- [x] T038 Final gates + headless recipe one more time (`cargo build && cargo clippy && cargo
   test`; `--headless --import`; `--headless main.tscn`/`level.tscn`). Report the final test count
   (SC-001: expect **156** = 133 + 23; the spec's floor is ≥ 148). Commit (R11 row 6):
   `CLAUDE.md: Port conventions (v3); spec: measured timing differences filled;

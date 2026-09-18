@@ -47,7 +47,10 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
    In headless `main.tscn` the set `Initializing already initialized RID` /
    `Parameter "mem" is null.` / 3× `Parameter "m" is null.` may appear intermittently (a race
    between the level loading in a sub-thread and the dummy renderer) — it is not a regression if
-   it disappears on a second run (specs/004 research §E.2).
+   it disappears on a second run (specs/004 research §E.2). Same rule for the rarer burst
+   `Bug in ResourceLoader logic, please report` / `Failed loading resource: ... structure.glb`
+   / `Parse Error: Failed. [Resource file res://level/level.tscn:77]` during the same threaded
+   level load (seen once in V3-A Session 1, absent on reruns and on the `v2` worktree).
 
 ## Port conventions (v1)
 
@@ -97,6 +100,76 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
   same early return — whenever the emitter's own lifetime isn't otherwise guaranteed (e.g. a
   child node that can be freed independently). No feature flag is required
   (`godot::task`/`TypedSignal::to_future`/`to_fallible_future` are unconditional in gdext 0.5.5).
+  In v3 gameplay modules these awaits become timer components stepped by the frame schedule —
+  see Port conventions (v3); v2 modules keep the async pattern.
+
+## Port conventions (v3)
+
+- **Crate pin**: `bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }`
+  in `[workspace.dependencies]`, inherited with `{ workspace = true }` (resolves to 0.19.1; 0.20
+  is `-rc`, forbidden). `bevy_reflect`, `async_executor` and `multi_threaded` stay OFF
+  (constitution 1.5.1): the Godot API is main-thread only, and gdext's `experimental-threads`
+  (ON in this workspace, see Toolchain) only widens gdext's own API surface — it does not make
+  `Gd<T>` `Send`, so `Gd<T>` can never be a component and every engine callback still runs on
+  the main thread. `pub mod ecs;` in `lib.rs` (a private module would report the core's items
+  as dead code in a cdylib).
+- **Autoload**: `oxide-godot/ecs/ecs_world.tscn` is the one-node scene
+  `[node name="EcsWorld" type="EcsWorld"]` (like `menu/settings.tscn`), registered in
+  `project.godot` `[autoload]` as `EcsWorld="*res://ecs/ecs_world.tscn"` after `Settings`.
+  `EcsWorld` (`src/ecs.rs`) owns the `World` and the two schedules and is the ONLY driver:
+  `physics_process` runs `Fixed`, `process` runs `Frame`; nothing else calls `Schedule::run`.
+  Its `ready` sets `process_priority` AND `physics_process_priority` to `i32::MAX`: it must run
+  LAST in both phases — after every scene node's callback and after the `AnimationPlayer`'s
+  internal processing (which emits `animation_finished`), so an event pushed during a phase is
+  consumed by that phase's schedule in the same frame. Scene-tree timers still fire after it
+  (`process_timers` follows the whole `_process` pass), so an event pushed from a timer callback
+  lands in the next iteration's fixed run. Proven by experiment (specs/011 research R1).
+- **Bridge template** (`door.rs`, `part_disappear.rs`, `blast.rs`): NO `process`/`physics_process`,
+  no `Entity` field, no access to `EcsWorld`. `ready` resolves child handles once
+  (`#[init(node = ...)]`), may do the one-shot engine setup v2 did at that moment, and pushes
+  `InboundEvent::Register { id: self.base().instance_id(), handles: Handles::X { root:
+  self.to_gd().upcast::<EngineBase>(), .. }, initial }` — the root is `upcast` to the engine
+  type the `Handles` variant declares (`to_gd()` gives `Gd<Self>`). `exit_tree` pushes
+  `Unregister { id }`. `#[func]`/`#[rpc]`/signal handlers ONLY translate the engine event into
+  one typed event and push it (boundary `try_cast` allowed). A child's signal received by the
+  parent is connected with `signals().x().connect_other(&self.to_gd(), Self::handler)` —
+  `connect_self`'s receiver is the EMITTER, so it is wrong for a child's signal.
+- **Push never borrows**: `ecs::queue::push(event)` is safe from ANY engine callback, including
+  one fired synchronously by an engine call the sync layer itself made mid-schedule: the queue
+  is a module-private `thread_local!` `RefCell<Vec<_>>` borrowed for one `Vec::push`. Never
+  `bind_mut()` on `EcsWorld` from a callback, never `get_autoload_by_name::<EcsWorld>` from a
+  bridge (a callback fired while the driver holds `&mut self` would double-borrow). Each
+  schedule run drains the queue FIFO before `SyncIn`; `Register`/`Unregister` are applied by
+  the drain (`ecs::apply_register`, `ecs/apply.rs`), gameplay events become `Messages<M>`.
+- **Phases and markers**: both schedules chain `Phase::SyncIn → Gameplay → EngineQuery →
+  SyncOut` (`ecs/setup.rs`). Gameplay systems are pure (`Query`/`Res`/`MessageReader`/
+  `Commands` only; no `NonSend`, no `Gd`) and decide by inserting markers (`PlayOpen`,
+  `StartEmitting`, `Remove`); the `SyncOut` systems in `ecs.rs` act on them and remove them in
+  the SAME run. That same-run visibility rests on bevy's default
+  `ScheduleBuildSettings::auto_insert_apply_deferred = true` (a sync point between ordered
+  systems that use `Commands`) — keep the default; `setup.rs`'s third test pins it. Every acting
+  `SyncOut` system runs `.before(sync_out_remove)`; nodes are released ONLY there, ONLY with
+  `queue_free()` — never `free()`, which would run `exit_tree` inside the schedule.
+- **bevy_ecs 0.19 API notes**: `World::insert_non_send` / `get_non_send_mut` / `non_send_mut`
+  (the `*_non_send_resource*` forms are `#[deprecated]` and would fail the zero-warning gate);
+  events are `Messages<M>` / `MessageReader<M>` / `#[derive(Message)]` (`Messages::update()` once
+  per owning schedule run, before the drain); systems are tested with
+  `use bevy_ecs::system::RunSystemOnce; world.run_system_once(system).unwrap()` on a
+  `World::new()` with resources inserted by hand; `World::entities().len()` counts bevy-internal
+  entities (4 on a fresh world) — assert liveness with `get_entity(e).is_ok()/is_err()` instead.
+  Timers reproduce `SceneTreeTimer` arithmetic (`time_left -= dt`, fires when `<= 0`).
+- **Parity harness (v3)**: the baseline is a `v2` worktree (`git worktree add ../oxide-godot-v2
+  v2`, its own `cargo build`, then `--headless --import`). The scratch files `zz_ecs_parity.gd`,
+  `zz_ecs_observer.gd`, `zz_ecs_parity.tscn` (specs/011 contracts) are copied into BOTH trees,
+  run with `--headless --path . --fixed-fps 60 --quit-after 400 zz_ecs_parity.tscn -- --case=X`
+  under SEPARATE `XDG_DATA_HOME`s, and the logs at
+  `"$XDG_DATA_HOME/godot/app_userdata/Third-Person Shooter Demo/zz_ecs_parity_X.log"`
+  (`config/name`, not the repo name — quote the path) are diffed in full AND on their `^RAW`
+  subset; paste the diff, never write "identical" without it. The observer is a child node at
+  `process_priority = i32::MIN` logging at the start of every process pass. Two lessons: attach
+  the observer's script BEFORE `add_child` (attached afterwards it never runs), and set a body's
+  position BEFORE `add_child` (a body added at the origin overlaps whatever sits there for its
+  first physics step). Delete every `zz_*` file (and `.uid`) from both trees before committing.
 
 ## API notes (gdext 0.5.5)
 

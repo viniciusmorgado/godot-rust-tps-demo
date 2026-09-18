@@ -15,7 +15,7 @@ pub enum InboundEvent {
 }
 pub enum Initial {                    // the pure half of a registration (Send, testable)
     Door,                             // → DoorState::Closed
-    Puff { lifetime: f32 },           // → DisappearPhase::start() (= WaitingToEmit(Timer::new(EMIT_DELAY))), Lifetime(lifetime)
+    Puff { lifetime: f64 },           // → DisappearPhase::start() (= WaitingToEmit(Timer::new(EMIT_DELAY))), Lifetime(lifetime)
     Blast,                            // → no component beyond the marker `BlastTag`
 }
 #[derive(Message, Clone, Copy)] pub struct DoorBodyEntered { pub entity: Entity, pub is_player: bool }
@@ -24,7 +24,7 @@ pub enum Initial {                    // the pure half of a registration (Send, 
 | Item | v2 line reproduced |
 |---|---|
 | `DoorBodyEntered { id, is_player }` pushed by the bridge; `is_player = body.try_cast::<Player>().is_ok()` | `door.rs:76` |
-| `Initial::Puff { lifetime }` = `get_lifetime()` read once in `ready` (f32) | `part_disappear.rs:35` |
+| `Initial::Puff { lifetime }` = `get_lifetime()` read once in `ready` (`f64` — the generated binding `cpu_particles_3d.rs:308` returns `f64`; implement-time correction, Session 2) | `part_disappear.rs:35` |
 | `BlastAnimationFinished` pushed by the `#[func]` connected to `animation_finished` | `blast.rs:29-33` |
 
 The `Message` form (`DoorBodyEntered { entity, is_player }`) is what the drain writes AFTER
@@ -86,7 +86,7 @@ impl Timer {
 | Item | v2 line reproduced |
 |---|---|
 | `Timer::new(DisappearPhase::EMIT_DELAY)` (`EMIT_DELAY: f64 = 0.2`) | `part_disappear.rs:26` `create_timer(0.2)` |
-| `Timer::new((lifetime * DisappearPhase::LIFETIME_FACTOR) as f64)` (`LIFETIME_FACTOR: f32 = 2.0`) — f32 multiply, then widen, as v2 passes an `f32` product to a `f64` parameter | `part_disappear.rs:35-37` |
+| `Timer::new(lifetime * DisappearPhase::LIFETIME_FACTOR)` (`LIFETIME_FACTOR: f64 = 2.0`) — `CpuParticles3D::get_lifetime()` returns `f64` in the generated bindings (`cpu_particles_3d.rs:308`), so v2's `lifetime * 2.0` was an `f64` product; `Lifetime(f64)`, `Initial::Puff { lifetime: f64 }` and `LIFETIME_FACTOR: f64` reproduce it exactly | `part_disappear.rs:35-37` |
 
 Tests: `expires_on_the_step_that_reaches_zero` (0.2 at `dt = 1/60` fires on step 13 and not on
 step 12 — the value R1 fact 6 observed on the engine), `does_not_expire_one_step_before`,
@@ -111,15 +111,15 @@ pub fn open_on_player(reader: MessageReader<DoorBodyEntered>, doors: Query<&mut 
 // part_disappear/system.rs
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub enum DisappearPhase { WaitingToEmit(Timer), Emitting(Timer) }
-#[derive(Component, Clone, Copy)] pub struct Lifetime(pub f32);
+#[derive(Component, Clone, Copy)] pub struct Lifetime(pub f64);
 #[derive(Debug, PartialEq)] pub enum Transition { None, StartEmitting, Finished }
 impl DisappearPhase {
     /// Tuning of this type (constitution Principle III: tuning constants belong to the type).
     pub const EMIT_DELAY: f64 = 0.2;        // v2 part_disappear.rs:26 — create_timer(0.2)
-    pub const LIFETIME_FACTOR: f32 = 2.0;   // v2 part_disappear.rs:37 — lifetime * 2.0
+    pub const LIFETIME_FACTOR: f64 = 2.0;   // v2 part_disappear.rs:37 — lifetime * 2.0 (f64 product)
     pub fn start() -> Self;                 // WaitingToEmit(Timer::new(Self::EMIT_DELAY)); the registration
                                             // path (Initial::Puff) calls this and never sees the literal
-    pub fn step(&mut self, dt: f64, lifetime: f32) -> Transition;
+    pub fn step(&mut self, dt: f64, lifetime: f64) -> Transition;
 }
 pub fn advance(dt: Res<FrameDelta>, puffs: Query<(Entity, &mut DisappearPhase, &Lifetime)>, commands: Commands);
 ```
