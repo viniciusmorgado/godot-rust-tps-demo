@@ -395,7 +395,7 @@ visual checkpoint (1).
   completion note — never write "identical" without the diff.** Delete the `zz_*` files from
   both trees. Commit (R11 row 4): `part_disappear: bridge + DisappearPhase/Timer system (tests:
   boundaries, order, no double fire); tradeoffs entry (a)`.
-- [ ] T028 [US3] 🛑 **STOP — user visual checkpoint (1)** (spec.md SC-005). Ask the user to run
+- [x] T028 [US3] 🛑 **STOP — user visual checkpoint (1)** (spec.md SC-005). Ask the user to run
   the game (`cargo build` done, editor or exported run), shoot a robot until it explodes, and
   confirm: the debris puffs appear, their mini-blasts burst immediately, the main puff starts
   emitting shortly after, and every puff vanishes as in v2. Do not proceed to Phase 5 until
