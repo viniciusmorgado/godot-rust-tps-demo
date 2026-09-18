@@ -8,10 +8,15 @@ The rules are in the constitution; this file only says *where* each rule bites.
 
 ## Facts that shape the design
 
-- **gdext math types are pure Rust.** `Vector2`, `Vector3`, `Basis`, `Quaternion`, `Transform3D`
-  (and their methods: `slerp`, `looking_at`, `orthonormalized`, `transposed`, ...) live in
-  `godot::builtin` and never cross the FFI. Pure logic may use them freely and be tested with
-  `cargo test` without an engine. There is no need for "game-side" vector types.
+- **gdext math builtins are pure only when their methods are implemented in Rust** (constitution
+  1.4.1, Principle III). The TYPES (`Vector2`, `Vector3`, `Basis`, `Quaternion`, `Transform3D`,
+  ...) live in `godot::builtin` and never cross the FFI themselves, but some of their METHODS
+  delegate to the engine: a method whose body goes through `as_inner()` or that is generated
+  under the bindings' `out/builtin_classes/**` (e.g. `Quaternion::slerp*`, `Basis::looking_at`)
+  calls the engine and belongs in glue, not the pure model. Operators, `from_quaternion`,
+  `get_quaternion`, `from_euler`, `orthonormalized`, `transposed` and vector arithmetic are
+  glam-based and pure. The practical check is a `#[test]`: an engine-backed method panics with
+  "Godot engine not available" under `cargo test`. There is no need for "game-side" vector types.
 - **These types need a running engine:** `Gd<T>` and every call on it, singletons (`Input`, `Os`,
   `RenderingServer`, ...), `Variant`, `GString`, `StringName`, `VarDictionary`, `VarArray`.
   Pure logic must not touch them; they belong to the glue.

@@ -341,7 +341,12 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   world positions are IDENTICAL between `v1`/`v2`; the parent path is a DOCUMENTED DIVERGENCE
   (expect `Death` on `v1`, the robot's own parent — e.g. the harness's own root `Node` in this
   standalone scenario — on `v2`) — report it, do not assert equality (spec Edge Cases/SC-006).
-- [ ] T034 [US2] 🛑 **STOP — user visual checkpoint 2**. Ask the user to confirm: a destroyed
+  CORRECTION (found at T038): the harness never seeded the global RNG, and `Part::explode`
+  draws 4 `randf()` per part (spin + wait) — destroy frames and puff positions differ on every
+  run, so "identical" could not have been observed this way; the seed was added in T038, and
+  THAT run is the authoritative one. This task's own run was not evidence of equality (only of
+  the RNG-independent scalars and the puff-parent divergence, which held regardless).
+- [x] T034 [US2] 🛑 **STOP — user visual checkpoint 2**. Ask the user to confirm: a destroyed
   robot's parts still fly apart with visible spin and gravity, fade near the end of their
   lifetime, disappear, and leave a brief particle puff behind at the correct position — no
   visible difference from before (the puff's new parent, backlog #15, has no observable effect
@@ -353,7 +358,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ## Phase 4: Polish
 
-- [ ] T035 Update `docs/v2-backlog.md`: mark items **#15, #16, #17, #18** done, each citing the
+- [x] T035 Update `docs/v2-backlog.md`: mark items **#15, #16, #17, #18** done, each citing the
   commit that closed it (T014's commit introduces the pure math but T021's commit is where
   #16/#17/#18 actually take effect in `red_robot.rs`; #15 closes at T032's commit); annotate
   **#28**'s existing row with a SECOND note — the user's checkpoint-1 (T025) observation on the
@@ -366,7 +371,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   per-variant counters (spec 009 FR-002's originally-sketched shape)"; motivation "`v1` quirk
   kept for parity in V2-D — the counters outlive `Idle`, so a per-state enum cannot represent
   `v1` faithfully today" (plan.md's Complexity Tracking entry, verbatim reasoning).
-- [ ] T036 Correct `docs/v2-catalog.md`'s "Facts that shape the design" section: replace "gdext
+- [x] T036 Correct `docs/v2-catalog.md`'s "Facts that shape the design" section: replace "gdext
   math types are pure Rust. `Vector2`, `Vector3`, `Basis`, `Quaternion`, `Transform3D` (and
   their methods: `slerp`, `looking_at`, `orthonormalized`, `transposed`, ...) live in
   `godot::builtin` and never cross the FFI" with the 1.4.1-accurate rule (the TYPES and their
@@ -374,7 +379,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   generated under `out/builtin_classes/**` — e.g. `Quaternion::slerp`, `Basis::looking_at` —
   calls the engine), matching `CLAUDE.md`'s existing wording (commit `cebb383`) and the
   constitution's 1.4.1 amendment. Same commit as T035 (docs-only).
-- [ ] T037 Commit T035+T036: `docs: close backlog #15, #16, #17, #18 citing this milestone's
+- [x] T037 Commit T035+T036: `docs: close backlog #15, #16, #17, #18 citing this milestone's
   commits; annotate #28 with the robot-laser half; add #31 (reset counters on Approach entry);
   correct docs/v2-catalog.md's stale pure-builtins claim to the 1.4.1 rule`.
 - [ ] T038 Final harness run: both cases (a)/(b) on both trees (`XDG_DATA_HOME` split,
