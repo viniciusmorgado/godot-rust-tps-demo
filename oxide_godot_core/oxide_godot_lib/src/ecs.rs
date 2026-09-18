@@ -12,7 +12,7 @@ use godot::prelude::*;
 
 use event::{DoorBodyEntered, InboundEvent, Initial};
 use index::{EntityIndex, Registration};
-use markers::{BlastTag, FixedDelta, FrameDelta, PlayOpen, Remove, StartEmitting};
+use markers::{BlastTag, FixedDelta, FrameDelta, LookTarget, PlayOpen, Remove, StartEmitting};
 use setup::Phase;
 
 use crate::door::system::DoorState;
@@ -229,6 +229,54 @@ fn sync_out_puff(
     }
 }
 
+/// `SyncIn`, FRAME schedule (FR-024; research.md R7): the cached camera's global origin, read ONCE
+/// per distinct camera instance per frame, becomes the blast's `LookTarget` — written only when
+/// it changed (`set_if_neq`), so `Changed<LookTarget>` is a real gate for `sync_out_blast`. An
+/// invalid camera yields no target and no write (v2 `blast.rs:42-44`).
+fn sync_in_blast(
+    blasts: Query<Entity, With<BlastTag>>,
+    handles: NonSend<NodeHandles>,
+    mut targets: Query<&mut LookTarget>,
+    mut cache: Local<HashMap<InstanceId, Option<Vector3>>>,
+    mut commands: Commands,
+) {
+    cache.clear();
+    for entity in &blasts {
+        let Some(Handles::Blast { camera: Some(cam), .. }) = handles.by_entity.get(&entity) else {
+            continue;
+        };
+        let key = cam.instance_id(); // no engine call: the id is stored in the Gd
+        let origin = *cache
+            .entry(key)
+            .or_insert_with(|| cam.is_instance_valid().then(|| cam.get_global_transform().origin));
+        let Some(origin) = origin else {
+            continue;
+        };
+        match targets.get_mut(entity) {
+            Ok(mut target) => {
+                target.set_if_neq(LookTarget(origin));
+            }
+            Err(_) => {
+                commands.entity(entity).insert(LookTarget(origin));
+            }
+        }
+    }
+}
+
+/// `SyncOut`, FRAME schedule (FR-025): `light_rays.look_at(target)` (v2 `blast.rs:46`) for every
+/// blast whose target changed this frame — engine-backed `Basis::looking_at`, glue by the 1.4.1
+/// rule, which is why the blast has no pure gameplay system.
+fn sync_out_blast(
+    query: Query<(Entity, &LookTarget), Changed<LookTarget>>,
+    mut handles: NonSendMut<NodeHandles>,
+) {
+    for (entity, target) in &query {
+        if let Some(Handles::Blast { light_rays, .. }) = handles.by_entity.get_mut(&entity) {
+            light_rays.look_at(target.0);
+        }
+    }
+}
+
 /// Adds the engine-touching systems to both schedules. The pure schedules come from `setup.rs`;
 /// the per-module sync systems join here in commits 3 (door), 4 (puff) and 5 (blast). Within
 /// `SyncOut` the rule is act, then release: every acting system runs `.before(sync_out_remove)`.
@@ -239,4 +287,6 @@ pub fn add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule) {
     }
     fixed.add_systems(sync_out_door.in_set(Phase::SyncOut).before(sync_out_remove));
     frame.add_systems(sync_out_puff.in_set(Phase::SyncOut).before(sync_out_remove));
+    frame.add_systems(sync_in_blast.in_set(Phase::SyncIn).after(sweep_dead_nodes));
+    frame.add_systems(sync_out_blast.in_set(Phase::SyncOut).before(sync_out_remove));
 }

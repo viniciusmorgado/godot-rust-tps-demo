@@ -413,7 +413,7 @@ checkpoint (2).
 
 ### Commit 5 — `blast.rs` bridge + `sync_in_blast`/`sync_out_blast`
 
-- [ ] T029 [P] [US4] Rewrite `oxide_godot_core/oxide_godot_lib/src/blast.rs` as a bridge
+- [x] T029 [P] [US4] Rewrite `oxide_godot_core/oxide_godot_lib/src/blast.rs` as a bridge
   (data-model.md "Bridges" row, FR-023): keep `#[class(init, base=Node3D)] pub struct Blast {
   base: Base<Node3D>, #[init(node = "LightRays")] light_rays: OnReady<Gd<CpuParticles3D>>,
   #[init(node = "AnimationPlayer")] animation_player: OnReady<Gd<AnimationPlayer>> }` and DELETE
@@ -431,7 +431,7 @@ checkpoint (2).
   { id: self.base().instance_id() }); } }` (the `StringName` parameter matches the signal's
   signature and is unused). Verification: `grep -n 'fn process\|task::spawn\|look_at\|camera:'
   blast.rs` returns nothing; `impact_effect.tscn` unedited.
-- [ ] T030 [US4] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add the blast sync pair
+- [x] T030 [US4] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add the blast sync pair
   (research.md R7, FR-024/FR-025): `fn sync_in_blast(blasts: Query<Entity, With<BlastTag>>,
   handles: NonSend<NodeHandles>, mut targets: Query<&mut LookTarget>, mut cache:
   Local<HashMap<InstanceId, Option<Vector3>>>, mut commands: Commands)` — `cache.clear()` at the
@@ -452,7 +452,7 @@ checkpoint (2).
   explicit engine calls are `is_instance_valid` (camera) + `get_global_transform` + `look_at`
   (when changed) = v2's three, plus the FR-009 root sweep (excluded by FR-025 as amended) — count
   them by reading the two systems and write the count in the completion note.
-- [ ] T031 [US4] Append rows (b) and (c) to `docs/v3-tradeoffs.md`: (b) `blast` — the engine owns
+- [x] T031 [US4] Append rows (b) and (c) to `docs/v3-tradeoffs.md`: (b) `blast` — the engine owns
   animation playback and emits `animation_finished` from the `AnimationPlayer`'s own idle
   processing; the ECS cannot hide it because the animation's end is engine time, not tick time;
   the bridge's `#[func]` (typed `connect_other`) pushes `BlastAnimationFinished`, the drain marks
@@ -463,7 +463,7 @@ checkpoint (2).
   `Changed`; measured explicit engine calls per blast per frame: 3 (v2's count) + the FR-009
   sweep for a lone blast, ≤ 3 + sweep amortized from two concurrent blasts — matching FR-025
   as amended (locations `ecs.rs::sync_in_blast`/`sync_out_blast`). Verification: 4 rows.
-- [ ] T032 [US4] Gates + headless: `cargo build && cargo clippy && cargo test` (**156**, no new
+- [x] T032 [US4] Gates + headless: `cargo build && cargo clippy && cargo test` (**156**, no new
   pure tests in this commit — the blast's drain test landed in T009); `--headless --import`,
   `main.tscn`, `level.tscn` clean (a laser hit is not scriptable headless; the harness covers
   it). Harness case (c) on both trees exactly as T021 did (`--case=c`; the blast is instanced

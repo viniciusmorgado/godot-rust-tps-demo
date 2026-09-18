@@ -102,8 +102,6 @@ func _physics_process(_d: float) -> void:
 			# physics-step body entry, as bodies move in the game (FR-029 (a))
 			player.velocity = Vector3(0, 0, 6); player.move_and_slide()
 			mover.velocity = Vector3(0, 0, 6); mover.move_and_slide()
-			if Engine.get_physics_frames() <= 3 or Engine.get_physics_frames() % 30 == 0:
-				print("DIAG P%d player.z=%.3f mover.z=%.3f" % [Engine.get_physics_frames(), player.global_position.z, mover.global_position.z])
 		"c":
 			if Engine.get_physics_frames() == 5:
 				# physics-step instancing, as red_robot.rs:423-425 does (FR-029 (c))
