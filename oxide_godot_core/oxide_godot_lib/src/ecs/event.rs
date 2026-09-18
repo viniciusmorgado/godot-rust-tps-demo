@@ -32,8 +32,10 @@ pub enum Initial {
     /// → `DoorState::Closed`
     Door,
     /// → `DisappearPhase::start()` + `Lifetime(lifetime)`; `lifetime` is the node's
-    /// `CPUParticles3D.lifetime` read once in `ready` (v2 `part_disappear.rs:35`, an `f32`).
-    Puff { lifetime: f32 },
+    /// `CPUParticles3D.lifetime` read once in `ready` (v2 `part_disappear.rs:35`; the gdext
+    /// binding `CpuParticles3D::get_lifetime` returns `f64`, so v2's `lifetime * 2.0` was an
+    /// `f64` product — implement-time correction of data-model.md's `f32`).
+    Puff { lifetime: f64 },
     /// → `BlastTag`
     Blast,
 }

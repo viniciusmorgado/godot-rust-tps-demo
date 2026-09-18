@@ -12,10 +12,11 @@ use godot::prelude::*;
 
 use event::{DoorBodyEntered, InboundEvent, Initial};
 use index::{EntityIndex, Registration};
-use markers::{BlastTag, FixedDelta, FrameDelta, PlayOpen, Remove};
+use markers::{BlastTag, FixedDelta, FrameDelta, PlayOpen, Remove, StartEmitting};
 use setup::Phase;
 
 use crate::door::system::DoorState;
+use crate::part_disappear::system::{DisappearPhase, Lifetime};
 
 pub mod apply;
 pub mod event;
@@ -146,8 +147,8 @@ fn apply_register(world: &mut World, id: InstanceId, handles: Handles, initial: 
         Initial::Door => {
             world.entity_mut(entity).insert(DoorState::Closed);
         }
-        Initial::Puff { lifetime: _ } => {
-            // filled in commit 4: `DisappearPhase::start()` + `Lifetime(lifetime)`
+        Initial::Puff { lifetime } => {
+            world.entity_mut(entity).insert((DisappearPhase::start(), Lifetime(lifetime)));
         }
         Initial::Blast => {
             world.entity_mut(entity).insert(BlastTag);
@@ -213,6 +214,21 @@ fn sync_out_door(
     }
 }
 
+/// `SyncOut`, FRAME schedule (FR-021): `emitting = true` exactly once per `StartEmitting` flag
+/// (v2 `part_disappear.rs:34`) and consumes the flag.
+fn sync_out_puff(
+    query: Query<Entity, With<StartEmitting>>,
+    mut handles: NonSendMut<NodeHandles>,
+    mut commands: Commands,
+) {
+    for entity in &query {
+        if let Some(Handles::Puff { root }) = handles.by_entity.get_mut(&entity) {
+            root.set_emitting(true);
+        }
+        commands.entity(entity).remove::<StartEmitting>();
+    }
+}
+
 /// Adds the engine-touching systems to both schedules. The pure schedules come from `setup.rs`;
 /// the per-module sync systems join here in commits 3 (door), 4 (puff) and 5 (blast). Within
 /// `SyncOut` the rule is act, then release: every acting system runs `.before(sync_out_remove)`.
@@ -222,4 +238,5 @@ pub fn add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule) {
         schedule.add_systems(sync_out_remove.in_set(Phase::SyncOut));
     }
     fixed.add_systems(sync_out_door.in_set(Phase::SyncOut).before(sync_out_remove));
+    frame.add_systems(sync_out_puff.in_set(Phase::SyncOut).before(sync_out_remove));
 }

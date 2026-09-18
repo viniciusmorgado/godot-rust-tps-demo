@@ -56,7 +56,9 @@ pub fn build_fixed() -> Schedule {
 }
 
 pub fn build_frame() -> Schedule {
-    chained(Frame)
+    let mut schedule = chained(Frame);
+    schedule.add_systems(crate::part_disappear::system::advance.in_set(Phase::Gameplay));
+    schedule
 }
 
 #[cfg(test)]

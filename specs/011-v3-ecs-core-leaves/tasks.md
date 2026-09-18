@@ -332,7 +332,7 @@ visual checkpoint (1).
 
 ### Commit 4 — `part_disappear/system.rs` + bridge + `sync_out_puff`
 
-- [ ] T022 [P] [US3] Create `oxide_godot_core/oxide_godot_lib/src/part_disappear/system.rs` and
+- [x] T022 [P] [US3] Create `oxide_godot_core/oxide_godot_lib/src/part_disappear/system.rs` and
   declare `mod system;` in `part_disappear.rs` (data-model.md "Components and markers"):
   `#[derive(Component, Clone, Copy, Debug, PartialEq)] pub enum DisappearPhase {
   WaitingToEmit(Timer), Emitting(Timer) }`, `#[derive(Component, Clone, Copy)] pub struct
@@ -348,7 +348,7 @@ visual checkpoint (1).
   commands: Commands)` — per entity `match phase.step(dt.0, lifetime.0) { StartEmitting =>
   insert StartEmitting, Finished => insert Remove, None => {} }`. Verification: compiles; no
   `godot::classes` import.
-- [ ] T023 [US3] Add `#[cfg(test)] mod tests` to `part_disappear/system.rs` (FR-022), driving
+- [x] T023 [US3] Add `#[cfg(test)] mod tests` to `part_disappear/system.rs` (FR-022), driving
   `advance` with `run_system_once` on a `World` holding `FrameDelta(1.0 / 60.0)` and one entity
   `(DisappearPhase::start(), Lifetime(1.5))` (the scene's `lifetime = 1.5`,
   `part_disappear.tscn:46`): `phases_occur_in_order` (`WaitingToEmit` → `Emitting` → `Remove`
@@ -359,7 +359,7 @@ visual checkpoint (1).
   subtractive timer reaches ≤ 0 for 3.0 s at 1/60 — step 181 per data-model.md — and not
   before), `no_double_fire_past_the_end` (10 more runs after `Finished`: no second
   `StartEmitting`, `Remove` count stays one). Depends on T022. Verification: four tests pass.
-- [ ] T024 [US3] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `fn sync_out_puff(query:
+- [x] T024 [US3] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `fn sync_out_puff(query:
   Query<Entity, With<StartEmitting>>, mut handles: NonSendMut<NodeHandles>, mut commands:
   Commands)` — `if let Some(Handles::Puff { root }) = handles.by_entity.get_mut(&e) {
   root.set_emitting(true); }` (v2 `part_disappear.rs:34`, once), then
@@ -370,7 +370,7 @@ visual checkpoint (1).
   DisappearPhase::start(), Lifetime(lifetime)))`. Depends on T022. Verification: compiles; the
   literal `0.2` appears nowhere in `ecs.rs` or `part_disappear.rs` (only as
   `DisappearPhase::EMIT_DELAY` in `system.rs`).
-- [ ] T025 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/part_disappear.rs` as a bridge
+- [x] T025 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/part_disappear.rs` as a bridge
   (FR-020): keep `#[class(init, base=CpuParticles3D)] pub struct PartDisappear { base:
   Base<CpuParticles3D>, #[init(node = "MiniBlasts")] mini_blasts: OnReady<Gd<CpuParticles3D>> }`;
   `impl ICpuParticles3D`: `ready` → `self.mini_blasts.set_emitting(true);` (v2 `:15`, one-shot,
@@ -380,12 +380,12 @@ visual checkpoint (1).
   `godot::task::spawn` block and its comment (`part_disappear.rs:17-46`); no
   `process`/`physics_process`. Verification: `grep -n 'task::spawn\|create_timer\|fn process'
   part_disappear.rs` returns nothing.
-- [ ] T026 [US3] Append row (a) to `docs/v3-tradeoffs.md`: `part_disappear`, `blast` — the
+- [x] T026 [US3] Append row (a) to `docs/v3-tradeoffs.md`: `part_disappear`, `blast` — the
   engine owns frame time (`_process` delta) and its `SceneTreeTimer`s; the ECS cannot hide time
   itself; the sync layer feeds `FrameDelta` from `EcsWorld::process` and the `Timer` component
   reproduces `SceneTree::process_timers`' subtractive arithmetic (research.md R5); location
   `ecs/timer.rs`, `part_disappear/system.rs`. Verification: 2 rows.
-- [ ] T027 [US3] Gates + headless: `cargo build && cargo clippy && cargo test` (152 + 4 =
+- [x] T027 [US3] Gates + headless: `cargo build && cargo clippy && cargo test` (152 + 4 =
   **156**); `--headless --import`, `main.tscn`, `level.tscn` clean. Harness case (b) on both
   trees exactly as T021 did for (a) (`--case=b`; the puff is instanced from a
   `SceneTreeTimer.timeout` callback — FR-029 (b)); diff the observer lines AND the RAW lines.
