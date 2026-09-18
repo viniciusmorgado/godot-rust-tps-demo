@@ -1,15 +1,17 @@
+mod model;
+
 use godot::classes::input::MouseMode;
-use godot::classes::rendering_server::{EnvironmentSdfgiRayCount, VoxelGiQuality};
 use godot::classes::{
     INode3D, Input, InputEvent, LightmapGi, LightmapGiData, Marker3D, Node, Node3D, PackedScene,
     RenderingServer, WorldEnvironment,
 };
-use godot::global::{randi, randomize};
+use godot::global::randi;
 use godot::prelude::*;
 
 use crate::player::Player;
 use crate::red_robot::EnemyRobot;
-use crate::settings::{GiQuality, GiType, Settings};
+use crate::settings::Settings;
+use model::GiPlan;
 
 #[derive(GodotClass)]
 #[class(init, base=Node3D)]
@@ -26,6 +28,15 @@ pub struct Level {
     player_spawn_points: OnReady<Gd<Node3D>>,
     #[init(node = "SpawnedNodes")]
     spawned_nodes: OnReady<Gd<Node3D>>,
+    #[init(node = "VoxelGI")]
+    voxel_gi: OnReady<Gd<Node3D>>,
+    #[init(node = "ReflectionProbes")]
+    reflection_probes: OnReady<Gd<Node3D>>,
+
+    #[init(val = load("res://enemies/red_robot/red_robot.tscn"))]
+    robot_scene: Gd<PackedScene>,
+    #[init(val = load("res://player/player.tscn"))]
+    player_scene: Gd<PackedScene>,
 
     #[init(val = OnReady::new(|| godot::tools::get_autoload_by_name::<Settings>("Settings")))]
     settings: OnReady<Gd<Settings>>,
@@ -39,12 +50,9 @@ impl INode3D for Level {
         let scene_root: Gd<Node> = self.to_gd().upcast();
         self.settings.bind_mut().apply_graphics_settings(window, environment, scene_root);
 
-        let gi_type = self.settings.bind().graphics().gi_type;
-        match gi_type {
-            GiType::Sdfgi => self.setup_sdfgi(),
-            GiType::VoxelGi => self.setup_voxelgi(),
-            GiType::LightmapGi => self.setup_lightmapgi(),
-        }
+        let graphics = self.settings.bind().graphics();
+        let plan = model::gi_plan(graphics.gi_type, graphics.gi_quality, self.lightmap_gi.is_some());
+        self.apply_gi_plan(plan);
 
         let multiplayer = self.base().get_multiplayer().unwrap();
         if multiplayer.is_server() {
@@ -54,7 +62,6 @@ impl INode3D for Level {
             }
 
             // Then spawn already connected players at random location
-            randomize();
             let mut spawn_points = self.player_spawn_points.get_children();
             spawn_points.shuffle();
             let first = spawn_points.pop_front().map(|n| n.cast::<Marker3D>());
@@ -91,79 +98,37 @@ impl Level {
 }
 
 impl Level {
-    fn setup_sdfgi(&mut self) {
-        self.world_environment.get_environment().unwrap().set_sdfgi_enabled(true);
-        self.base().get_node_as::<Node3D>("VoxelGI").hide();
-        self.base().get_node_as::<Node3D>("ReflectionProbes").hide();
-        // LightmapGI nodes override SDFGI (even when hidden)
-        // so we need to free the LightmapGI node if it exists
-        if let Some(lightmap_gi) = &mut self.lightmap_gi {
+    /// v1: `setup_sdfgi`/`setup_voxelgi`/`setup_lightmapgi` (`level.rs:94-162`), unified via
+    /// `model::gi_plan`'s pure decision, applied in the same order (research.md R3).
+    fn apply_gi_plan(&mut self, plan: GiPlan) {
+        self.world_environment.get_environment().unwrap().set_sdfgi_enabled(plan.sdfgi_enabled);
+        self.voxel_gi.set_visible(plan.voxel_visible);
+        self.reflection_probes.set_visible(plan.probes_visible);
+        if plan.free_lightmap
+            && let Some(mut lightmap_gi) = self.lightmap_gi.take()
+        {
             lightmap_gi.queue_free();
         }
-
-        let gi_quality = self.settings.bind().graphics().gi_quality;
-        match gi_quality {
-            GiQuality::High => {
-                RenderingServer::singleton()
-                    .environment_set_sdfgi_ray_count(EnvironmentSdfgiRayCount::COUNT_96);
-            }
-            GiQuality::Low => {
-                RenderingServer::singleton()
-                    .environment_set_sdfgi_ray_count(EnvironmentSdfgiRayCount::COUNT_32);
-            }
-            GiQuality::Disabled => {
-                self.world_environment.get_environment().unwrap().set_sdfgi_enabled(false);
-            }
-        }
-    }
-
-    fn setup_voxelgi(&mut self) {
-        self.world_environment.get_environment().unwrap().set_sdfgi_enabled(false);
-        self.base().get_node_as::<Node3D>("VoxelGI").show();
-        self.base().get_node_as::<Node3D>("ReflectionProbes").hide();
-        // LightmapGI nodes override VoxelGI (even when hidden)
-        // so we need to free the LightmapGI node if it exists
-        if let Some(lightmap_gi) = &mut self.lightmap_gi {
-            lightmap_gi.queue_free();
-        }
-
-        let gi_quality = self.settings.bind().graphics().gi_quality;
-        match gi_quality {
-            GiQuality::High => {
-                RenderingServer::singleton().voxel_gi_set_quality(VoxelGiQuality::HIGH);
-            }
-            GiQuality::Low => {
-                RenderingServer::singleton().voxel_gi_set_quality(VoxelGiQuality::LOW);
-            }
-            GiQuality::Disabled => {
-                self.base().get_node_as::<Node3D>("VoxelGI").hide();
-            }
-        }
-    }
-
-    fn setup_lightmapgi(&mut self) {
-        self.world_environment.get_environment().unwrap().set_sdfgi_enabled(false);
-        self.base().get_node_as::<Node3D>("VoxelGI").hide();
-        self.base().get_node_as::<Node3D>("ReflectionProbes").show();
-        // If no LightmapGI node, create one
-        if self.lightmap_gi.is_none() {
+        if plan.create_lightmap {
             let mut new_gi = LightmapGi::new_alloc();
             new_gi.set_light_data(&load::<LightmapGiData>("res://level/level.lmbake"));
             new_gi.set_name("LightmapGI");
             self.lightmap_gi = Some(new_gi.clone());
             self.base_mut().add_child(&new_gi);
         }
-
-        let gi_quality = self.settings.bind().graphics().gi_quality;
-        if gi_quality == GiQuality::Disabled {
-            self.lightmap_gi.as_mut().unwrap().hide();
-            self.base().get_node_as::<Node3D>("ReflectionProbes").hide();
+        if let Some(visible) = plan.lightmap_visible {
+            self.lightmap_gi.as_mut().unwrap().set_visible(visible);
+        }
+        if let Some(rays) = plan.sdfgi_rays {
+            RenderingServer::singleton().environment_set_sdfgi_ray_count(rays);
+        }
+        if let Some(quality) = plan.voxel_quality {
+            RenderingServer::singleton().voxel_gi_set_quality(quality);
         }
     }
 
     fn spawn_robot(&mut self, spawn_point: Gd<Node3D>) {
-        let mut robot: Gd<EnemyRobot> =
-            load::<PackedScene>("res://enemies/red_robot/red_robot.tscn").instantiate_as::<EnemyRobot>();
+        let mut robot: Gd<EnemyRobot> = self.robot_scene.instantiate_as::<EnemyRobot>();
         robot.set_transform(spawn_point.get_transform());
         robot
             .signals()
@@ -176,12 +141,19 @@ impl Level {
     }
 
     fn _respawn_robot(&mut self, spawn_point: Gd<Node3D>) {
-        self.base()
-            .get_tree()
-            .create_timer(15.0)
-            .signals()
-            .timeout()
-            .connect_other(&*self, move |this: &mut Level| this.spawn_robot(spawn_point.clone()));
+        let this = self.to_gd();
+        godot::task::spawn(async move {
+            this.get_tree()
+                .create_timer(15.0)
+                .signals()
+                .timeout()
+                .to_future()
+                .await;
+            if !this.is_instance_valid() {
+                return;
+            }
+            this.clone().bind_mut().spawn_robot(spawn_point);
+        });
     }
 
     fn del_player(&mut self, id: i32) {
@@ -196,15 +168,17 @@ impl Level {
         let spawn_point = spawn_point.unwrap_or_else(|| {
             let count = self.player_spawn_points.get_child_count();
             self.player_spawn_points
-                .get_child((randi() % count as i64) as i32)
+                .get_child(model::pick_spawn(randi() as i64, count as i64) as i32)
                 .unwrap()
                 .cast::<Marker3D>()
         });
-        let mut player: Gd<Player> =
-            load::<PackedScene>("res://player/player.tscn").instantiate_as::<Player>();
+        let mut player: Gd<Player> = self.player_scene.instantiate_as::<Player>();
         player.set_name(&id.to_string());
         player.bind_mut().set_player_id(id);
         player.set_transform(spawn_point.get_transform());
-        self.spawned_nodes.add_child(&player);
+        self.spawned_nodes
+            .add_child_ex(&player)
+            .force_readable_name(true)
+            .done();
     }
 }
