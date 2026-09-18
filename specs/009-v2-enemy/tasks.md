@@ -13,11 +13,11 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ## Phase 1: Setup
 
-- [ ] T001 Add the `v1` worktree: `git worktree add ../oxide-godot-v1 v1`, then
+- [x] T001 Add the `v1` worktree: `git worktree add ../oxide-godot-v1 v1`, then
   `cd ../oxide-godot-v1/oxide_godot_core && cargo build` and
   `cd ../oxide-godot-v1/oxide-godot && /usr/bin/godot.x86_64 --headless --import --path .`.
   Verification: worktree builds clean, extension loads.
-- [ ] T002 On `v2` at `541de80`, confirm the baseline gate: from `oxide_godot_core/`,
+- [x] T002 On `v2` at `541de80`, confirm the baseline gate: from `oxide_godot_core/`,
   `cargo build && cargo clippy && cargo test`. Verification: zero warnings, **62 tests pass**
   (spec.md Context — this is the number SC-001's "≥ 77 total" is measured against).
 
@@ -31,7 +31,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 1 — `red_robot/model.rs` (pure)
 
-- [ ] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/red_robot.rs`, add `mod model;`
+- [x] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/red_robot.rs`, add `mod model;`
   (matching `player.rs`'s `mod model;`). Create `oxide_godot_core/oxide_godot_lib/src/red_robot/
   model.rs` with `RobotTuning` (`#[derive(Clone, Copy, Debug)]`, 8 fields per data-model.md:
   `player_aim_tolerance: f32 = 15.0_f32.to_radians()` — RENAMED from
@@ -40,12 +40,12 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `removal_delay: f32 = 10.0`; `trauma_delay: f32 = 0.1`; `trauma_amount: f64 = 13.0`) and its
   `impl Default` with exactly these `v1` literals (`red_robot.rs:21,23,24,26,27` + the inline
   literals at `:305,395,399`).
-- [ ] T004 [P] [US1] In the same file, add `RobotCounters` (`aim_preparing: f32,
+- [x] T004 [P] [US1] In the same file, add `RobotCounters` (`aim_preparing: f32,
   shoot_countdown: f32, aim_countdown: f32`, `#[derive(Clone, Copy, Debug)]`), `RobotInputs`
   (`has_player: bool, angle_to_player: Option<f32>, sees_player: Option<bool>`, `#[derive(Clone,
   Copy, Debug)]`), and `Cmd` (`RpcPlayShoot, ResumeApproach`, `#[derive(Clone, Copy, Debug,
   PartialEq)]`).
-- [ ] T005 [US1] Add the two raycast-timing predicates `shoot_countdown_will_expire(
+- [x] T005 [US1] Add the two raycast-timing predicates `shoot_countdown_will_expire(
   shoot_countdown: f32, dt: f32) -> bool` (`shoot_countdown - dt < 0.0`) and
   `aim_countdown_will_expire(aim_countdown: f32, dt: f32) -> bool` (`aim_countdown - dt < 0.0`)
   (research.md R3 — the exact arithmetic `step` itself independently performs); `facing(angle:
@@ -53,7 +53,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   152-154`); `angle_to_player(local_target: Vector3) -> f32` (`local_target.x.atan2(
   local_target.z)` — `red_robot.rs:151`, the transposed-basis-local vector is computed by GLUE
   and passed in here as `local_target`).
-- [ ] T006 [US1] Add `step(state: State, counters: &mut RobotCounters, dt: f32, inputs:
+- [x] T006 [US1] Add `step(state: State, counters: &mut RobotCounters, dt: f32, inputs:
   &RobotInputs, tuning: &RobotTuning) -> (State, Vec<Cmd>)` — the LITERAL transcription of
   `red_robot.rs:140-235` per data-model.md's pseudocode, in `v1`'s exact order: **Approach**:
   `aim_preparing` counts down toward `0.0` (clamped) if `> 0.0`; if `inputs.angle_to_player` is
@@ -70,15 +70,15 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `counters.aim_preparing`/`shoot_countdown`, `state = Approach`, push `Cmd::ResumeApproach`.
   **Idle**: no-op (matches `v1` — no `if self.state == State::Idle` branch exists at all).
   Depends on T003, T004, T005.
-- [ ] T007 [US1] Add `resume_approach_reset(tuning: &RobotTuning) -> (f32, f32)` returning
+- [x] T007 [US1] Add `resume_approach_reset(tuning: &RobotTuning) -> (f32, f32)` returning
   `(tuning.aim_prepare_time, tuning.shoot_wait)` — the SAME reset formula `v1`'s `#[func]
   resume_approach()` performs (`red_robot.rs:271-273`), shared by `step`'s `Cmd::ResumeApproach`
   path (T006) and the glue `#[func]` (T020) so the reset lives in exactly one place.
-- [ ] T008 [US1] Add `hit_step(health: i32) -> (i32, bool)` — `let new = health - 1; (new,
+- [x] T008 [US1] Add `hit_step(health: i32) -> (i32, bool)` — `let new = health - 1; (new,
   health > 0 && new == 0)` (`red_robot.rs:284-285` — the decrement and the "health JUST reached
   zero" transition only; the RNG hit-reaction pick and every engine effect of the death sequence
   stay in glue, T019).
-- [ ] T009 [US1] Add the `animate` decomposition (`red_robot.rs:406-456`): `transition_request(
+- [x] T009 [US1] Add the `animate` decomposition (`red_robot.rs:406-456`): `transition_request(
   state: State, angle_to_player: Option<f32>, target_is_zero: bool, tuning: &RobotTuning) ->
   &'static str` (`Approach`: `"turn_left"`/`"turn_right"` outside `±tuning.player_aim_tolerance`,
   else `"idle"` if `target_is_zero` else `"walk"`; any other state: `"idle"` unconditionally,
@@ -94,20 +94,20 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   mesh_offset)` — `:372`); `ember_extents(current: Vector3, max_dist: f32, mesh_offset: f32) ->
   Vector3` (only `.z = (max_dist - mesh_offset.abs()) / 2.0` changes, x/y unchanged from
   `current` — `:373-374`).
-- [ ] T010 [US1] Add the root-motion integration TWIN `integrate_root_motion(orientation:
+- [x] T010 [US1] Add the root-motion integration TWIN `integrate_root_motion(orientation:
   Transform3D, root_motion: Transform3D, dt: f32, gravity: Vector3, velocity_in: Vector3) ->
   (Transform3D, Vector3)` — body IDENTICAL to `player/model.rs:137-156` (research.md R6: a
   twin, not a cross-module import, since `player.rs`'s `mod model;` is private and this
   milestone leaves `player.rs` untouched); `idle_velocity(gravity: Vector3, dt: f32) -> Vector3`
   (`gravity * dt` — `red_robot.rs:128-136`'s no-player-branch velocity).
-- [ ] T011 [US1] Add `#[cfg(test)] mod tests` covering: `shoot_countdown_will_expire`/
+- [x] T011 [US1] Add `#[cfg(test)] mod tests` covering: `shoot_countdown_will_expire`/
   `aim_countdown_will_expire` true/false around the zero crossing; `facing` true inside the
   tolerance, false outside (both signs); `angle_to_player` returns `0.0` for a target straight
   ahead (`+Z` local) and `±π/2` for one 90° to either side; `hit_step(5)` → `(4, false)`;
   `hit_step(1)` → `(0, true)` (health JUST reached zero); a call with `health <= 0` is NOT this
   function's concern — glue's existing `if self.dead { return }` guard (unchanged from `v1`)
   never lets that happen, so no test asserts `hit_step`'s behavior there.
-- [ ] T012 [US1] Add to `mod tests`: `step`'s 8 named scenarios, each asserting BOTH the
+- [x] T012 [US1] Add to `mod tests`: `step`'s 8 named scenarios, each asserting BOTH the
   returned `State` and the exact `RobotCounters`/`Cmd` values — (a) `Approach`, `aim_preparing >
   0.0`, no raycast this frame: counts DOWN and clamps at `0.0`; (b) `Approach`,
   `angle_to_player` outside tolerance (or `None`): `shoot_countdown` does NOT decrement; (c)
@@ -121,7 +121,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   [Cmd::ResumeApproach]`; (g) `Shooting`, `aim_countdown` crosses below `0.0`: state stays
   `Shooting` (the `state == Aim` gate excludes it — `v1` quirk), `aim_countdown` is negative
   (kept draining, no clamp); (h) `Idle`: state and counters both unchanged, `cmds` empty.
-- [ ] T013 [US1] Add to `mod tests`: `transition_request` covering all 4 outcomes
+- [x] T013 [US1] Add to `mod tests`: `transition_request` covering all 4 outcomes
   (`"turn_left"`/`"turn_right"`/`"idle"`/`"walk"`) plus the non-`Approach` `"idle"` fallback;
   `aim_blend_step` clamps BOTH axes at `±1.0` for an over-large `h_angle`/`v_angle` input, and
   moves partway (not equal to either endpoint) for a mid-range input; `cannon_angles` returns
@@ -131,7 +131,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   dt`, gravity added, returned orientation's origin is `Vector3::ZERO` and its basis is
   orthonormal (same assertions as `player/model.rs`'s existing test, confirming the twin
   matches byte-for-byte); `idle_velocity` equals `gravity * dt` for a non-trivial `dt`.
-- [ ] T014 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
+- [x] T014 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
   (zero warnings; all T011–T013 tests pass; ≥ 15 new tests in this file per spec SC-001).
   Commit: `red_robot: extract RobotTuning, State-projected step, animate decomposition,
   hit_step and a root-motion integration twin into red_robot/model.rs`.

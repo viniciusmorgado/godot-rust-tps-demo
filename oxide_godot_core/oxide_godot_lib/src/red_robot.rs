@@ -9,6 +9,8 @@ use godot::prelude::*;
 use crate::part::Part;
 use crate::player::Player;
 
+mod model;
+
 #[derive(GodotConvert, Var, Export, Clone, Copy, PartialEq, Debug)]
 #[godot(via = i64)]
 pub enum State {
