@@ -54,7 +54,7 @@ root motion read (`orient_and_anim`); `move_and_slide` + post-move origin (`move
 crosshair raycast after the in-set camera rotation (`camera_and_ray`); noise samples
 (`shake_sample`); `slerp`/`looking_at` engine-backed math (`orient_and_anim`); bullet instancing
 from the tick (`orient_and_anim`); the `AnimationTree` MANUAL + `advance` decision
-(`sync_out_player`, `player.tscn:592`); replication as projection (§2); RPC `call_local` timing
+(`sync_out_player`, `player.tscn:592`); replication as projection (§2); RPC timing — `jump`/`land`/`shoot` are `call_remote` (option (b)): local effects inline in the fixed `SyncOut`, handlers only on remote peers
 (`apply_player_fx` in the same iteration's frame run).
 
 ## 6. Harness contract files

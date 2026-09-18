@@ -48,7 +48,7 @@ transform with zero origin (`:90-91`), the camera's `ready` capture (`camera_noi
 
 ```rust
 Handles::Player {
-    root: Gd<CharacterBody3D>, input: Gd<PlayerInputSynchronizer>,
+    root: Gd<Player>, input: Gd<PlayerInputSynchronizer>,   // both user classes: their #[var]/#[export] fields are written via bind_mut() (glue); the guard is dropped before any engine call that can invoke a callback
     anim_tree: Gd<AnimationTree>, model: Gd<Node3D>, shoot_from: Gd<Marker3D>,
     shoot_particle: Gd<CpuParticles3D>, muzzle_particle: Gd<CpuParticles3D>, fire_cooldown: Gd<Timer>,
     snd_jump: Gd<AudioStreamPlayer>, snd_land: Gd<AudioStreamPlayer>, snd_shoot: Gd<AudioStreamPlayer>,
@@ -131,7 +131,9 @@ fn sync_out_shake(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &StartRota
 
 `sync_out_player` ends with `anim_tree.advance(dt.0)` for every `PlayerTag` entity (R1, option
 B), after the model basis (`player.rs:326`), the respawn reset (`:330-333`), the projection writes
-and the three `rpc` calls in v2's order (`:246-251`, `:290`).
+(`root.bind_mut()`, guard dropped), the LOCAL effects on `Simulates` in v2's order (option (b),
+FR-004: `Land` sound, `Jump` sound, `Shoot` effects `:146-154` with `Trauma += 0.35`) and the
+three `rpc` calls — `call_remote` — in v2's order (`:246-251`, `:290`).
 
 ## Drain arms (`ecs/apply.rs`, pure)
 
@@ -140,7 +142,8 @@ and the three `rpc` calls in v2's order (`:246-251`, `:290`).
 | `JumpPressed` | `JumpQueued.0 = true` | `player_input.rs:163` |
 | `MouseLook` | `PendingMouseLook.0.push(screen_relative)` | `:151-154` |
 | `AddTrauma` | `Trauma.0 = model::add_trauma(trauma, amount as f32, &tuning)` | `player.rs:163-164`, `camera_noise_shake.rs:64-67` |
-| `PlayerFx` | `PendingFx.0.push(fx)` | `player.rs:133-159` |
+| `PlayerFx` | `PendingFx.0.push(fx)`; for `Shoot` also `Trauma.0 = model::add_trauma(trauma, 0.35, &tuning)` at drain time (same-run shake) | `player.rs:133-154` |
+| (`hit`) | pushes `AddTrauma { 0.75 }` — no `PlayerFx::Hit` variant | `player.rs:157-159` |
 
 ## Bridges
 

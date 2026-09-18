@@ -72,8 +72,12 @@ visible to the poll of iteration N+1 only if iteration N+1 has NO physics step b
 — which happens whenever rendering runs faster than 60 Hz (v2's default settings have VSync
 OFF; at 144 fps ~58% of iterations carry no physics step).
 
-**Decision (FR-015's fallback, applied)**: the `PlayerFx::Jump`/`Land` handlers' `JumpUp`/
-`JumpDown` plan writes are DROPPED on `Simulates` entities; only the sounds are applied. Reasoning:
+**Decision (superseded at plan review by option (b), see R7 and FR-004)**: originally, the
+`PlayerFx::Jump`/`Land` handlers' `JumpUp`/`JumpDown` plan writes were to be DROPPED on
+`Simulates` entities with only the sounds applied. With `jump`/`land`/`shoot` now `call_remote`,
+no handler runs on the `Simulates` peer at all — its effects are applied inline by the fixed
+`SyncOut` — so the transient write cannot occur there; the analysis below still governs the
+non-`Simulates` path and is why the local path had to move out of the frame run. Reasoning:
 in v2 both writes happened INSIDE the physics step (`rpc(...)` with `call_local` at `player.rs:247`/
 `:250`, before step (5) at `:254-310`), and step (5)'s `apply_anim` always overwrote
 `current_animation` and the tree's `transition_request` before the tree processed and before any
@@ -146,7 +150,7 @@ engine-touching system is still confined to an `EngineQuery*` or sync set.
 
 ```rust
 Handles::Player {
-    root: Gd<CharacterBody3D>,               // self.to_gd().upcast()
+    root: Gd<Player>,                        // the user class: projection writes (`motion`, `current_animation`) need bind_mut(); Deref reaches CharacterBody3D/Node for the engine calls
     input: Gd<PlayerInputSynchronizer>,      // user class: its replicated fields are read/written via bind()/bind_mut() (glue)
     anim_tree: Gd<AnimationTree>, model: Gd<Node3D>, shoot_from: Gd<Marker3D>,
     shoot_particle: Gd<CpuParticles3D>, muzzle_particle: Gd<CpuParticles3D>,
@@ -210,7 +214,7 @@ Fixed schedule (per player entity; `Simulates` filter where stated):
 | `GameplayIntegrate` | `tick_integrate` (pure) | `integrate_root_motion` → new `Orientation`, `Velocity(Vector3)` | `:313-317` |
 | `EngineQueryMove` | `move_body` (glue) | `set_velocity`, `set_up_direction(UP)`, `move_and_slide`, read post-move origin into `BodyState.origin_y` | `:320-322`, `:329` |
 | `GameplaySettle` | `tick_settle` (pure) | `should_respawn` → `intents.respawn` | `:329` |
-| `SyncOut` | `sync_out_player` (glue) | `model.set_global_basis`; respawn reset; `input.bind_mut()`-free projection writes into the `Player` node (`motion`, `current_animation`) on `Simulates`; `rpc("land")`, `rpc("jump")`, `rpc("shoot")` in that order; LAST: `anim_tree.advance(FixedDelta)` for every player | `:326`, `:330-333`, `:246-251`, `:290`; R1 |
+| `SyncOut` | `sync_out_player` (glue) | `model.set_global_basis`; respawn reset; projection writes into the `Player` node (`motion`, `current_animation`) through `root.bind_mut()` (`root: Gd<Player>`), the guard DROPPED before any further engine call; then, on `Simulates`, the LOCAL effects inline in v2's order (option (b), FR-004): `Land` sound, `Jump` sound, then the `Shoot` effects (particles restart+emit, `fire_cooldown.start()`, sound, `Trauma += 0.35`); then `rpc("land")`, `rpc("jump")`, `rpc("shoot")` — now `call_remote`, reaching remote peers only; LAST: `anim_tree.advance(FixedDelta)` for every player | `:326`, `:330-333`, `:134-154`, `:246-251`, `:290`; R1 |
 
 Frame schedule:
 
@@ -222,13 +226,15 @@ Frame schedule:
 | `EngineQuery` | `camera_and_ray` (glue): applies each camera delta as `rotate_y`/`orthonormalize`/`set_rotation` in order, THEN the crosshair raycast when shooting → `ReplicatedInput.shoot_target` | `:184-191`, `:117-138` |
 | `EngineQuery` | `shake_sample` (glue): three `get_noise_1d(time as f32)` → `offsets` → `ShakeOffset` | `:50-55` |
 | `SyncOut` | `sync_out_input` (glue): camera cue play; `input.bind_mut()` writes of `aiming`, `shoot_target`, `motion`, `shooting`; `color_rect.set_modulate`; `input.rpc("jump")` when jump pressed | `:100-109`, `:92/:99/:115/:135-137`, `:147`, `:111-113` |
-| `SyncOut` | `apply_player_fx` (glue): drains `PendingFx` in order — `Jump`: sound (+ plan write only on non-`Simulates`, R2); `Land`: same; `Shoot`: both particles restart+emit, `fire_cooldown.start()`, sound, `Trauma += 0.35` (via `model::add_trauma`); `Hit`: `Trauma += 0.75` | `:134-159` |
+| `SyncOut` | `apply_player_fx` (glue): drains `PendingFx` in order — only ever non-empty on non-`Simulates` entities (remote peers; option (b)) — `Jump`: `JumpUp` plan write + sound; `Land`: `JumpDown` plan write + sound; `Shoot`: both particles restart+emit, `fire_cooldown.start()`, sound (its trauma was already applied at drain time) | `:134-154` |
 | `SyncOut` | `sync_out_shake` (glue): `camera.set_rotation(start_rotation + offset)` when `ShakeOffset` is `Some` | `:56-57` |
 
 Drain (`ecs/apply.rs`, pure): `JumpPressed { root_id }` → `JumpQueued = true`; `MouseLook {
 root_id, screen_relative }` → push into `PendingMouseLook`; `AddTrauma { root_id, amount }` →
-`Trauma = model::add_trauma(trauma, amount as f32, &tuning)`; `PlayerFx { root_id, fx }` → push
-into `PendingFx`. No `Messages` for these (single consumer each, keyed to the entity, consumed and
+`Trauma = model::add_trauma(trauma, amount as f32, &tuning)` (this is also what `hit` pushes:
+`AddTrauma { 0.75 }`); `PlayerFx { root_id, fx }` → push into `PendingFx`, and for `Shoot` ALSO
+`Trauma += 0.35` at drain time so the same run's `shake_decide` sees it (plan review: applying
+it in `SyncOut` would start the shake one frame late). No `Messages` for these (single consumer each, keyed to the entity, consumed and
 cleared by the consuming system — exactly-once by construction, no per-schedule `update()` rule);
 the door keeps its `Messages`. `jumping` is DROPPED from the input node (backlog #9 already removed
 its export; nothing reads it once `JumpQueued` exists); `CameraNoiseShake::add_trauma` is deleted.
