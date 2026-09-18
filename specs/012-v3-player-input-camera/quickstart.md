@@ -10,7 +10,7 @@ build` + `--headless --import` if absent). Paths from the repository root.
 cd oxide_godot_core && cargo build && cargo clippy && cargo test
 ```
 
-Expected: 156 + 5 after commit 1; ≥ 156 + 16 after commit 2; ≥ 156 + 19 after commit 3
+Expected: 163 after commit 1 (156 + 2 setup + 5 apply); 177 after commit 2 (+ 9 player/system + 5 player_input/system); 179 after commit 3 (+ 2 shake) — SC-001's floor is ≥ 166
 (data-model.md "Tests by name"); the 36 model tests preserved by name; clippy at zero warnings.
 
 ## 2. Headless validation (after commits 2 and 3)

@@ -36,7 +36,7 @@ pub enum InboundEvent {                    // V3-A's four variants +
     AddTrauma { root_id: InstanceId, amount: f64 },              // player.rs:161-165 (+ red_robot.rs:452)
     PlayerFx { root_id: InstanceId, fx: PlayerFx },              // player.rs:133-159
 }
-#[derive(Clone, Copy, Debug, PartialEq)] pub enum PlayerFx { Jump, Land, Shoot, Hit }
+#[derive(Clone, Copy, Debug, PartialEq)] pub enum PlayerFx { Jump, Land, Shoot }   // no Hit: `hit` pushes AddTrauma { 0.75 }
 pub enum Initial { …V3-A…, Player { peer_id: i32, simulates: bool, owns_input: bool, initial_position: Vector3, orientation: Transform3D, start_rotation: Vector3 } }
 ```
 
@@ -85,10 +85,10 @@ cloned through `player_input.bind()`), `camera_noise_shake.rs:17-22` (three nois
 // per-run snapshots (written by SyncIn)
 #[derive(Component, Clone, Copy)] pub struct InputFrameC(pub InputFrame);        // player/model.rs:38-48
 #[derive(Component, Clone, Copy)] pub struct BodyState { pub on_floor: bool, pub velocity: Vector3, pub gravity: Vector3, pub cooldown_left: f64, pub origin_y: f32 }
-#[derive(Component, Clone, Copy)] pub struct ReplicatedInput { pub aiming: bool, pub shoot_target: Vector3, pub motion: Vector2, pub shooting: bool } // player_input.rs:32-39
+#[derive(Component, Clone, Copy)] pub struct ReplicatedInput { pub aiming: bool, pub shoot_target: Vector3, pub motion: Vector2, pub shooting: bool } // player_input.rs:32-39 — frame run, OwnsInput only (the values this peer projects); the fixed run reads the node directly into InputFrameC
 #[derive(Component, Clone, Copy)] pub struct ReplayState { pub current_animation: Animations, pub motion: Vector2, pub aim_rotation: f64 } // player.rs:104-117
 #[derive(Component, Clone, Copy)] pub struct InputSnapshotC(pub InputSnapshot);  // player_input/model.rs:64-72
-#[derive(Component, Clone, Copy)] pub struct CameraFrame { pub rot_x: f32, pub parent_y: f32, pub fade_alpha: f32 } // player_input.rs:144-146, :188
+#[derive(Component, Clone, Copy)] pub struct CameraFrame { pub parent_y: f32, pub fade_alpha: f32 } // player_input.rs:144-146; the live rotations are read per delta by camera_and_ray
 // per-run outputs (research R6)
 #[derive(Component, Clone, Copy, Default)] pub struct TickIntents { pub land: bool, pub jump: bool, pub shoot: bool, pub respawn: bool, pub jump_velocity_y: Option<f32>, pub orient: Option<OrientTarget>, pub plan: Option<AnimPlan>, pub read_root_motion: bool }
 #[derive(Clone, Copy, Debug, PartialEq)] pub enum OrientTarget { Camera(Quaternion), Walk(Vector3) }   // player.rs:262 / :294
@@ -98,8 +98,7 @@ cloned through `player_input.bind()`), `camera_noise_shake.rs:17-22` (three nois
 #[derive(Component, Clone, Copy)] pub struct Trauma(pub f32);                    // camera_noise_shake.rs:15
 #[derive(Component, Clone, Copy)] pub struct ShakeTime(pub f64);                 // :16
 #[derive(Component, Clone, Copy)] pub struct StartRotation(pub Vector3);         // :14, :41
-#[derive(Component, Clone, Copy, Default)] pub struct ShakePending(pub Option<(f32, f64)>); // (shake, time) from shake_decide
-#[derive(Component, Clone, Copy, Default)] pub struct ShakeOffset(pub Option<Vector3>);     // from shake_sample
+#[derive(Component, Clone, Copy, Default)] pub struct ShakePending(pub Option<(f32, f64)>); // (shake, time) from shake_decide; consumed by sync_out_shake (no ShakeOffset, no EngineQuery member)
 ```
 
 ## Systems (signatures; research R7 for the sets and the v2 lines)
@@ -111,28 +110,29 @@ pub fn tick_integrate(dt: Res<FixedDelta>, q: Query<(&BodyState, &RootMotion, &m
 pub fn tick_settle(tuning: Res<Tuning<PlayerTuning>>, q: Query<(&BodyState, &mut TickIntents), With<Simulates>>);
 pub fn replay_plan(state: &ReplayState) -> AnimPlan;                                   // player.rs:104-117
 // player/sync.rs (glue)
-fn sync_in_player(handles: NonSend<NodeHandles>, q: Query<(Entity, &mut JumpQueued, Has<Simulates>), With<PlayerTag>>, commands: Commands);
-fn orient_and_anim(tuning, dt, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &mut Orientation, &mut RootMotion, &mut CurrentAnimation, &TickIntents, &InputFrameC, Has<Simulates>, Option<&ReplayState>), With<PlayerTag>>);
+fn sync_in_player(input_tuning: Res<Tuning<PlayerInputTuning>>, handles: NonSend<NodeHandles>, q: Query<(Entity, &mut JumpQueued, Has<Simulates>), With<PlayerTag>>, commands: Commands);
+fn orient_and_anim(tuning: Res<Tuning<PlayerTuning>>, dt: Res<FixedDelta>, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &mut Orientation, &mut RootMotion, &TickIntents, &InputFrameC), With<Simulates>>);   // slerp/looking_at, root-motion read, bullet spawn — NO parameter writes (moved to sync_out_player)
+pub(crate) fn apply_anim(anim_tree: &mut Gd<AnimationTree>, plan: AnimPlan);   // v2 player.rs:179-200: the four parameter paths + four transition names (eight consts) live here; called by sync_out_player and apply_player_fx
 fn move_body(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &Velocity, &mut BodyState), With<Simulates>>);
-fn sync_out_player(dt: Res<FixedDelta>, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &Orientation, &InitialPosition, &Motion, &CurrentAnimation, &TickIntents, Has<Simulates>), With<PlayerTag>>);
-fn apply_player_fx(tuning: Res<Tuning<CameraShakeTuning>>, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &mut PendingFx, &mut Trauma, &mut CurrentAnimation, Has<Simulates>)>);
+fn sync_out_player(dt: Res<FixedDelta>, shake_tuning: Res<Tuning<CameraShakeTuning>>, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &Orientation, &InitialPosition, &Motion, &CurrentAnimation, &TickIntents, &mut Trauma, Has<Simulates>, Option<&ReplayState>), With<PlayerTag>>);   // basis, respawn, projection (bind_mut dropped), local effects on Simulates (+0.35 trauma), rpcs (call_remote), apply_anim(plan | replay plan), advance
+fn apply_player_fx(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &mut PendingFx), Without<Simulates>>);   // remote peers only: Jump/Land → apply_anim + node field current_animation via root.bind_mut() (dropped) + sound; Shoot → particles, fire_cooldown.start(), sound
 // player_input/system.rs (pure)
 pub fn input_decide(tuning: Res<Tuning<PlayerInputTuning>>, dt: Res<FrameDelta>, q: Query<(&InputSnapshotC, &CameraFrame, &mut PendingMouseLook, &mut AimStateC, &mut FrameIntents, &mut ReplicatedInput), With<OwnsInput>>);
 // player_input/sync.rs (glue)
 fn sync_in_input(handles: NonSend<NodeHandles>, q: Query<(Entity, Has<OwnsInput>), With<PlayerTag>>, commands: Commands);
-fn camera_and_ray(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &FrameIntents, &mut ReplicatedInput), With<OwnsInput>>);
+fn camera_and_ray(tuning: Res<Tuning<PlayerInputTuning>>, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &FrameIntents, &mut ReplicatedInput), With<OwnsInput>>);   // clamp_pitch per delta on the live rotation, then the raycast
 fn sync_out_input(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &FrameIntents, &ReplicatedInput), With<OwnsInput>>);
 // camera_noise_shake/system.rs (pure)
 pub fn shake_decide(tuning: Res<Tuning<CameraShakeTuning>>, dt: Res<FrameDelta>, q: Query<(&mut Trauma, &mut ShakeTime, &mut ShakePending), With<PlayerTag>>);
 // camera_noise_shake/sync.rs (glue)
-fn shake_sample(tuning, handles: NonSend<NodeHandles>, q: Query<(Entity, &ShakePending, &mut ShakeOffset)>);
-fn sync_out_shake(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &StartRotation, &ShakeOffset)>);
+fn sync_out_shake(tuning: Res<Tuning<CameraShakeTuning>>, handles: NonSendMut<NodeHandles>, q: Query<(Entity, &StartRotation, &ShakePending)>);   // samples + offsets + set_rotation in ONE SyncOut system (no EngineQuery member)
 ```
 
 `sync_out_player` ends with `anim_tree.advance(dt.0)` for every `PlayerTag` entity (R1, option
 B), after the model basis (`player.rs:326`), the respawn reset (`:330-333`), the projection writes
 (`root.bind_mut()`, guard dropped), the LOCAL effects on `Simulates` in v2's order (option (b),
-FR-004: `Land` sound, `Jump` sound, `Shoot` effects `:146-154` with `Trauma += 0.35`) and the
+FR-004: `Land` sound, `Jump` sound, `Shoot` effects `:146-154` with `Trauma += 0.35`), the
+`AnimationTree` parameter writes (`apply_anim`, analyze finding 3) and the
 three `rpc` calls — `call_remote` — in v2's order (`:246-251`, `:290`).
 
 ## Drain arms (`ecs/apply.rs`, pure)
@@ -157,22 +157,25 @@ three `rpc` calls — `call_remote` — in v2's order (`:246-251`, `:290`).
 
 Preserved (36): `player/model.rs` 16, `player_input/model.rs` 13, `camera_noise_shake/model.rs` 7.
 
-New:
+New (the authoritative names are tasks.md's — T006, T007, T009, T010, T020; this list mirrors
+them, analyze finding 21):
 
-- `ecs/setup.rs`: `fixed_sets_are_chained_in_order_and_frame_sets_unchanged`.
-- `ecs/apply.rs`: `jump_pressed_sets_jump_queued`, `mouse_look_is_queued_on_the_entity_in_order`,
-  `add_trauma_applies_model_clamp`, `player_fx_is_queued_in_order`.
-- `player/system.rs` (tick, ≥ 6): `tick_decide_walking_sets_walk_plan_and_walk_target`,
-  `tick_decide_aiming_sets_strafe_plan_and_camera_target`,
-  `tick_decide_airborne_sets_jump_plan_and_skips_root_motion_read`,
-  `tick_decide_jump_sets_velocity_and_land_jump_intents_in_v2_order`,
-  `tick_decide_fires_only_when_shooting_with_zero_cooldown`,
-  `tick_integrate_matches_model_integrate_root_motion`,
-  `tick_settle_flags_respawn_below_threshold_only`, `replay_plan_maps_current_animation_as_v2`.
-- `player_input/system.rs` (≥ 3): `input_decide_orders_mouse_deltas_before_controller_delta`,
-  `input_decide_aim_state_and_cue_match_step_aim`, `input_decide_sets_jump_pressed_and_shooting`,
-  `input_decide_fade_alpha_matches_model`.
-- `camera_noise_shake/system.rs` (≥ 2): `shake_decide_is_idle_without_trauma`,
-  `shake_decide_decay_time_and_shake_match_model`.
+- `ecs/setup.rs` (2): `fixed_sets_are_chained_in_order_and_frame_sets_unchanged`,
+  `marker_inserted_in_gameplay_is_visible_in_engine_query_orient_of_the_same_run`.
+- `ecs/apply.rs` (5): `jump_pressed_sets_jump_queued`, `mouse_look_is_queued_in_order`,
+  `add_trauma_clamps_at_max`, `player_fx_is_queued_and_shoot_adds_trauma_at_drain`,
+  `player_events_for_unknown_root_are_dropped`.
+- `player/system.rs` (9): `walk_decides_walk_plan_and_walk_target`,
+  `aim_decides_strafe_plan_and_camera_orient`,
+  `airborne_decides_jump_plan_and_skips_orient_and_root_motion`,
+  `jump_step_plans_jump_up_from_the_post_jump_velocity` (analyze finding 1),
+  `land_and_jump_intents_can_both_fire`, `shoot_fires_only_when_aiming_and_cooldown_zero`,
+  `integrate_updates_orientation_and_velocity`, `settle_flags_respawn_below_threshold`,
+  `replay_builds_v2_plans_for_all_four_animations`.
+- `player_input/system.rs` (5): `controller_look_is_scaled`,
+  `mouse_look_is_applied_before_controller_look`, `aim_hold_and_toggle_reach_v2_cues`,
+  `fade_alpha_follows_height`, `jump_just_pressed_sets_intent_for_one_frame`.
+- `camera_noise_shake/system.rs` (2): `shake_runs_only_while_trauma_positive`,
+  `decay_and_time_advance_in_v2_order`.
 
-Total ≥ 156 + 19.
+Total: 156 + 23 = 179 (163 after commit 1, 177 after commit 2, 179 after commit 3).

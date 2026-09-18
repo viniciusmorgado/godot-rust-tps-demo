@@ -21,15 +21,17 @@ unchanged; this file adds what the player introduces.
 |---|---|---|
 | `Player.motion`, `Player.current_animation` | fixed `sync_out_player`, `Simulates` only | fixed `sync_in_player` on non-`Simulates` (replay) |
 | `Player.player_id` | `set_player_id` (before `ready`), never again | registration → `PeerId` |
-| `InputSynchronizer.{aiming, shoot_target, motion, shooting}` | frame `sync_out_input`, `OwnsInput` only | frame `sync_in_input` on EVERY player (→ `ReplicatedInput`, consumed by the next fixed tick) |
+| `InputSynchronizer.{aiming, shoot_target, motion, shooting}` | frame `sync_out_input`, `OwnsInput` only | fixed `sync_in_player` on EVERY player (read directly into `InputFrameC` — the projection's consumer; the frame run holds `ReplicatedInput` only on `OwnsInput`, where it writes it) |
 | `CameraBase.rotation`, `CameraRot.rotation` | frame `camera_and_ray`, `OwnsInput` only | fixed `sync_in_player` (the three camera reads) on every player |
 | `Player.transform`, `PlayerModel.transform` | engine (`move_and_slide`), `sync_out_player` (`set_global_basis`, respawn) | engine replication |
 
 The engine samples these in `SceneMultiplayer::poll()` at the top of `SceneTree::process`, after
 the physics steps and before the frame run, once per rendered frame (research R2). A frame-run
 write is therefore sampled only in physics-less iterations; nothing written by the frame run may
-be a value that a physics-step write would have replaced (the reason `PlayerFx::Jump/Land` do not
-write the animation on `Simulates` entities).
+be a value that a physics-step write would have replaced — the reason the `Simulates` entity's
+local RPC effects are applied inline by the fixed `SyncOut` and `jump`/`land`/`shoot` are
+`call_remote` (option (b)): no `PlayerFx` ever occurs on `Simulates`; `apply_player_fx` is
+remote-only.
 
 ## 3. The fixed tick (seven sets)
 
@@ -44,7 +46,7 @@ write is `advance(delta)`; the RPC calls push events only.
 ## 4. The frame run for the player
 
 `SyncIn` (`sync_in_input`) → `Gameplay` (`input_decide`, `shake_decide`) → `EngineQuery`
-(`camera_and_ray` — rotation BEFORE raycast; `shake_sample`) → `SyncOut` (`sync_out_input`,
+(`camera_and_ray` — rotation BEFORE raycast) → `SyncOut` (`sync_out_input`, `sync_out_shake` — samples + offsets + write, no `EngineQuery` member,
 `apply_player_fx`, `sync_out_shake`, all `.before(sync_out_remove)`). Mouse events drained by
 either schedule run of an iteration sit in `PendingMouseLook` until this frame's `input_decide`.
 
@@ -52,7 +54,7 @@ either schedule run of an iteration sit in `PendingMouseLook` until this frame's
 
 root motion read (`orient_and_anim`); `move_and_slide` + post-move origin (`move_body`);
 crosshair raycast after the in-set camera rotation (`camera_and_ray`); noise samples
-(`shake_sample`); `slerp`/`looking_at` engine-backed math (`orient_and_anim`); bullet instancing
+(`sync_out_shake`, sync-only); `slerp`/`looking_at` engine-backed math (`orient_and_anim`); `AnimationTree` parameter writes in `sync_out_player` before `advance` (not in `EngineQueryOrient`); bullet instancing
 from the tick (`orient_and_anim`); the `AnimationTree` MANUAL + `advance` decision
 (`sync_out_player`, `player.tscn:592`); replication as projection (§2); RPC timing — `jump`/`land`/`shoot` are `call_remote` (option (b)): local effects inline in the fixed `SyncOut`, handlers only on remote peers
 (`apply_player_fx` in the same iteration's frame run).

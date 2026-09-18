@@ -31,8 +31,12 @@ authority, RPCs with `call_local`, and a `Node::input` callback. Every later mil
 - **Residual dynamic access kept after this milestone** (`.rpc("name")`, the one sanctioned
   form): `rpc("land")`/`rpc("jump")` (v2 `player.rs:247`, `:250`), `rpc("shoot")` (`:290`) on
   `Player`; `rpc("jump")` on the input node (`player_input.rs:112`); `rpc("hit")` in
-  `hittable.rs:33` (unchanged file). No other dynamic access is introduced. `jump`/`land`/
-  `shoot` on `Player` change `call_local` → `call_remote` (FR-004, option (b)).
+  `hittable.rs:33` (unchanged file). Also pre-existing and moved unchanged from `player.rs:185-198`
+  to `player/sync.rs`: the four string-keyed `AnimationTree::set("parameters/…")` writes
+  (`TRANSITION_REQUEST`, `AIM_ADD_AMOUNT`, `STRAFE_BLEND`, `WALK_BLEND`) with their four
+  transition names — Godot property paths, sanctioned in specs/008 (V2-C) as the engine's only
+  interface to tree parameters. No other dynamic access is introduced. `jump`/`land`/`shoot` on
+  `Player` change `call_local` → `call_remote` (FR-004, option (b)).
 
 **Input**: User description: "Milestone V3-B — the player: `player`, `player_input`,
 `camera_noise_shake` as ONE entity over three nodes. The player tick on the fixed schedule in
@@ -194,10 +198,10 @@ identical on `v2` and `v3` (or every differing frame is in the timing table); vi
    aiming branch the orientation quaternion is slerped toward the camera base quaternion
    (`Quaternion::slerp`, engine-backed, v2 `:261-264`); for the walking branch `walk_target`
    (pure, `model.rs:130-133`) is turned into a quaternion by `Basis::looking_at` and slerped
-   (v2 `:296-300`); for the airborne branch nothing; THEN the `AnimationTree` parameters are
-   written from the `AnimPlan` in v1's per-variant order (v2 `apply_anim`, `:179-200`); THEN
-   the root motion is read (`get_root_motion_rotation/position`, v2 `:269-272`/`:306-309`,
-   never while airborne, `:258`); THEN, when the shoot decision is `Fire` (`shooting &&
+   (v2 `:296-300`); for the airborne branch nothing; THEN the root motion is read
+   (`get_root_motion_rotation/position`, v2 `:269-272`/`:306-309`, never while airborne, `:258`
+   — the value is the one the previous step's tree processing produced, independent of any
+   parameter written in this step, research R1); THEN, when the shoot decision is `Fire` (`shooting &&
    cooldown_left == 0.0`, `:274`), the bullet is instantiated from the preloaded scene, added
    under the player's parent with `force_readable_name`, positioned at `ShootFrom`'s origin,
    `look_at`-ed toward `shoot_target`, given the collision exception with the player, and the
@@ -250,7 +254,8 @@ trees; checkpoint (1).
    callback (and therefore the `MouseLook` event) exists only on the node whose entity owns the
    input; `set_process(false)` (`:66`) does become moot because the class has no `process`. It
    resolves the ROOT player's `InstanceId` once
-   (`OnReady::from_base_fn` over `get_parent()`), pushes nothing (the root registers), and keeps
+   (`OnReady::from_base_fn` over `get_owner()` — the `Player` root owns every node saved in
+   `player.tscn`, research R1), pushes nothing (the root registers), and keeps
    its `#[export] OnEditor` refs with their names (`node_paths` in `player.tscn:339` unedited).
 2. **Given** an `OwnsInput` entity, **When** the frame schedule runs, **Then** `SyncIn` builds
    the `InputSnapshot` from the ten `Input` reads in v2's order (`:76-90`), reads the current
@@ -306,10 +311,14 @@ preserved plus the shake system's; harness case (d) identical on both trees; che
    no `process`; the three noise handles and `start_rotation` reach the entity through the
    root's registration (the camera sub-bridge exposes them typed, read once by `Player.ready`).
 2. **Given** `Trauma > 0`, **When** the frame schedule runs, **Then** `Gameplay` runs `decay`,
-   `advance_time`, `shake` (`model.rs:29-48`, unchanged, in v2's order `:47-49`), the frame
-   `EngineQuery` reads the three `get_noise_1d(time as f32)` samples (`:50-54`), `Gameplay`
-   computes `offsets` (`:55`), and `SyncOut` writes `camera.set_rotation(start_rotation +
-   offset)` (`:56-57`); with `Trauma == 0` nothing runs and nothing is written (v2 `:45`).
+   `advance_time`, `shake` (`model.rs:29-48`, unchanged, in v2's order `:47-49`) and leaves
+   `(shake, time)` pending, and ONE `SyncOut` system (`sync_out_shake`) reads the three
+   `get_noise_1d(time as f32)` samples (`:50-54`), computes `offsets` (`:55`, pure, called from
+   glue) and writes `camera.set_rotation(start_rotation + offset)` (`:56-57`); with `Trauma ==
+   0` nothing runs and nothing is written (v2 `:45`). The shake has NO `EngineQuery` member
+   (analyze, 2026-09-18): the noise samples answer no mid-tick decision — nothing after them
+   decides anything — so a sync-only pair (`Gameplay` decide → `SyncOut` sample+write) is the
+   honest shape, as V3-A's blast was.
 3. **Given** `Player::add_camera_shake_trauma(amount)` (kept as `#[rpc(authority, call_local,
    unreliable)] pub(crate) fn (&mut self, f64)` — `red_robot.rs:452` calls it typed, `hittable`
    sends `hit`), **When** it is invoked, **Then** it only pushes `AddTrauma { root_id, amount }`;
@@ -382,25 +391,22 @@ identical.
   iteration when the caller is a physics-phase node (`bullet.rs`'s `rpc("hit")`, `red_robot`'s
   async block resumed in the physics phase), so `shake_decide` of that frame already sees the
   trauma, as v2's `camera.process` did.
-- **The `Jump`/`Land` Fx animation write is transient** (spec review, 2026-09-18): in v2 the
-  `land` handler's `apply_anim(JumpDown)` (`:141`) runs INLINE in the tick and the tick's own
-  plan overwrites it in the SAME step (`:254-310`); on a remote peer the next replay
-  (`:100-119`) overwrites it. In v3 the Fx is applied by the FRAME run, AFTER the fixed
-  `SyncOut` wrote the projection `current_animation = Walk` into the node, so the node field
-  reads `JumpDown` between frame run N and fixed run N+1 (which rewrites `Walk` before anything
-  observes it). Invisible to the observer (it logs after that iteration's physics) and to the
-  `AnimationTree` (the request is overwritten before the next `advance`/processing); invisible
-  to REPLICATION only if Assumption (5) holds — `SceneMultiplayer::poll()` samples node values
-  at the top of `SceneTree::process`, BEFORE the frame run. Assumption (5) is therefore
-  load-bearing for FR-015: research MUST verify it from the engine source; if the poll instead
-  samples after the frame run, the Fx animation write is DROPPED on `Simulates` entities as
-  redundant (the tick's plan already set the same or a later state), with the reason recorded
-  in `docs/v3-tradeoffs.md`; the sound/particle/cooldown/trauma effects are never dropped.
-  Harness case (b) logs `current_animation` per frame on both trees either way.
+- **The `Jump`/`Land` Fx animation write on remote peers** (spec review, 2026-09-18; superseded
+  for `Simulates` by option (b)): in v2 the `land` handler's `apply_anim(JumpDown)` (`:141`) ran
+  INLINE in the tick and the tick's own plan overwrote it in the SAME step (`:254-310`) — with
+  `call_remote` (FR-004) no handler runs on the `Simulates` peer, so no transient write exists
+  there. On a remote (non-`Simulates`) peer the handler pushes `PlayerFx::Land`; the frame run
+  applies the `JumpDown` plan write to the tree parameters AND to the node's `current_animation`
+  field through `root.bind_mut()` (as v2's handler wrote `self.current_animation`, `:172-177`),
+  and the next replay (`:100-119`, from the replicated value) overwrites it — the same window v2
+  had. Research R2 established the replication sample point (`SceneMultiplayer::poll()` at the
+  top of `SceneTree::process`, once per rendered frame); it no longer bears on `Simulates`.
+  Harness case (b) logs `current_animation` per frame on both trees.
 - **Shoot with a dead cooldown timer**: `fire_cooldown.get_time_left() == 0.0` is read at
-  `SyncIn`; the `shoot` handler's `fire_cooldown.start()` (v2 `:151`) is applied by the frame
-  schedule's `SyncOut` after the local RPC; the next fixed run reads the new `time_left` — same
-  ordering as v2 (the RPC handler ran inside the tick, before the next step's read).
+  `SyncIn`; on the `Simulates` entity `fire_cooldown.start()` (v2 `:151`) is applied INLINE by
+  the fixed `SyncOut` in the same physics step (option (b)), so the next fixed run reads the new
+  `time_left` exactly as v2 (the handler ran inside the tick); on a remote peer the `Shoot` Fx
+  starts the timer from the frame run (cosmetic there: remotes never decide shots).
 - **Bullet spawn frame**: the bullet is instantiated in the first `EngineQuery` set BEFORE
   `move_and_slide`, so its origin is `ShootFrom`'s pre-move transform exactly as v2 (`:275`
   precedes `:322`); harness case (c) logs the first bullet's global transform on its spawn frame.
@@ -408,10 +414,13 @@ identical.
   (`:329`); the next `SyncIn` reads the reset origin. Harness case (f) removes the floor at
   frame 50 and logs origin, `ColorRect.modulate.a` and the respawn frame.
 - **A remote player's input on the server**: the server simulates a client's player from the
-  input properties the network wrote into that player's `InputSynchronizer`; `SyncIn` reads
-  those fields for every entity regardless of `OwnsInput`, so the server's tick sees them.
-- **Mouse look while not aiming vs aiming**: `scaled_mouse_look` uses the aim state of the frame
-  in which the event is applied (v2 read `self.aiming` at `input` time, `:153`); the harness
+  input properties the network wrote into that player's `InputSynchronizer`; the fixed
+  `sync_in_player` reads those node fields into `InputFrameC` for every entity regardless of
+  `OwnsInput`, so the server's tick sees them — that read IS the projection's consumer; no
+  separate "replicated input" component is kept on the fixed side (analyze, 2026-09-18).
+- **Mouse look while not aiming vs aiming**: `scaled_mouse_look` uses the aim state left by the
+  PREVIOUS frame's `step_aim` (v2 read `self.aiming` at `input` time, `:153`, before `process`
+  updated it); the harness
   case (e) sends the event at frame 25 with aim idle, so both trees use the same scale.
 - **The camera moved by something other than the shake** (backlog #6): `start_rotation` stays
   the `ready`-time capture, as in v2; deferred again.
@@ -476,10 +485,15 @@ identical.
   the 16 tests stay; each gameplay system gains at least one `run_system_once` test.
 - **FR-008**: `EngineQueryOrient` MUST, in this order per entity: slerp the orientation
   (aiming: toward the camera base quaternion, v2 `:261-264`; walking: toward
-  `Basis::looking_at(walk_target).get_quaternion()`, `:296-300`; airborne: none), write the
-  `AnimationTree` parameters in v1's per-variant order (`:179-200`), read the root motion
-  (`:269-272`/`:306-309`; not while airborne, `:258`), and spawn the bullet when the shoot
-  decision fired (`:275-291`, including `add_collision_exception_with` and the `Shoot` intent).
+  `Basis::looking_at(walk_target).get_quaternion()`, `:296-300`; airborne: none), read the root
+  motion (`:269-272`/`:306-309`; not while airborne, `:258`), and spawn the bullet when the
+  shoot decision fired (`:275-291`, including `add_collision_exception_with` and the `Shoot`
+  intent — an engine write that MUST precede `move_and_slide`, hence inside this set). The
+  `AnimationTree` parameter writes (v2 `apply_anim`, `:179-200`, v1's per-variant order — for
+  the `Simulates` plan and for the non-`Simulates` replay alike) are made by `SyncOut`
+  (`sync_out_player`) immediately before `advance` (FR-018): behavior-identical to v2, where the
+  tree consumed them only when it processed after the tick (analyze, 2026-09-18), and it keeps
+  `EngineQueryOrient` to the two mid-tick answers plus the pre-move spawn.
 - **FR-009**: `EngineQueryMove` MUST perform `set_velocity`, `set_up_direction(Vector3::UP)`,
   `move_and_slide()` and read the post-move origin (`:320-322`, `:329`); `GameplaySettle`
   decides `should_respawn`.
@@ -496,16 +510,20 @@ identical.
 - **FR-012**: The frame schedule MUST keep V3-A's four sets `SyncIn → Gameplay → EngineQuery →
   SyncOut` and place the input and shake work as scenario 2 (US2) and scenario 2 (US3) state:
   `Input` snapshot (ten reads in v2's order, per-frame semantics) at `SyncIn`; `scaled_look`,
-  mouse look, `clamp_pitch`, `step_aim`, `alpha_for_height`, decay/time/shake/offsets in
-  `Gameplay` (existing functions unchanged, 13 + 7 tests preserved, each system with a
-  `run_system_once` test); camera rotation writes THEN the crosshair raycast, and the three
-  `get_noise_1d`, in `EngineQuery`; cues, the four replicated input properties, `color_rect`
-  modulate, `rpc("jump")` and the shake `set_rotation` in `SyncOut`.
+  mouse look, `step_aim`, `alpha_for_height`, decay/time/shake in `Gameplay` (existing functions
+  unchanged, 13 + 7 tests preserved, each system with a `run_system_once` test; `clamp_pitch` is
+  applied per delta by the rotation writer because it needs the live rotation between deltas);
+  camera rotation writes THEN the crosshair raycast in `EngineQuery` (the raycast is the mid-tick
+  answer `sync_out_input` projects); cues, the four replicated input properties, `color_rect`
+  modulate, `rpc("jump")` in `SyncOut`; the shake's three `get_noise_1d` + `offsets` +
+  `set_rotation` in ONE `SyncOut` system (scenario 2, US3 — no `EngineQuery` member).
 - **FR-013**: Only `OwnsInput` entities MUST snapshot `Input`, rotate the camera, raycast, fade
   and issue `rpc("jump")`; the sub-bridge's `input` callback MUST exist only on the node whose
   entity owns the input, gated exactly as v2 did — `set_process_input(false)` on non-authority
-  nodes in `ready` (`:67`), an engine one-shot, not a per-event check. Every entity's `SyncIn`
-  MUST read the four replicated input properties from the node into components.
+  nodes in `ready` (`:67`), an engine one-shot, not a per-event check. The four replicated input
+  properties are read from the node for EVERY entity by the fixed `sync_in_player` (into
+  `InputFrameC`) — the projection's consumer; the frame run keeps them only on `OwnsInput`
+  entities, where it writes them.
 - **FR-014**: The camera rotation MUST be applied in v2's order — the mouse event's
   `rotate_camera` first (v2 `input`), then the controller's (v2 `process` `:95`) — each as
   `rotate_y`, `orthonormalize`, `clamp_pitch`, `set_rotation` (`:184-191`), and BEFORE the
@@ -570,7 +588,8 @@ identical.
   + post-move origin; the crosshair raycast; the three noise samples; `slerp`/`looking_at`
   (engine-backed math); bullet instancing from the tick; the `AnimationTree` ordering decision;
   replication as a projection (which node fields are written by `SyncOut` and read by `SyncIn`
-  on which peers); RPC `call_local` timing (same-iteration argument of the Edge Cases).
+  on which peers); RPC timing (`jump`/`land`/`shoot` `call_remote`, local effects inline in the
+  fixed `SyncOut`, handlers on remote peers only — option (b), FR-004).
   `CLAUDE.md`'s v3 section MUST be extended with the sub-bridge pattern and the two-`EngineQuery`
   tick shape.
 - **FR-024**: Gates unchanged: `cargo build`, `cargo clippy` 0 warnings, `cargo test` green with
@@ -616,7 +635,8 @@ identical.
   camera-side nodes (`CameraBase`, `CameraRot`, `Camera3D`, `Animation`, `Crosshair`,
   `ColorRect`); the three `FastNoiseLite`; the input node itself; the bullet `PackedScene`.
 - **Inbound events**: `Register`/`Unregister` (root only), `JumpPressed`, `MouseLook`,
-  `AddTrauma`, `PlayerFx::{Jump, Land, Shoot, Hit}` — all keyed by the root's `InstanceId`.
+  `AddTrauma`, `PlayerFx::{Jump, Land, Shoot}` (`hit` pushes `AddTrauma`) — all keyed by the
+  root's `InstanceId`.
 - **Sets**: fixed `SyncIn → Gameplay → EngineQueryOrient → GameplayIntegrate → EngineQueryMove →
   GameplaySettle → SyncOut`; frame `SyncIn → Gameplay → EngineQuery → SyncOut` (V3-A's).
 - **Replicated projections**: `Player.motion`, `Player.current_animation` (written by `SyncOut`
@@ -661,16 +681,19 @@ diffs (and the US4 experiment) were empty.
 | (to be measured) | | | | | |
 
 Candidates the harness must settle: the local RPC effects (`Jump`/`Land`/`Shoot` sounds,
-`FireCooldown.start`) now applied by the frame schedule of the same iteration instead of inline;
-the mouse-look event applied by the frame run instead of inside `input`; the camera cue
-animations played from `SyncOut`; the respawn reset applied in `SyncOut` after `move_and_slide`
-(same step as v2's inline reset).
+`FireCooldown.start`) applied inline by the fixed `SyncOut` (option (b): same physics step as
+v2, expected identical); the mouse-look event applied by the frame run instead of inside `input`
+(R3: same frame); the camera cue animations played from `SyncOut`; the respawn reset applied in
+`SyncOut` after `move_and_slide` (same step as v2's inline reset); the `AnimationTree`
+parameter writes moved to `SyncOut` before `advance` (behavior-identical by R1's evidence).
 
 ## Assumptions
 
 - Phase v3 (constitution 1.5.1). Zero behavior deviations from `v2` are sanctioned beyond
-  measured frame-level shifts recorded in the table; the one scene edit of FR-018 (if B) changes
-  no observable behavior — that is its acceptance criterion.
+  measured frame-level shifts recorded in the table; the one scene edit of FR-018 (option B)
+  and the one RPC attribute change of FR-004 (option (b): `jump`/`land`/`shoot` `call_remote`)
+  change no observable behavior — that is their acceptance criterion; both are spec-sanctioned
+  design outcomes, not parity deviations, and do not belong in the timing table.
 - **To verify at research time**: (1) `AnimationMixer::advance(f64)` exists in the bindings
   (`animation_mixer.rs:347`) and, with `callback_mode_process = MANUAL` (`ord 2`,
   `animation_mixer.rs:529-531`), the tree advances only when called — the experiment of US4

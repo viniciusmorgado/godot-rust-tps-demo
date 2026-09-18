@@ -10,8 +10,8 @@ contracts/zz_r1_probe.gd, contracts/zz_r3_probe.gd, quickstart.md — all at com
 **Tests**: requested by the spec (FR-007, FR-012, FR-024; Principle III: every gameplay system
 carries a `run_system_once` test; the 36 model tests are preserved by name). Named test cases
 below are the MINIMUM; a task that creates pure code without its named tests is incomplete.
-Running totals are computed from the names: 156 → 163 (commit 1: setup +2, apply +5) → 176
-(commit 2: player/system +8, player_input/system +5) → 178 (commit 3: shake +2).
+Running totals are computed from the names: 156 → 163 (commit 1: setup +2, apply +5) → 177
+(commit 2: player/system +9, player_input/system +5) → 179 (commit 3: shake +2).
 
 **Organization**: one task group per commit of research R10's Commit Plan (four commits, in
 order). The two user visual checkpoints are 🛑 STOP tasks after commit 3 — confirmed by the user,
@@ -60,12 +60,14 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   `InputFrameC(InputFrame)`, `BodyState { on_floor, velocity, gravity, cooldown_left: f64,
   origin_y: f32 }`, `ReplicatedInput { aiming, shoot_target, motion, shooting }`, `ReplayState {
   current_animation, motion, aim_rotation: f64 }`, `InputSnapshotC(InputSnapshot)`, `CameraFrame {
-  rot_x, parent_y, fade_alpha }`, `TickIntents { land, jump, shoot, respawn, jump_velocity_y:
+  parent_y, fade_alpha }` (no rotation snapshot — `camera_and_ray` reads the live rotation per
+  delta, analyze finding 7), `TickIntents { land, jump, shoot, respawn, jump_velocity_y:
   Option<f32>, orient: Option<OrientTarget>, plan: Option<AnimPlan>, read_root_motion }` +
   `OrientTarget { Camera(Quaternion), Walk(Vector3) }`, `Velocity(Vector3)`, `FrameIntents {
   camera_deltas: Vec<Vector2>, cue: Option<CameraCue>, jump_pressed, shooting, fade_alpha }`,
-  `Trauma(f32)`, `ShakeTime(f64)`, `StartRotation(Vector3)`, `ShakePending(Option<(f32, f64)>)`,
-  `ShakeOffset(Option<Vector3>)`, with the derives data-model.md shows (`Default` where listed).
+  `Trauma(f32)`, `ShakeTime(f64)`, `StartRotation(Vector3)`, `ShakePending(Option<(f32, f64)>)`
+  (no `ShakeOffset`: the shake is sync-only, analyze finding 2), with the derives data-model.md
+  shows (`Default` where listed).
   Verification: compiles; `grep -c 'Gd<' ecs/markers.rs` = 0.
 - [ ] T004 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` add the variants
   `InboundEvent::JumpPressed { root_id: InstanceId }`, `MouseLook { root_id, screen_relative:
@@ -82,14 +84,17 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   Gd<AudioStreamPlayer>, camera_base: Gd<Node3D>, camera_rot: Gd<Node3D>, camera: Gd<Camera3D>,
   camera_anim: Gd<AnimationPlayer>, crosshair: Gd<TextureRect>, color_rect: Gd<ColorRect>, noise:
   [Gd<FastNoiseLite>; 3], bullet_scene: Gd<PackedScene>, parent_rid: Rid }` (data-model.md
-  "Handles"), the `root_valid()` arm on `root`, and the `apply_register` arm `Initial::Player {
+  "Handles"), the `root_valid()` arm on `root`, a `Handles::Player { mut root, .. } =>
+  root.queue_free()` arm in `sync_out_remove`'s EXHAUSTIVE match (`ecs.rs:191-195` has no
+  wildcard — without the arm commit 1 does not compile; no player is ever removed by this
+  milestone, analyze finding 9), and the `apply_register` arm `Initial::Player {
   .. }` inserting `PlayerTag`, `PeerId(peer_id)`, `Motion(Vector2::ZERO)` (v2 `player.rs:44`, zero
   at init), `Orientation(orientation)`, `RootMotion(Transform3D::IDENTITY)`, `AirborneTime(0.0)`
   (`:38-39`, backlog #10 — keep the comment), `InitialPosition(initial_position)`,
   `CurrentAnimation(Animations::Walk)` (`:81`), `AimStateC(AimState::Idle)` (`player_input.rs:21-22`),
   `Trauma(0.0)`, `ShakeTime(0.0)`, `StartRotation(start_rotation)`, `JumpQueued::default()`,
   `PendingMouseLook::default()`, `PendingFx::default()`, `TickIntents::default()`,
-  `FrameIntents::default()`, `ShakePending::default()`, `ShakeOffset::default()`,
+  `FrameIntents::default()`, `ShakePending::default()`,
   `ReplicatedInput { aiming: false, shoot_target: Vector3::ZERO, motion: Vector2::ZERO, shooting:
   false }`, `Velocity(Vector3::ZERO)`, and the markers `Simulates` iff `simulates`, `OwnsInput`
   iff `owns_input`. Depends on T003, T004. Verification: compiles; `apply_register` is still the
@@ -136,7 +141,7 @@ no bridge changed yet.
 
 ## Phase 3: User Story 1 + User Story 2 + User Story 4 — commit 2: `player` + `player_input`, the `.tscn` edit
 
-**Goal**: FR-001…FR-011, FR-012…FR-014, FR-018 (option B), FR-019. **Independent Test**: 176
+**Goal**: FR-001…FR-011, FR-012…FR-014, FR-018 (option B), FR-019. **Independent Test**: 177
 tests green with the 16 + 13 model tests untouched; harness cases (a), (b), (c), (e), (f)
 identical on `v2` and `v3`; the game plays as v2 in single player (shake still on v2's path until
 commit 3).
@@ -151,7 +156,9 @@ commit 3).
   camera_z) = flatten_camera_axes(frame.camera_rotation_basis)` (`:229`); `airborne_step(airborne,
   dt, body.on_floor, frame.jumping, &tuning)` → `AirborneTime`, `intents.jump_velocity_y`,
   `intents.land`, `intents.jump` (`:232-251`); the branch (`:254-310`): `on_air` → `plan =
-  anim_plan(true, body.velocity.y, false, motion, 0.0)`, `orient = None`, `read_root_motion =
+  anim_plan(true, intents.jump_velocity_y.unwrap_or(body.velocity.y), false, motion, 0.0)` —
+  the POST-jump velocity: v2 wrote the jump velocity at `:240-244` and re-read it at `:255`
+  before `anim_plan`, so the jump step plans `JumpUp` (analyze BLOCKER 1) — `orient = None`, `read_root_motion =
   false` (`:255-258`); aiming → `orient = Some(OrientTarget::Camera(frame.camera_base_quaternion))`
   (`:262`), `plan = anim_plan(false, 0.0, true, motion, frame.aim_rotation)` (`:266`),
   `read_root_motion = true`, `shoot = frame.shooting && body.cooldown_left == 0.0` (`:274`); else
@@ -171,12 +178,14 @@ commit 3).
   `aim_decides_strafe_plan_and_camera_orient` (`aiming` → `Strafe`, `orient = Some(Camera(q))`),
   `airborne_decides_jump_plan_and_skips_orient_and_root_motion` (`on_floor = false`, airborne
   time past the threshold → `JumpUp`/`JumpDown` by velocity sign, `orient = None`,
-  `read_root_motion = false`), `land_and_jump_intents_can_both_fire` (the model's same-frame case,
+  `read_root_motion = false`), `jump_step_plans_jump_up_from_the_post_jump_velocity` (`on_floor
+  = true`, `jumping = true`, `body.velocity.y = 0` → `jump_velocity_y = Some(jump_speed)` and
+  `plan = JumpUp`, not `JumpDown`), `land_and_jump_intents_can_both_fire` (the model's same-frame case,
   `player/model.rs:50-52`), `shoot_fires_only_when_aiming_and_cooldown_zero` (`shooting` with
   `cooldown_left = 0.1` → no shoot; `0.0` → shoot), `integrate_updates_orientation_and_velocity`
   (equals a direct `integrate_root_motion` call on the same inputs),
   `settle_flags_respawn_below_threshold` (`origin_y = -41` → true; `-39` → false),
-  `replay_builds_v2_plans_for_all_four_animations`. Verification: 8 tests pass; no
+  `replay_builds_v2_plans_for_all_four_animations`. Verification: 9 tests pass; no
   `godot::classes` import in the file.
 - [ ] T010 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/player_input/system.rs` (pure;
   `pub(crate) mod system;` in `player_input.rs`; `player_input/model.rs` untouched): `pub fn
@@ -192,37 +201,46 @@ commit 3).
   snapshot.shoot_pressed`, `replicated.shooting = …` (`:115`); `intents.fade_alpha =
   alpha_for_height(camera.parent_y, camera.fade_alpha, dt, &tuning)` (`:146`). `clamp_pitch` is
   applied per delta by `camera_and_ray` (it needs the live rotation between deltas); the pure
-  system emits the deltas in order. Tests: `controller_look_is_scaled_and_pitch_clamped` (delta =
-  `scaled_look`; `clamp_pitch` on both bounds via a helper `pitch_after(deltas, start)` the sync
-  system shares — define it here, pure), `mouse_look_is_applied_before_controller_look` (queued
+  system emits the deltas in order (no `pitch_after` helper: `camera_and_ray` clamps on the live
+  `get_rotation()` per delta exactly as v2 `:188-190`, analyze finding 7). Tests:
+  `controller_look_is_scaled` (delta = `scaled_look` of the snapshot, aiming and not),
+  `mouse_look_is_applied_before_controller_look` (queued
   mouse + controller → `camera_deltas[0]` is the mouse delta),
   `aim_hold_and_toggle_reach_v2_cues` (hold past 0.4 s then release → `Far`; tap → `Toggled`,
   no cue), `fade_alpha_follows_height` (`parent_y = -32` → 1.0; above −17 → decays),
   `jump_just_pressed_sets_intent_for_one_frame`. Verification: 5 tests pass; no `godot::classes`.
 - [ ] T011 [US1] Create `oxide_godot_core/oxide_godot_lib/src/player/sync.rs` (glue; `pub(crate)
-  mod sync;` in `player.rs`) with: `fn sync_in_player(handles: NonSend<NodeHandles>, q:
-  Query<(Entity, &mut JumpQueued, Has<Simulates>), With<PlayerTag>>, commands: Commands)` — for
+  mod sync;` in `player.rs`) with: `fn sync_in_player(input_tuning: Res<Tuning<PlayerInputTuning>>,
+  handles: NonSend<NodeHandles>, q: Query<(Entity, &mut JumpQueued, Has<Simulates>),
+  With<PlayerTag>>, commands: Commands)` — for
   each `Handles::Player`: `InputFrameC` from `input.bind()`'s `aiming`/`shoot_target`/`motion`/
   `shooting` (`:211-216`) + `jumping = jump_queued.0` then `jump_queued.0 = false` (`:215`, `:221`)
   + the three camera reads `camera_rot.get_global_transform().basis`,
   `camera_base.get_global_transform().basis.get_quaternion()`, `aim_rotation(camera_rot.get_rotation().x,
   &tuning)` (`player_input.rs:171-182`); `BodyState { on_floor: root.is_on_floor(), velocity:
   root.get_velocity(), gravity: root.get_gravity(), cooldown_left: fire_cooldown.get_time_left(),
-  origin_y: root.get_transform().origin.y }` (`player.rs:235`, `:241`, `:314`, `:274`, `:329`);
-  `ReplicatedInput` from the same `bind()`; for non-`Simulates`: `ReplayState { current_animation:
+  origin_y: 0.0 }` (`player.rs:235`, `:241`, `:314`, `:274`; `origin_y` is written ONLY by
+  `move_body` post-move — v2 read the origin once, at `:329`; no `ReplicatedInput` on the fixed
+  side: the `InputFrameC` read IS the projection's consumer, analyze findings 13/14); for
+  non-`Simulates`: `ReplayState { current_animation:
   root.bind().current_animation, motion: root.bind().motion, aim_rotation }` (`:104-116`). All
   `bind()` guards dropped before the next engine call. `fn orient_and_anim(...)`
   (`EngineQueryOrient`): `Simulates` — `orient` `Camera(q_to)` → `Orientation.basis =
   Basis::from_quaternion(q_from.slerp(q_to, dt * tuning.rotation_interpolate_speed))` (`:261-264`);
   `Walk(target)` → `q_to = Basis::looking_at(target).get_quaternion()` then the same slerp
-  (`:296-300`); write `CurrentAnimation` and the `AnimationTree` parameters from `intents.plan` in
-  v1's per-variant order (`apply_anim`, `:171-200`, the four constants moved here); when
-  `read_root_motion`: `RootMotion = Transform3D::new(Basis::from_quaternion(anim_tree.get_root_motion_rotation()),
+  (`:296-300`); NO `AnimationTree` parameter write here (moved to `sync_out_player`, analyze
+  finding 3 — the root motion read below returns the previous `advance`'s value regardless, R1);
+  when `read_root_motion`: `RootMotion = Transform3D::new(Basis::from_quaternion(anim_tree.get_root_motion_rotation()),
   anim_tree.get_root_motion_position())` (`:269-272`/`:306-309`); when `intents.shoot`: the bullet
   spawn verbatim (`:275-291`: `shoot_from.get_global_transform().origin`, `bullet_scene.instantiate_as::<CharacterBody3D>()`,
   `root.get_parent().unwrap().add_child_ex(&bullet).force_readable_name(true).done()`,
   `set_global_position`, `look_at(origin + dir)`, `add_collision_exception_with(&root)`);
-  non-`Simulates` — `replay_plan(&replay_state)` parameters written the same way (`:118`). `fn
+  `orient_and_anim` runs on `Simulates` only. Define here `pub(crate) fn apply_anim(anim_tree:
+  &mut Gd<AnimationTree>, plan: AnimPlan)` — v2 `apply_anim`'s parameter writes (`:179-200`) in
+  v1's per-variant order, with the EIGHT constants moved from `player.rs:21-29`: the four
+  parameter paths (`TRANSITION_REQUEST`, `AIM_ADD_AMOUNT`, `STRAFE_BLEND`, `WALK_BLEND`) and the
+  four transition names (`jump_up`, `jump_down`, `strafe`, `walk`); called by `sync_out_player`
+  and, in commit 3, by `apply_player_fx` (analyze finding 10). `fn
   move_body(...)` (`EngineQueryMove`): `root.set_velocity(velocity.0)`,
   `root.set_up_direction(Vector3::UP)`, `root.move_and_slide()`, `body.origin_y =
   root.get_transform().origin.y` (`:320-322`, `:329`). `fn sync_out_player(dt: Res<FixedDelta>,
@@ -235,21 +253,25 @@ commit 3).
   `intents.jump` → `snd_jump.play()` (`:136`); if `intents.shoot` → `shoot_particle.restart()` +
   `set_emitting(true)`, `muzzle_particle` same, `fire_cooldown.start()`, `snd_shoot.play()`
   (`:147-152`), and the trauma 0.35 — IN THIS COMMIT through the v2 path
-  `camera.cast::<CameraNoiseShake>().bind_mut().add_trauma(0.35)` (`:153`, commit 3 replaces it
-  with the `Trauma` component write); then `root.rpc("land")`, `root.rpc("jump")`,
-  `root.rpc("shoot")` when flagged, in that order (`:246-251`, `:290`; now `call_remote`, T014);
-  LAST for EVERY `PlayerTag` entity: `anim_tree.advance(dt.0)` (R1, option B). Depends on T009,
+  `camera.clone().cast::<CameraNoiseShake>().bind_mut().add_trauma(0.35)` (`:153`; `.clone()`
+  because `Gd::cast` consumes an owned `Gd` and `camera` is borrowed from the handles map —
+  analyze finding 12; commit 3 replaces it with the `Trauma` component write); then
+  `root.rpc("land")`, `root.rpc("jump")`, `root.rpc("shoot")` when flagged, in that order
+  (`:246-251`, `:290`; now `call_remote`, T014); then the `AnimationTree` parameter writes:
+  `apply_anim(&mut anim_tree, plan)` with `plan = intents.plan` on `Simulates` or
+  `replay_plan(&replay_state)` on non-`Simulates` (`:179-200`, `:118`; analyze finding 3 —
+  behavior-identical to v2, where the tree consumed them only when it processed after the
+  tick); LAST for EVERY `PlayerTag` entity: `anim_tree.advance(dt.0)` (R1, option B). Depends on T009,
   T005. Verification: compiles; `grep -n 'free()' player/sync.rs` empty; every `bind_mut()` scope
   ends before the next engine call.
 - [ ] T012 [US2] Create `oxide_godot_core/oxide_godot_lib/src/player_input/sync.rs` (glue;
   `pub(crate) mod sync;`): `fn sync_in_input(handles: NonSend<NodeHandles>, q: Query<(Entity,
   Has<OwnsInput>), With<PlayerTag>>, commands: Commands)` — on `OwnsInput`: the ten `Input`
-  reads into `InputSnapshotC` in v2's order (`player_input.rs:76-90`), `CameraFrame { rot_x:
-  camera_rot.get_rotation().x, parent_y: root.get_global_transform().origin.y, fade_alpha:
-  color_rect.get_modulate().a }` (`:144-145`, `:188`); on EVERY player: `ReplicatedInput` from
-  `input.bind()` (the values the network or this peer wrote). `fn camera_and_ray(handles:
-  NonSendMut<NodeHandles>, q: Query<(Entity, &FrameIntents, &mut ReplicatedInput),
-  With<OwnsInput>>)` (`EngineQuery`): for each delta in `camera_deltas`: `camera_base.rotate_y(-mv.x)`,
+  reads into `InputSnapshotC` in v2's order (`player_input.rs:76-90`), `CameraFrame { parent_y:
+  root.get_global_transform().origin.y, fade_alpha: color_rect.get_modulate().a }` (`:144-145`);
+  NOTHING for other players (the fixed `sync_in_player` reads the projection, analyze finding
+  14). `fn camera_and_ray(tuning: Res<Tuning<PlayerInputTuning>>, handles: NonSendMut<NodeHandles>,
+  q: Query<(Entity, &FrameIntents, &mut ReplicatedInput), With<OwnsInput>>)` (`EngineQuery`): for each delta in `camera_deltas`: `camera_base.rotate_y(-mv.x)`,
   `camera_base.orthonormalize()`, `rot = camera_rot.get_rotation(); rot.x = clamp_pitch(rot.x,
   mv.y, &tuning); camera_rot.set_rotation(rot)` (`:184-191`); THEN if `intents.shooting`: the
   crosshair raycast verbatim (`:117-138`: `crosshair.get_position() + get_size() * 0.5`,
@@ -275,7 +297,7 @@ commit 3).
   player_id` + `set_player_id` (`:75-78`, `:125-131`, untouched), `#[export] current_animation`
   (`:80-82`) and `#[var] motion` (`:43-44`) as projection fields; DELETE `airborne_time`,
   `orientation`, `root_motion`, `initial_position`, `physics_process`, `apply_input`, `apply_anim`
-  and the four parameter constants (moved to `player/sync.rs`); move backlog #10's comment to
+  and the eight `AnimationTree` constants (`:21-29`, moved to `player/sync.rs`); move backlog #10's comment to
   `apply_register`'s `AirborneTime(0.0)` (T005) and #11's to `sync_out_player`'s respawn (T011).
   `ready`: `let mp = self.base().get_multiplayer().unwrap(); let simulates = mp.is_server();`
   (`:98`); `let owns_input = self.player_input.get_multiplayer_authority() ==
@@ -335,11 +357,11 @@ commit 3).
   §2 table); RPC timing — `jump`/`land`/`shoot` `call_remote`, local effects inline in the fixed
   `SyncOut` (option (b), R2). Verification: 5 + 8 = 13 rows.
 - [ ] T019 [US1] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
-  warnings; **176** = 163 + 8 (player/system) + 5 (player_input/system); the 16 + 13 model tests
+  warnings; **177** = 163 + 9 (player/system) + 5 (player_input/system); the 16 + 13 model tests
   still listed by name; paste the `test result:` line. Headless: import (`Initialize godot-rust`),
   `main/main.tscn` ×2, `level/level.tscn` clean vs `CLAUDE.md`'s catalog. Harness (research R9,
   quickstart §3): write `zz_ecs_parity.gd` (from `contracts/zz_ecs_parity.gd`),
-  `zz_ecs_observer.gd` (two lines), `zz_ecs_physics_probe.gd` (three lines, quoted in the
+  `zz_ecs_observer.gd` (two lines), `zz_ecs_physics_probe.gd` (three literal lines, quoted in the
   contract) and `zz_ecs_parity.tscn` (six lines, V3-A contract §4) into BOTH trees; run cases
   (a) walk, (b) jump+land, (c) aim+shoot, (e) mouse look, (f) fall/respawn with `--fixed-fps 60
   --quit-after 400` under `XDG_DATA_HOME=/tmp/xdg-v2` and `/tmp/xdg-v3`; logs at
@@ -361,7 +383,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
 ## Phase 4: User Story 3 — commit 3: camera shake, the trauma path, remote `PlayerFx`
 
 **Goal**: FR-015 (`apply_player_fx`), FR-016, FR-017, and the last v2 per-frame callback gone.
-**Independent Test**: 178 tests with the 7 model tests untouched; harness (d) identical, (b) and
+**Independent Test**: 179 tests with the 7 model tests untouched; harness (d) identical, (b) and
 (c) re-run identical; both visual checkpoints.
 
 ### Commit 3 — `camera_noise_shake/system.rs`, `camera_noise_shake/sync.rs`, `camera_noise_shake.rs`, `player/sync.rs` (`apply_player_fx`, trauma component), `player.rs` (handlers push only), `ecs.rs`, `docs/v3-tradeoffs.md`
@@ -376,20 +398,22 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   `decay_and_time_advance_in_v2_order` (values equal a direct `decay`/`advance_time`/`shake`
   chain). Verification: 2 tests pass; no `godot::classes`.
 - [ ] T021 [US3] Create `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake/sync.rs` (glue;
-  `pub(crate) mod sync;`): `fn shake_sample(tuning, handles: NonSend<NodeHandles>, q: Query<(Entity,
-  &ShakePending, &mut ShakeOffset)>)` (`EngineQuery`): on `Some((shake, time))` → `samples =
-  [noise[0].get_noise_1d(time as f32), noise[1]…, noise[2]…]` (`:50-54`), `offset.0 =
-  Some(offsets(shake, samples, &tuning))` (`:55`); else `None`. `fn sync_out_shake(handles:
-  NonSendMut<NodeHandles>, q: Query<(Entity, &StartRotation, &ShakeOffset)>)` (`SyncOut`): on
-  `Some(o)` → `camera.set_rotation(start.0 + o)` (`:56-57`). In `player/sync.rs` add `fn
-  apply_player_fx(handles: NonSendMut<NodeHandles>, q: Query<(Entity, &mut PendingFx, &mut
-  CurrentAnimation, Has<Simulates>)>)` (`SyncOut`, frame): drain `PendingFx` in order — only ever
-  non-empty on non-`Simulates` entities (option (b)) — `Jump` → `JumpUp` plan write (the
-  parameter writes of T011's `apply_anim` helper) + `snd_jump.play()` (`player.rs:134-137`);
-  `Land` → `JumpDown` + `snd_land.play()` (`:140-143`); `Shoot` → both particles restart +
+  `pub(crate) mod sync;`): ONE system `fn sync_out_shake(tuning: Res<Tuning<CameraShakeTuning>>,
+  handles: NonSendMut<NodeHandles>, q: Query<(Entity, &StartRotation, &ShakePending)>)`
+  (`SyncOut`): on `Some((shake, time))` → `samples = [noise[0].get_noise_1d(time as f32),
+  noise[1]…, noise[2]…]` (`:50-54`), `offset = offsets(shake, samples, &tuning)` (`:55`, pure,
+  called from glue), `camera.set_rotation(start.0 + offset)` (`:56-57`); else nothing. The shake
+  has NO `EngineQuery` member (analyze finding 2: the samples answer no mid-tick decision; a
+  sync-only pair like V3-A's blast). In `player/sync.rs` add `fn apply_player_fx(handles:
+  NonSendMut<NodeHandles>, q: Query<(Entity, &mut PendingFx), Without<Simulates>>)` (`SyncOut`,
+  frame; remote peers only, option (b)): drain `PendingFx` in order — `Jump` → `apply_anim(&mut
+  anim_tree, AnimPlan::JumpUp)` + `{ root.bind_mut().current_animation = Animations::JumpUp }`
+  (the NODE field, as v2's handler wrote `self.current_animation`, `:172-177`; guard dropped
+  before the sound — analyze finding 19) + `snd_jump.play()` (`:134-137`); `Land` → the same with
+  `JumpDown` + `snd_land.play()` (`:140-143`); `Shoot` → both particles restart +
   `set_emitting(true)`, `fire_cooldown.start()`, `snd_shoot.play()` (`:147-152`; its trauma was
-  applied at drain time). Depends on T020, T005. Verification: compiles; `apply_player_fx` writes
-  `CurrentAnimation` only when `!simulates`.
+  applied at drain time). Depends on T020, T005. Verification: compiles; `grep -n 'EngineQuery'
+  camera_noise_shake/sync.rs` empty.
 - [ ] T022 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake.rs` as the
   camera sub-bridge: keep the three `FastNoiseLite` fields and `#[init(val = (randi() as i32))]
   noise_seed` (`:17-24`, same init call order), `start_rotation`, `ready` (`:29-42` verbatim), the
@@ -406,14 +430,15 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   Depends on T021, T022. Verification: `grep -n 'CameraNoiseShake\|add_trauma' player.rs
   player/sync.rs` shows only the `cast::<CameraNoiseShake>()` in `ready` and the model call.
 - [ ] T024 [US3] In `ecs.rs`'s `add_engine_systems` register (frame): `camera_noise_shake::sync::
-  shake_sample.in_set(Phase::EngineQuery)`, `sync_out_shake.in_set(Phase::SyncOut).before(sync_out_remove)`,
+  sync_out_shake.in_set(Phase::SyncOut).before(sync_out_remove)`,
   `player::sync::apply_player_fx.in_set(Phase::SyncOut).before(sync_out_remove)`; in
   `ecs/setup.rs::build_frame`: `camera_noise_shake::system::shake_decide.in_set(Phase::Gameplay)`.
   Depends on T021. Verification: setup tests pass.
-- [ ] T025 [US3] Append to `docs/v3-tradeoffs.md` the row: noise samples (`shake_sample`; the
-  engine owns `FastNoiseLite`; three reads per frame while `Trauma > 0`, R8). Verification: 14 rows.
+- [ ] T025 [US3] Append to `docs/v3-tradeoffs.md` the row: noise samples (`sync_out_shake`, a
+  sync-only pair — the engine owns `FastNoiseLite`; three reads per frame while `Trauma > 0`, R8).
+  Verification: 14 rows.
 - [ ] T026 [US3] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
-  warnings; **178** = 176 + 2 (shake); paste the line. Headless import, `main.tscn`, `level.tscn`
+  warnings; **179** = 177 + 2 (shake); paste the line. Headless import, `main.tscn`, `level.tscn`
   clean. Harness on both trees as T019: case (d) camera shake (`player.hit()` at frame 30; per
   frame `Camera3D.rotation`), and RE-RUN (b) and (c) (the trauma path changed: `Shoot` trauma at
   drain time); `diff` full and `^RAW`. **Paste the actual diff output in the completion note —
@@ -450,25 +475,26 @@ the v2 path); multiplayer remote effects arrive with commit 3.
 - [ ] T030 [P] Fill `specs/012-v3-player-input-camera/spec.md`'s "Measured timing differences"
   table from the six diffs of T019/T026 (one row per differing RAW event with cause; or a single
   "no differences" row quoting the commit hashes where the empty diffs are recorded); align
-  `data-model.md` with the code: `PlayerFx { Jump, Land, Shoot }` at line 39 (no `Hit`) and the
-  "Tests by name" list with the names actually landed (T006, T007, T009, T010, T020); confirm
+  `data-model.md` with the code (the "Tests by name" list already mirrors T006/T007/T009/T010/
+  T020 after the analyze-fix commit — re-check names actually landed); confirm
   `docs/v3-tradeoffs.md` has the 9 new rows (14 total). Verification: no `(to be measured)` in
-  spec.md; `grep -c 'Hit' data-model.md` counts only the drain-table note.
+  spec.md; `grep -n 'PlayerFx::Hit' specs/012-v3-player-input-camera/*.md` empty.
 - [ ] T031 Run quickstart.md §5's grep list VERBATIM and paste every output (no `process`/
   `physics_process` in the three bridges; `fn input` only in `player_input.rs`; no
   `godot::task::spawn`/`bind_mut::<EcsWorld>`/`get_autoload_by_name::<EcsWorld>` in the three
   modules; no `godot::classes` in the three `system.rs`; the three `model.rs` diff-empty against
   `abfe35a`; the excluded modules diff-empty; `player.tscn` diff = the one line; tradeoffs ≥ 14;
   backlog #6/#29 open). If a grep reveals a violation, STOP and report.
-- [ ] T032 Final gates + headless (`cargo build && cargo clippy && cargo test` → **178**; import;
+- [ ] T032 Final gates + headless (`cargo build && cargo clippy && cargo test` → **179**; import;
   `main.tscn`; `level.tscn`); commit (R10 row 4): `CLAUDE.md: v3 sub-bridge pattern +
   two-EngineQuery tick; spec: measured timing differences filled; tradeoffs complete`.
 - [ ] T033 Cleanup and count: `git worktree remove ../oxide-godot-v2 && git worktree prune`;
   `find . -name 'zz_*' -not -path '*/specs/*'` returns nothing; `git status` clean;
   `git log --oneline <tasks-commit>..HEAD` where `<tasks-commit>` is the commit that added this
   file (`git log --format=%h --diff-filter=A -- specs/012-v3-player-input-camera/tasks.md`) —
-  state the count explicitly: the four milestone commits plus the checkpoint-mark commits (two,
-  after T027 and T028) = six lines expected; `git status -sb` shows `## v3` with no upstream.
+  state the count explicitly: the analyze-fix commit (made before commit 1) plus the four
+  milestone commits plus the checkpoint-mark commits (two, after T027 and T028) = seven lines
+  expected; `git status -sb` shows `## v3` with no upstream.
 
 **Checkpoint**: Milestone V3-B complete.
 

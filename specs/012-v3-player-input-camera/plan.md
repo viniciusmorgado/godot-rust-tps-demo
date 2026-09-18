@@ -24,8 +24,9 @@ MANUAL+advance reproduces v2 line by line (R1, three runs on two trees). Replica
 projection: the fixed `SyncOut` writes `motion`/`current_animation` on `Simulates` entities and
 the frame `SyncOut` writes the four input fields on `OwnsInput` entities; the engine samples them
 in `SceneMultiplayer::poll()` at the top of `SceneTree::process`, after the physics steps and
-before the frame run, once per rendered frame (R2) — which is why the `Jump`/`Land` handlers'
-transient animation writes are dropped on `Simulates` entities (FR-015's fallback). Input and
+before the frame run, once per rendered frame (R2) — which is why the `Simulates` entity's local
+RPC effects are applied inline by the fixed `SyncOut` and `jump`/`land`/`shoot` are `call_remote`
+(option (b), FR-004): no `PlayerFx` occurs on `Simulates`; `apply_player_fx` is remote-only. Input and
 camera run on the frame schedule with the camera rotation applied inside the frame
 `EngineQuery` before the raycast (spec FR-014); the shake is `Trauma`/`ShakeTime` on the player
 entity. Parity: a six-case harness on both trees (R9) plus two visual checkpoints, the second a
@@ -65,7 +66,7 @@ files untouched), new `player/system.rs`, `player/sync.rs`, `player_input/system
 `ecs/*`, `player.tscn:592`, docs; preserved surfaces of FR-019; backlog #6/#29 deferred.
 
 **Scale/Scope**: 3 bridges (336 + 192 + 68 lines today), 6 new files, `Phase` +3 variants,
-`Handles`/`Initial` +1 variant each, 4 drain arms, ~17 systems, ≥ 18 new tests, 9 tradeoffs rows.
+`Handles`/`Initial` +1 variant each, 4 drain arms, ~16 systems, 23 new tests (163/177/179), 9 tradeoffs rows.
 
 ## Constitution Check
 
@@ -120,6 +121,13 @@ of the spec's top block; build + headless per commit. PASS.
   systems), pure into `x/model.rs` + `x/system.rs` — an extension of V3-A's "sync systems live in
   `ecs.rs`" recorded in `CLAUDE.md` (commit 4) because `ecs.rs` would otherwise grow by ~600
   lines. Principle III requires the separation, not one file. PASS.
+
+- `Changed<T>` clause ("wherever it removes writes without changing behavior"): DECLINED for this
+  milestone's `SyncOut` writes — `PlayerModel.set_global_basis`, the two projection fields, the
+  four input fields, `color_rect.set_modulate`, the camera rotations — each reproduces a v2
+  per-step/per-frame write whose omission on an unchanged value is behavior-identical but
+  unmeasured; R8 records the budget, and a later milestone may gate them with the harness as
+  evidence (analyze finding 17). PASS (the clause is permissive).
 
 **Governance**: SC-006's checklist (quickstart §5); parity evidence (six diffs + two
 checkpoints) in the `/speckit-implement` summaries; tradeoffs rows per commit.

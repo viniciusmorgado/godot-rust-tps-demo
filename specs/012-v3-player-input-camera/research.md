@@ -91,7 +91,8 @@ write reproduces v2's observable state at every sample point; the harness's case
 `current_animation` every frame to prove it. On NON-`Simulates` entities the plan write is kept
 (v2's client-side handler behaved the same way; the client's replay write of the next fixed run
 precedes its `advance`, so the outcome is v2's). `Shoot`'s effects (particles, cooldown start,
-sound, trauma 0.35) and `Hit`'s trauma are not animation writes and are applied on every peer.
+sound, trauma 0.35) and `hit`'s trauma (`AddTrauma { 0.75 }`, no `PlayerFx::Hit` variant) are not
+animation writes and are applied on every peer.
 
 ## R3 — Headless input driving (EXPERIMENT, spec Assumption (3))
 
@@ -185,18 +186,20 @@ parent chain. The input node keeps `parent`/`parent_rid` (`:26-29`) for the RID 
 `PlayerTag`; queued by the drain: `JumpQueued(bool)`, `PendingMouseLook(Vec<Vector2>)`,
 `PendingFx(Vec<PlayerFx>)`. Per-run snapshots written by `SyncIn`: `InputFrameC(InputFrame)`
 (the model's struct wrapped — `player/model.rs:38-48`), `BodyState { on_floor, velocity,
-gravity, cooldown_left, origin_y }`, `ReplicatedInput { aiming, shoot_target, motion, shooting }`
-(read from the input node on every entity), `ReplayState { current_animation, motion,
-aim_rotation }` (non-`Simulates`), `InputSnapshotC(InputSnapshot)` + `CameraFrame { base_rotation,
-rot_rotation, parent_y, fade_alpha }` (frame, `OwnsInput`). Per-run outputs: ONE `TickIntents`
+gravity, cooldown_left, origin_y }` (`origin_y` is written ONLY by `move_body`, post-move —
+`SyncIn` does not read the origin, v2 read it once at `:329`), `ReplicatedInput { aiming, shoot_target, motion, shooting }`
+(frame run, `OwnsInput` only: the values this peer will project into the input node; the fixed
+run reads the node directly into `InputFrameC` for every entity — analyze finding 14), `ReplayState { current_animation, motion,
+aim_rotation }` (non-`Simulates`), `InputSnapshotC(InputSnapshot)` + `CameraFrame { parent_y, fade_alpha }` (frame, `OwnsInput`; the live camera rotations are read
+per delta by `camera_and_ray`, as v2's `rotate_camera` did, so they are not snapshotted). Per-run outputs: ONE `TickIntents`
 struct (`land`, `jump`, `shoot`, `respawn: bool`, `jump_velocity_y: Option<f32>`, `orient:
 Option<OrientTarget>` with `OrientTarget::Camera(Quaternion) | Walk(Vector3)`, `plan: AnimPlan`,
 `root_motion_read: bool`) written by `tick_decide` and read by THREE later systems
 (`orient_and_anim`, `move_body`, `sync_out_player`) — a struct, per V3-A R6's rule (markers for a
 single `SyncOut` consumer, a struct when several systems read the same intent set);
 `FrameIntents` (`camera_deltas: Vec<Vector2>` in application order, `cue: Option<CameraCue>`,
-`jump_pressed`, `shooting`, `fade_alpha`) for the frame run; `ShakeOffset(Option<Vector3>)` for the
-shake. `Remove`-like one-shots stay markers (none new). Tuning: `#[derive(Resource)] pub struct
+`jump_pressed`, `shooting`, `fade_alpha`) for the frame run; `ShakePending(Option<(f32, f64)>)`
+for the shake (consumed by `sync_out_shake`; no `ShakeOffset`). `Remove`-like one-shots stay markers (none new). Tuning: `#[derive(Resource)] pub struct
 Tuning<T>(pub T)` in `ecs/markers.rs`, inserted by `build_world` as
 `Tuning(PlayerTuning::default())`, `Tuning(PlayerInputTuning::default())`,
 `Tuning(CameraShakeTuning::default())` — the constitution's "tuning structs become
@@ -208,26 +211,25 @@ Fixed schedule (per player entity; `Simulates` filter where stated):
 
 | Set | System | Parameters (shape) | v2 lines |
 |---|---|---|---|
-| `SyncIn` | `sync_in_player` (glue, `player/sync.rs`) | `NonSend<NodeHandles>`, `Query<(Entity, &JumpQueued, …), With<PlayerTag>>`, `Commands` → writes `InputFrameC` (from `input.bind()` fields + the three camera reads), `BodyState`, `ReplicatedInput`; clears `JumpQueued`; for non-`Simulates` writes `ReplayState` | `:207-223`, `:235`, `:241`, `:274`, `:313-314`, `:329`; `:104-117` |
+| `SyncIn` | `sync_in_player` (glue, `player/sync.rs`) | `NonSend<NodeHandles>`, `Query<(Entity, &JumpQueued, …), With<PlayerTag>>`, `Commands` → writes `InputFrameC` (from `input.bind()` fields — the projection's consumer for EVERY entity — + the three camera reads, `aim_rotation` via `Res<Tuning<PlayerInputTuning>>`), `BodyState` (no origin read: `origin_y` is written post-move by `move_body`); clears `JumpQueued`; for non-`Simulates` writes `ReplayState` | `:207-223`, `:235`, `:241`, `:274`, `:313-314`; `:104-117` |
 | `Gameplay` | `tick_decide` (pure, `player/system.rs`) | `Res<Tuning<PlayerTuning>>`, `Res<FixedDelta>`, `Query<(&InputFrameC, &BodyState, &mut Motion, &mut AirborneTime, &mut TickIntents, &Orientation), With<Simulates>>` — steps (2), (3), (4), the branch decision, `anim_plan`, `walk_target`, the shoot decision | `:226-258`, `:266`, `:274`, `:294-303` |
-| `EngineQueryOrient` | `orient_and_anim` (glue) | slerp / `looking_at` + slerp into `Orientation`; `apply_anim` parameter writes; root motion read into `RootMotion` (skipped when airborne); bullet spawn when `intents.shoot`; also the non-`Simulates` replay parameter writes | `:261-264`, `:296-300`, `:179-200`, `:269-272`/`:306-309`, `:275-291`; `:118` |
+| `EngineQueryOrient` | `orient_and_anim` (glue) | slerp / `looking_at` + slerp into `Orientation`; root motion read into `RootMotion` (skipped when airborne; the value is the previous `advance`'s, independent of this step's parameter writes — R1); bullet spawn when `intents.shoot` (a write, but it MUST precede `move_and_slide`). The `AnimationTree` parameter writes moved to `sync_out_player` (analyze finding 3) | `:261-264`, `:296-300`, `:269-272`/`:306-309`, `:275-291` |
 | `GameplayIntegrate` | `tick_integrate` (pure) | `integrate_root_motion` → new `Orientation`, `Velocity(Vector3)` | `:313-317` |
 | `EngineQueryMove` | `move_body` (glue) | `set_velocity`, `set_up_direction(UP)`, `move_and_slide`, read post-move origin into `BodyState.origin_y` | `:320-322`, `:329` |
 | `GameplaySettle` | `tick_settle` (pure) | `should_respawn` → `intents.respawn` | `:329` |
-| `SyncOut` | `sync_out_player` (glue) | `model.set_global_basis`; respawn reset; projection writes into the `Player` node (`motion`, `current_animation`) through `root.bind_mut()` (`root: Gd<Player>`), the guard DROPPED before any further engine call; then, on `Simulates`, the LOCAL effects inline in v2's order (option (b), FR-004): `Land` sound, `Jump` sound, then the `Shoot` effects (particles restart+emit, `fire_cooldown.start()`, sound, `Trauma += 0.35`); then `rpc("land")`, `rpc("jump")`, `rpc("shoot")` — now `call_remote`, reaching remote peers only; LAST: `anim_tree.advance(FixedDelta)` for every player | `:326`, `:330-333`, `:134-154`, `:246-251`, `:290`; R1 |
+| `SyncOut` | `sync_out_player` (glue) | `model.set_global_basis`; respawn reset; projection writes into the `Player` node (`motion`, `current_animation`) through `root.bind_mut()` (`root: Gd<Player>`), the guard DROPPED before any further engine call; then, on `Simulates`, the LOCAL effects inline in v2's order (option (b), FR-004): `Land` sound, `Jump` sound, then the `Shoot` effects (particles restart+emit, `fire_cooldown.start()`, sound, `Trauma += 0.35`); then `rpc("land")`, `rpc("jump")`, `rpc("shoot")` — now `call_remote`, reaching remote peers only; then the `AnimationTree` parameter writes (`apply_anim(&mut anim_tree, plan)` — the `Simulates` plan or the non-`Simulates` replay plan, v1's per-variant order, `:179-200`; moved here from `EngineQueryOrient`, analyze finding 3); LAST: `anim_tree.advance(FixedDelta)` for every player | `:326`, `:330-333`, `:134-154`, `:246-251`, `:290`, `:179-200`; R1 |
 
 Frame schedule:
 
 | Set | System | v2 lines |
 |---|---|---|
-| `SyncIn` | `sync_in_input` (glue, `player_input/sync.rs`): on `OwnsInput` the ten `Input` reads → `InputSnapshotC`, camera rotations, parent y, `modulate.a` → `CameraFrame`; on EVERY player the four replicated fields → `ReplicatedInput` | `:76-90`, `:144-146` |
+| `SyncIn` | `sync_in_input` (glue, `player_input/sync.rs`): on `OwnsInput` only: the ten `Input` reads → `InputSnapshotC`; parent y, `modulate.a` → `CameraFrame` (no rotation snapshot: `camera_and_ray` reads the live rotation per delta) | `:76-90`, `:144-146` |
 | `Gameplay` | `input_decide` (pure, `player_input/system.rs`): drains `PendingMouseLook` into `scaled_mouse_look` deltas FIRST, then `scaled_look` for the controller; `clamp_pitch` per delta in order; `step_aim` + cue; `alpha_for_height`; `jump_pressed`, `shooting` → `FrameIntents`, updates `AimStateC` | `:92-99`, `:111`, `:115`, `:146`, `:153` |
-| `Gameplay` | `shake_decide` (pure, `camera_noise_shake/system.rs`): while `Trauma > 0`: `decay`, `advance_time`, `shake` → `ShakePending { shake, time }`; else nothing | `:45-49` |
+| `Gameplay` | `shake_decide` (pure, `camera_noise_shake/system.rs`): while `Trauma > 0`: `decay`, `advance_time`, `shake` → `ShakePending { shake, time }`; else `None` | `:45-49` |
 | `EngineQuery` | `camera_and_ray` (glue): applies each camera delta as `rotate_y`/`orthonormalize`/`set_rotation` in order, THEN the crosshair raycast when shooting → `ReplicatedInput.shoot_target` | `:184-191`, `:117-138` |
-| `EngineQuery` | `shake_sample` (glue): three `get_noise_1d(time as f32)` → `offsets` → `ShakeOffset` | `:50-55` |
 | `SyncOut` | `sync_out_input` (glue): camera cue play; `input.bind_mut()` writes of `aiming`, `shoot_target`, `motion`, `shooting`; `color_rect.set_modulate`; `input.rpc("jump")` when jump pressed | `:100-109`, `:92/:99/:115/:135-137`, `:147`, `:111-113` |
 | `SyncOut` | `apply_player_fx` (glue): drains `PendingFx` in order — only ever non-empty on non-`Simulates` entities (remote peers; option (b)) — `Jump`: `JumpUp` plan write + sound; `Land`: `JumpDown` plan write + sound; `Shoot`: both particles restart+emit, `fire_cooldown.start()`, sound (its trauma was already applied at drain time) | `:134-154` |
-| `SyncOut` | `sync_out_shake` (glue): `camera.set_rotation(start_rotation + offset)` when `ShakeOffset` is `Some` | `:56-57` |
+| `SyncOut` | `sync_out_shake` (glue): when `ShakePending` is `Some((shake, time))`: three `get_noise_1d(time as f32)` → `offsets(shake, samples, &tuning)` (pure, called from glue) → `camera.set_rotation(start_rotation + offset)`. NO `EngineQuery` member for the shake (analyze, 2026-09-18): the samples answer no mid-tick decision, so a sync-only pair is the honest shape (V3-A blast precedent); `ShakeOffset` is dropped | `:50-57` |
 
 Drain (`ecs/apply.rs`, pure): `JumpPressed { root_id }` → `JumpQueued = true`; `MouseLook {
 root_id, screen_relative }` → push into `PendingMouseLook`; `AddTrauma { root_id, amount }` →
@@ -279,7 +281,7 @@ player commit. The game stays playable after every commit: commit 2 keeps the v2
 
 | # | Commit | Files | Gate + validation |
 |---|---|---|---|
-| 1 | `ecs: seven fixed-schedule sets (Phase extension), Tuning<T> resources, drain arms for JumpPressed/MouseLook/AddTrauma/PlayerFx (tests)` | `ecs/setup.rs`, `ecs/markers.rs`, `ecs/event.rs`, `ecs/apply.rs`, `ecs.rs` (Handles::Player, Initial::Player) | gates (156 + 5 new tests) |
+| 1 | `ecs: seven fixed-schedule sets (Phase extension), Tuning<T> resources, drain arms for JumpPressed/MouseLook/AddTrauma/PlayerFx (tests)` | `ecs/setup.rs`, `ecs/markers.rs`, `ecs/event.rs`, `ecs/apply.rs`, `ecs.rs` (Handles::Player, Initial::Player; a `Player` arm in `sync_out_remove`'s exhaustive match) | gates (156 + 2 setup + 5 apply = 163 tests) |
 | 2 | `player + player_input: bridges, Player entity (Handles::Player), fixed tick (7 sets) and frame input systems; AnimationTree MANUAL + advance (R1 option B)` | `player.rs`, `player/system.rs`, `player/sync.rs`, `player_input.rs`, `player_input/system.rs`, `player_input/sync.rs`, `player.tscn:592`, `ecs.rs` (registration of the systems), `docs/v3-tradeoffs.md` (rows: root motion, move_and_slide, raycast, slerp/looking_at, bullet spawn, AnimationTree ordering, replication projection, RPC call_local timing) | gates (+ ≥ 11 tests); headless; harness (a), (b), (c), (e), (f) on both trees |
 | 3 | `camera_noise_shake: sub-bridge, shake systems on the player entity, AddTrauma/PlayerFx trauma path` | `camera_noise_shake.rs`, `camera_noise_shake/system.rs`, `camera_noise_shake/sync.rs`, `player.rs` (handlers now push only), `ecs.rs`, `docs/v3-tradeoffs.md` (row: noise samples) | gates (+ ≥ 2 tests); headless; harness (d) + rerun (b)/(c) (trauma path changed); **STOP 1 — checkpoint (1) single player**; **STOP 2 — checkpoint (2) multiplayer, two instances** |
 | 4 | `CLAUDE.md: v3 sub-bridge pattern + two-EngineQuery tick; spec: measured timing differences filled; tradeoffs complete` | `CLAUDE.md`, `spec.md`, `docs/v3-tradeoffs.md` | docs-only |

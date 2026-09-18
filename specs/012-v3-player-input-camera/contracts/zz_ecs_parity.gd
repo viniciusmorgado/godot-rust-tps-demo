@@ -52,9 +52,13 @@ func _ready() -> void:
 	for n in ["Jump", "Land", "Shoot"]:
 		snd[n] = player.get_node("SoundEffects/" + n); snd_playing[n] = false
 	if case in ["a", "f"]:
-		var probe := Node.new(); probe.name = "PhysicsProbe"; probe.set_script(load("res://zz_ecs_physics_probe.gd")); add_child(probe)
-	# zz_ecs_physics_probe.gd: extends Node; _ready: process_physics_priority = -2147483648;
-	# _physics_process: get_parent()._observe_physics()
+		var probe := Node.new(); probe.name = "PhysicsProbe"; probe.set_script(load("res://zz_ecs_physics_probe.gd")); add_child(probe)  # script before add_child
+	# zz_ecs_physics_probe.gd (second scratch file, copied alongside; script set BEFORE add_child) is exactly:
+	#   extends Node
+	#   func _ready() -> void: process_physics_priority = -2147483648
+	#   func _physics_process(_d: float) -> void: get_parent()._observe_physics()
+	# NOTE: set_script AFTER add_child (as the line above does) would skip _ready — V3-A's lesson;
+	# create the node, set the script, THEN add_child.
 
 func _log(line: String) -> void:
 	log_file.store_line(line)
