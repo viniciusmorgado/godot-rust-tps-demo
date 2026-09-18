@@ -525,7 +525,7 @@ checkpoint (2).
   (SC-001: expect **156** = 133 + 23; the spec's floor is ≥ 148). Commit (R11 row 6):
   `CLAUDE.md: Port conventions (v3); spec: measured timing differences filled;
   docs/v3-tradeoffs.md complete`.
-- [ ] T039 Remove the harness worktree and verify cleanliness: `git worktree remove
+- [x] T039 Remove the harness worktree and verify cleanliness: `git worktree remove
   ../oxide-godot-v2 && git worktree prune`; `find . ../oxide-godot-v2 -name 'zz_*' 2>/dev/null`
   returns nothing; `git status` clean on `v3`; `git log --oneline 08bc3bd..HEAD` shows exactly
   the six milestone commits; nothing pushed (`git status -sb` shows no upstream ahead/behind
