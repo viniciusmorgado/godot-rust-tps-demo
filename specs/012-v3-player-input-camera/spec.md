@@ -31,7 +31,8 @@ authority, RPCs with `call_local`, and a `Node::input` callback. Every later mil
 - **Residual dynamic access kept after this milestone** (`.rpc("name")`, the one sanctioned
   form): `rpc("land")`/`rpc("jump")` (v2 `player.rs:247`, `:250`), `rpc("shoot")` (`:290`) on
   `Player`; `rpc("jump")` on the input node (`player_input.rs:112`); `rpc("hit")` in
-  `hittable.rs:33` (unchanged file). No other dynamic access is introduced.
+  `hittable.rs:33` (unchanged file). No other dynamic access is introduced. `jump`/`land`/
+  `shoot` on `Player` change `call_local` → `call_remote` (FR-004, option (b)).
 
 **Input**: User description: "Milestone V3-B — the player: `player`, `player_input`,
 `camera_noise_shake` as ONE entity over three nodes. The player tick on the fixed schedule in
@@ -362,12 +363,25 @@ identical.
   before the node was in the tree.
 - **`land` and `jump` in the same step** (v2 `player/model.rs:50-52`): both intents fire; the
   RPCs are issued in v2's order (`land` then `jump`, `:246-251`) from `SyncOut`.
-- **`call_local` re-entrancy**: `rpc("land")` from `SyncOut` invokes `Player::land` synchronously
-  while the fixed run is in progress; the handler only pushes `PlayerFx::Land`, which the FRAME
-  schedule of the same iteration drains (physics before process) and applies (`JumpDown` plan
-  + `Land` sound) — the same iteration as v2, where the handler ran inline. The harness's RAW
-  stamps of `SoundEffects/Jump.playing`, `Land.playing`, `Shoot.playing` and
-  `FireCooldown.time_left` verify it (cases (b), (c)).
+- **Local RPC effects on the simulating peer** (option (b), FR-004): `rpc("land")`/`rpc("jump")`/
+  `rpc("shoot")` are `call_remote`, so on the `Simulates` entity NO handler runs locally;
+  `sync_out_player` applies the local effects itself, inside the physics step, in v2's order:
+  `Land` sound, `Jump` sound (step (4)'s position, `:246-251`; the `JumpUp`/`JumpDown` plan
+  writes are omitted — v2's step (5) overwrote them in the same step), then after the bullet
+  spawn the `Shoot` effects (`:146-154`: both particles restart+emit, `fire_cooldown.start()`,
+  `Shoot` sound, trauma 0.35 via `model::add_trauma` on the `Trauma` component). The RPC then
+  reaches the remote peers only, whose handlers push `PlayerFx` (non-`Simulates` path, applied
+  by their frame run: sounds/particles/cooldown, plus the plan writes that v2's client handlers
+  also made). `bind_mut()` on the `Player` bridge (projection writes) is ALWAYS released before
+  any engine call that can invoke a callback (`rpc`, `play`, `start`): a `call_local` RPC or a
+  synchronous signal would otherwise double-borrow. The harness's RAW stamps of
+  `SoundEffects/Jump.playing`, `Land.playing`, `Shoot.playing` and `FireCooldown.time_left`
+  verify the same-step timing (cases (b), (c)).
+- **`hit` and `add_camera_shake_trauma` (still `call_local`)**: their local handler pushes
+  `AddTrauma`, applied by the drain of the NEXT schedule run — the frame run of the same
+  iteration when the caller is a physics-phase node (`bullet.rs`'s `rpc("hit")`, `red_robot`'s
+  async block resumed in the physics phase), so `shake_decide` of that frame already sees the
+  trauma, as v2's `camera.process` did.
 - **The `Jump`/`Land` Fx animation write is transient** (spec review, 2026-09-18): in v2 the
   `land` handler's `apply_anim(JumpDown)` (`:141`) runs INLINE in the tick and the tick's own
   plan overwrites it in the SAME step (`:254-310`); on a remote peer the next replay
@@ -426,10 +440,23 @@ identical.
   one-shot engine write (v2 `:126-131`) and MUST NOT touch the ECS; registration reads
   `player_id` into `PeerId`.
 - **FR-004**: The RPC handlers `jump`, `land`, `shoot`, `hit`, `add_camera_shake_trauma` on
-  `Player` and `jump` on `PlayerInputSynchronizer` MUST keep their exact names, attributes and
-  signatures (`add_camera_shake_trauma` stays `pub(crate) fn (&mut self, f64)` for
-  `red_robot.rs:452`) and MUST only push events: `PlayerFx::{Jump, Land, Shoot, Hit}`,
-  `AddTrauma { amount }`, `JumpPressed`, each keyed by the root's `InstanceId`.
+  `Player` and `jump` on `PlayerInputSynchronizer` MUST keep their exact names and signatures
+  (`add_camera_shake_trauma` stays `pub(crate) fn (&mut self, f64)` for `red_robot.rs:452`)
+  and MUST only push events: `PlayerFx::{Jump, Land, Shoot}`, `AddTrauma { amount }`,
+  `JumpPressed`, each keyed by the root's `InstanceId` (`hit` pushes `AddTrauma { 0.75 }` —
+  it never did anything else, v2 `:157-159`). ONE attribute change, approved at plan review
+  (2026-09-18, option (b)): `jump`, `land` and `shoot` on `Player` become
+  `#[rpc(authority, call_remote, unreliable)]`. Reason: v2 applied their local effects INLINE in
+  the physics step through `call_local`; in v3 a locally-invoked handler could only push an
+  event consumed by the frame run, which (i) starts `FireCooldown` one frame later than v2
+  (the `Timer` node processes in tree order before the driver), (ii) adds the shoot/hit trauma
+  after `shake_decide` already ran, and (iii) leaves the transient animation write that R2
+  showed replication can sample. With `call_remote`, the `Simulates` entity's fixed `SyncOut`
+  applies the local effects itself, in the physics step, in v2's order, and the RPC reaches
+  only the remote peers, whose handlers push `PlayerFx` for the non-`Simulates` path. `hit` and
+  `add_camera_shake_trauma` keep `call_local` (`hittable.rs` calls `rpc("hit")` and the trauma
+  is applied at drain time, so the local path is already same-frame); the input node's `jump`
+  keeps `call_local` (its local push is consumed by the next fixed run, as v2's field was).
 
 **The fixed tick (US1)**
 
@@ -486,14 +513,15 @@ identical.
   `docs/v3-tradeoffs.md` (the raycast needs the engine-computed post-rotation camera transform
   through the `SpringArm3D` chain).
 - **FR-015**: `JumpPressed`, `MouseLook`, `AddTrauma`, `PlayerFx::*` MUST be applied by the
-  drain to the entity found by root id (unknown id dropped), and the frame schedule's
-  `SyncOut` MUST apply the local RPC effects of `PlayerFx` in v2's per-handler order: `Jump` →
-  `JumpUp` plan + `Jump` sound (`:134-137`); `Land` → `JumpDown` plan + `Land` sound
-  (`:140-143`); `Shoot` → restart+emit both particles, `fire_cooldown.start()`, `Shoot` sound,
-  trauma 0.35 (`:146-154`); `Hit` → trauma 0.75 (`:157-159`). The `JumpUp`/`JumpDown` plan
-  writes of `Jump`/`Land` are transient (Edge Cases): they are kept only if Assumption (5)
-  makes them invisible to replication; otherwise they are dropped on `Simulates` entities with
-  the reason recorded.
+  drain to the entity found by root id (unknown id dropped). The drain applies trauma
+  IMMEDIATELY (`AddTrauma`, and the 0.35 of a remote `Shoot`), so the same run's `shake_decide`
+  sees it; the engine effects of `PlayerFx` are queued and applied by the frame schedule's
+  `SyncOut` in v2's per-handler order: `Jump` → `JumpUp` plan + `Jump` sound (`:134-137`);
+  `Land` → `JumpDown` plan + `Land` sound (`:140-143`); `Shoot` → restart+emit both particles,
+  `fire_cooldown.start()`, `Shoot` sound (`:146-153`). On the `Simulates` entity these events
+  never occur (FR-004: `call_remote`); its local effects are applied inline by the fixed
+  `SyncOut` (Edge Cases). On non-`Simulates` entities the plan writes are kept, as v2's client
+  handlers made them (R2).
 - **FR-016**: `Trauma`/`ShakeTime` live on the player entity; the shake runs only while
   `Trauma > 0` (v2 `:45`); `add_trauma` clamps at `max_trauma` (`model.rs:58-63`);
   `CameraNoiseShake::add_trauma` is removed (single caller, now an event).
