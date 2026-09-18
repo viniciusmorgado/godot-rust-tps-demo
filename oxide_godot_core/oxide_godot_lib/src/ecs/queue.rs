@@ -39,6 +39,10 @@ mod tests {
             InboundEvent::Unregister { id } => (1, id.to_i64()),
             InboundEvent::DoorBodyEntered { id, .. } => (2, id.to_i64()),
             InboundEvent::BlastAnimationFinished { id } => (3, id.to_i64()),
+            InboundEvent::JumpPressed { root_id } => (4, root_id.to_i64()),
+            InboundEvent::MouseLook { root_id, .. } => (5, root_id.to_i64()),
+            InboundEvent::AddTrauma { root_id, .. } => (6, root_id.to_i64()),
+            InboundEvent::PlayerFx { root_id, .. } => (7, root_id.to_i64()),
         }
     }
 

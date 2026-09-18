@@ -2,7 +2,7 @@ use godot::classes::{Camera3D, FastNoiseLite, ICamera3D};
 use godot::global::randi;
 use godot::prelude::*;
 
-mod model;
+pub(crate) mod model;
 
 use model::CameraShakeTuning;
 

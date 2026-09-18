@@ -6,17 +6,28 @@
 use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
-use godot::classes::{AnimationPlayer, Area3D, Camera3D, CpuParticles3D, INode, Node, Node3D};
+use godot::classes::{
+    AnimationPlayer, AnimationTree, Area3D, AudioStreamPlayer, Camera3D, ColorRect, CpuParticles3D,
+    FastNoiseLite, INode, Marker3D, Node, Node3D, PackedScene, TextureRect, Timer,
+};
 use godot::obj::InstanceId;
 use godot::prelude::*;
 
 use event::{DoorBodyEntered, InboundEvent, Initial};
 use index::{EntityIndex, Registration};
-use markers::{BlastTag, FixedDelta, FrameDelta, LookTarget, PlayOpen, Remove, StartEmitting};
+use markers::{
+    AimStateC, AirborneTime, BlastTag, CurrentAnimation, FixedDelta, FrameDelta, FrameIntents,
+    InitialPosition, JumpQueued, LookTarget, Motion, Orientation, OwnsInput, PeerId, PendingFx,
+    PendingMouseLook, PlayOpen, PlayerTag, Remove, ReplicatedInput, RootMotion, ShakePending,
+    ShakeTime, Simulates, StartEmitting, StartRotation, TickIntents, Trauma, Velocity,
+};
 use setup::Phase;
 
 use crate::door::system::DoorState;
 use crate::part_disappear::system::{DisappearPhase, Lifetime};
+use crate::player::{Animations, Player};
+use crate::player_input::model::AimState;
+use crate::player_input::PlayerInputSynchronizer;
 
 pub mod apply;
 pub mod event;
@@ -42,6 +53,36 @@ pub enum Handles {
         light_rays: Gd<CpuParticles3D>,
         camera: Option<Gd<Camera3D>>,
     },
+    /// The player entity over three nodes (specs/012 research R5), boxed: twenty handles would
+    /// otherwise dwarf the other variants (clippy `large_enum_variant`, gate at zero warnings).
+    Player(Box<PlayerHandles>),
+}
+
+/// `Handles::Player`'s payload. `root` and `input` are the USER classes because their
+/// `#[var]`/`#[export]` projection fields are written through `bind_mut()` (the guard is dropped
+/// before any engine call that can invoke a callback); `Deref` reaches `CharacterBody3D`/`Node`
+/// for the engine calls.
+pub struct PlayerHandles {
+    pub root: Gd<Player>,
+    pub input: Gd<PlayerInputSynchronizer>,
+    pub anim_tree: Gd<AnimationTree>,
+    pub model: Gd<Node3D>,
+    pub shoot_from: Gd<Marker3D>,
+    pub shoot_particle: Gd<CpuParticles3D>,
+    pub muzzle_particle: Gd<CpuParticles3D>,
+    pub fire_cooldown: Gd<Timer>,
+    pub snd_jump: Gd<AudioStreamPlayer>,
+    pub snd_land: Gd<AudioStreamPlayer>,
+    pub snd_shoot: Gd<AudioStreamPlayer>,
+    pub camera_base: Gd<Node3D>,
+    pub camera_rot: Gd<Node3D>,
+    pub camera: Gd<Camera3D>,
+    pub camera_anim: Gd<AnimationPlayer>,
+    pub crosshair: Gd<TextureRect>,
+    pub color_rect: Gd<ColorRect>,
+    pub noise: [Gd<FastNoiseLite>; 3],
+    pub bullet_scene: Gd<PackedScene>,
+    pub parent_rid: Rid,
 }
 
 impl Handles {
@@ -52,6 +93,7 @@ impl Handles {
             Handles::Door { root, .. } => root.is_instance_valid(),
             Handles::Puff { root } => root.is_instance_valid(),
             Handles::Blast { root, .. } => root.is_instance_valid(),
+            Handles::Player(p) => p.root.is_instance_valid(),
         }
     }
 }
@@ -153,6 +195,50 @@ fn apply_register(world: &mut World, id: InstanceId, handles: Handles, initial: 
         Initial::Blast => {
             world.entity_mut(entity).insert(BlastTag);
         }
+        Initial::Player { peer_id, simulates, owns_input, initial_position, orientation, start_rotation } => {
+            let mut e = world.entity_mut(entity);
+            e.insert((
+                PlayerTag,
+                PeerId(peer_id),
+                // v2 `player.rs:44`: zero at init.
+                Motion(Vector2::ZERO),
+                Orientation(orientation),
+                RootMotion(Transform3D::IDENTITY),
+                // Backlog #10: starts at 0 (not v1's 100.0) so the first floor contact after
+                // spawn never exceeds the land threshold and never fires a spurious `land`
+                // RPC/sound (v2 `player.rs:36-39`).
+                AirborneTime(0.0),
+                InitialPosition(initial_position),
+                // v2 `player.rs:81`.
+                CurrentAnimation(Animations::Walk),
+                // v2 `player_input.rs:21-22`.
+                AimStateC(AimState::Idle),
+                Trauma(0.0),
+                ShakeTime(0.0),
+                StartRotation(start_rotation),
+            ));
+            e.insert((
+                JumpQueued::default(),
+                PendingMouseLook::default(),
+                PendingFx::default(),
+                TickIntents::default(),
+                FrameIntents::default(),
+                ShakePending::default(),
+                ReplicatedInput {
+                    aiming: false,
+                    shoot_target: Vector3::ZERO,
+                    motion: Vector2::ZERO,
+                    shooting: false,
+                },
+                Velocity(Vector3::ZERO),
+            ));
+            if simulates {
+                e.insert(Simulates);
+            }
+            if owns_input {
+                e.insert(OwnsInput);
+            }
+        }
     }
     world.non_send_mut::<NodeHandles>().by_entity.insert(entity, handles);
 }
@@ -192,6 +278,8 @@ fn sync_out_remove(
                 Handles::Door { mut root, .. } => root.queue_free(),
                 Handles::Puff { mut root } => root.queue_free(),
                 Handles::Blast { mut root, .. } => root.queue_free(),
+                // No player is ever marked `Remove` by V3-B; the arm keeps the match exhaustive.
+                Handles::Player(mut p) => p.root.queue_free(),
             }
         }
         index.remove_entity(entity);

@@ -27,11 +27,11 @@ engine-call rule.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add the `v2` worktree if absent (`git worktree list`; else `git worktree add
+- [x] T001 Add the `v2` worktree if absent (`git worktree list`; else `git worktree add
   ../oxide-godot-v2 v2`, `cd ../oxide-godot-v2/oxide_godot_core && cargo build`, `cd
   ../oxide-godot && /usr/bin/godot.x86_64 --headless --import --path .`). Verification: the
   worktree is at `e2932b4`, builds clean, import prints `Initialize godot-rust (...)`.
-- [ ] T002 On `v3` at `9010a3a`: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
+- [x] T002 On `v3` at `9010a3a`: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
   → zero warnings, **156 passed** (paste the `test result:` line); `sed -n 592p
   oxide-godot/player/player.tscn` prints `callback_mode_process = 0` (the line T017 edits);
   `grep -c '#\[test\]' oxide_godot_core/oxide_godot_lib/src/{player,player_input,camera_noise_shake}/model.rs`
@@ -49,7 +49,7 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
 
 ### Commit 1 — `ecs/setup.rs`, `ecs/markers.rs`, `ecs/event.rs`, `ecs/apply.rs`, `ecs.rs`
 
-- [ ] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/markers.rs` add
+- [x] T003 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/markers.rs` add
   `#[derive(Resource)] pub struct Tuning<T: Send + Sync + 'static>(pub T);` and every player
   component of data-model.md "Components" verbatim: `PlayerTag`, `Simulates`, `OwnsInput`,
   `PeerId(i32)`, `Motion(Vector2)`, `Orientation(Transform3D)`, `RootMotion(Transform3D)`,
@@ -69,7 +69,7 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   (no `ShakeOffset`: the shake is sync-only, analyze finding 2), with the derives data-model.md
   shows (`Default` where listed).
   Verification: compiles; `grep -c 'Gd<' ecs/markers.rs` = 0.
-- [ ] T004 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` add the variants
+- [x] T004 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` add the variants
   `InboundEvent::JumpPressed { root_id: InstanceId }`, `MouseLook { root_id, screen_relative:
   Vector2 }`, `AddTrauma { root_id, amount: f64 }`, `PlayerFx { root_id, fx: PlayerFx }`;
   `#[derive(Clone, Copy, Debug, PartialEq)] pub enum PlayerFx { Jump, Land, Shoot }` (NO `Hit`:
@@ -77,7 +77,7 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   i32, simulates: bool, owns_input: bool, initial_position: Vector3, orientation: Transform3D,
   start_rotation: Vector3 }` (v2 `player.rs:78`, `:98`, `player_input.rs:61-62`, `player.rs:88`,
   `:90-91`, `camera_noise_shake.rs:41`). Verification: compiles; `Initial` stays `Copy`.
-- [ ] T005 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `Handles::Player { root:
+- [x] T005 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `Handles::Player { root:
   Gd<Player>, input: Gd<PlayerInputSynchronizer>, anim_tree: Gd<AnimationTree>, model: Gd<Node3D>,
   shoot_from: Gd<Marker3D>, shoot_particle: Gd<CpuParticles3D>, muzzle_particle:
   Gd<CpuParticles3D>, fire_cooldown: Gd<Timer>, snd_jump, snd_land, snd_shoot:
@@ -99,7 +99,7 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   false }`, `Velocity(Vector3::ZERO)`, and the markers `Simulates` iff `simulates`, `OwnsInput`
   iff `owns_input`. Depends on T003, T004. Verification: compiles; `apply_register` is still the
   only writer of `NodeHandles.by_entity`.
-- [ ] T006 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs`: `Phase` gains
+- [x] T006 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs`: `Phase` gains
   `EngineQueryOrient`, `GameplayIntegrate`, `EngineQueryMove`, `GameplaySettle` (research R4,
   option (a)); `build_fixed` chains `(SyncIn, Gameplay, EngineQueryOrient, GameplayIntegrate,
   EngineQueryMove, GameplaySettle, SyncOut)`; `build_frame` unchanged (`SyncIn, Gameplay,
@@ -113,7 +113,7 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   `marker_inserted_in_gameplay_is_visible_in_engine_query_orient_of_the_same_run` (a `Gameplay`
   probe spawns a marker via `Commands`, an `EngineQueryOrient` probe counts 1). Depends on T003.
   Verification: both pass; `phase_sets_are_chained_in_order` still passes.
-- [ ] T007 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` add the four drain arms
+- [x] T007 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` add the four drain arms
   (data-model.md "Drain arms"; every unknown `root_id` dropped): `JumpPressed` → `JumpQueued.0 =
   true` (v2 `player_input.rs:163`); `MouseLook` → `PendingMouseLook.0.push(screen_relative)`
   (`:151-154`); `AddTrauma` → `Trauma.0 = camera_noise_shake::model::add_trauma(trauma.0, amount
@@ -128,7 +128,7 @@ Test**: `cargo test` green at 163 with V3-A's tests untouched; the game still ru
   (`[Jump, Shoot]` queued in order; `Trauma == 0.35` after the drain),
   `player_events_for_unknown_root_are_dropped` (all four events with an unregistered id change
   nothing, no panic). Depends on T003, T004. Verification: five tests pass.
-- [ ] T008 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test` —
+- [x] T008 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test` —
   zero warnings; **163** = 156 + 2 (setup) + 5 (apply); paste the `test result:` line. Headless
   import + `main/main.tscn` + `level/level.tscn` clean (nothing engine-facing changed; a sanity
   run). Commit (R10 row 1): `ecs: seven fixed-schedule sets (Phase extension), Tuning<T>

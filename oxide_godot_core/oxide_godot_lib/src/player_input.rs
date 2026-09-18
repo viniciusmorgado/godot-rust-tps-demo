@@ -6,7 +6,7 @@ use godot::classes::{
 };
 use godot::prelude::*;
 
-mod model;
+pub(crate) mod model;
 
 use model::{
     AimState, CameraCue, InputSnapshot, PlayerInputTuning, aim_rotation, alpha_for_height,
