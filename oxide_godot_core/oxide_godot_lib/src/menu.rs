@@ -272,7 +272,7 @@ impl Menu {
 #[godot_api]
 impl Menu {
     #[signal]
-    fn replace_main_scene(scene: Gd<PackedScene>);
+    pub fn replace_main_scene(scene: Gd<PackedScene>);
 
     #[func]
     fn _on_loading_done_timer_timeout(&mut self) {

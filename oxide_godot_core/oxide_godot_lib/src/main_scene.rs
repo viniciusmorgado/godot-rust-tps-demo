@@ -1,3 +1,5 @@
+use crate::level::Level;
+use crate::menu::Menu;
 use crate::settings::Settings;
 use godot::classes::{
     DisplayServer, Engine, INode, MultiplayerPeer, Node, OfflineMultiplayerPeer, PackedScene,
@@ -33,9 +35,7 @@ impl INode for Main {
     }
 }
 
-#[godot_api]
 impl Main {
-    #[func]
     fn go_to_main_menu(&mut self) {
         let menu = ResourceLoader::singleton()
             .load("res://menu/menu.tscn")
@@ -47,28 +47,33 @@ impl Main {
         self.change_scene_to_packed(menu);
     }
 
-    #[func]
     fn replace_main_scene(&mut self, resource: Gd<PackedScene>) {
-        self.base_mut()
-            .call_deferred("change_scene_to_packed", &[resource.to_variant()]);
+        let mut this = self.to_gd();
+        Callable::from_fn("change_scene_to_packed", move |_args| {
+            this.bind_mut().change_scene_to_packed(resource.clone());
+            Variant::nil()
+        })
+        .call_deferred(&[]);
     }
 
-    #[func]
     fn change_scene_to_packed(&mut self, resource: Gd<PackedScene>) {
-        let mut node = resource.instantiate().unwrap();
+        let node = resource.instantiate().unwrap();
         for mut child in self.base().get_children().iter_shared() {
             self.base_mut().remove_child(&child);
             child.queue_free();
         }
-        self.base_mut().add_child(&node);
-        if node.has_signal("quit") {
-            node.connect("quit", &Callable::from_object_method(&self.to_gd(), "go_to_main_menu"));
-        }
-        if node.has_signal("replace_main_scene") {
-            node.connect(
-                "replace_main_scene",
-                &Callable::from_object_method(&self.to_gd(), "replace_main_scene"),
+        let this = self.to_gd();
+        if let Ok(level) = node.clone().try_cast::<Level>() {
+            level
+                .signals()
+                .quit()
+                .connect_other(&this, |main: &mut Main| main.go_to_main_menu());
+        } else if let Ok(menu) = node.clone().try_cast::<Menu>() {
+            menu.signals().replace_main_scene().connect_other(
+                &this,
+                |main: &mut Main, scene: Gd<PackedScene>| main.replace_main_scene(scene),
             );
         }
+        self.base_mut().add_child(&node);
     }
 }

@@ -87,7 +87,7 @@ impl INode3D for Level {
 #[godot_api]
 impl Level {
     #[signal]
-    fn quit();
+    pub fn quit();
 }
 
 impl Level {
