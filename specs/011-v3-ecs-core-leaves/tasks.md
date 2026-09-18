@@ -235,7 +235,7 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
 
 ### Commit 3 — `door/system.rs` + `door.rs` bridge + `sync_out_door` + `docs/v3-tradeoffs.md`
 
-- [ ] T016 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/door/system.rs` and declare
+- [x] T016 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/door/system.rs` and declare
   `mod system;` in `door.rs` (data-model.md "Components and markers"): move `#[derive(Component,
   Clone, Copy, Debug, PartialEq)] pub enum DoorState { Closed, Open }` and `pub fn on_body(state:
   DoorState, is_player: bool) -> (DoorState, bool)` VERBATIM from v2 `door.rs:10-23` (same `match
@@ -246,7 +246,7 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
   msg.is_player); *state = next; if play { commands.entity(msg.entity).insert(PlayOpen) }`. No
   `Gd`, no `NonSend`. Verification: compiles; `door/system.rs` imports nothing from
   `godot::classes`.
-- [ ] T017 [US2] Add `#[cfg(test)] mod tests` to `door/system.rs` (FR-018; recipe research.md
+- [x] T017 [US2] Add `#[cfg(test)] mod tests` to `door/system.rs` (FR-018; recipe research.md
   R9: `use bevy_ecs::system::RunSystemOnce;`, `World::new()`, insert `EntityIndex` and
   `Messages::<DoorBodyEntered>::default()`, spawn one entity with `DoorState`, write one message,
   `world.run_system_once(open_on_player).unwrap()`, assert `world.get::<DoorState>(e)` and
@@ -259,7 +259,7 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
   { id, is_player: true })`, run the system, assert `Open` + `PlayOpen`) and
   `event_for_unknown_id_is_dropped` (unregistered id → no message written, door stays `Closed`).
   Depends on T016. Verification: five tests pass.
-- [ ] T018 [US2] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `fn sync_out_door(query:
+- [x] T018 [US2] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `fn sync_out_door(query:
   Query<Entity, With<PlayOpen>>, mut handles: NonSendMut<NodeHandles>, mut commands: Commands)`
   — for each entity, `if let Some(Handles::Door { anim, .. }) = handles.by_entity.get_mut(&e) {
   anim.play_ex().name("doorsimple_opening").done(); }` (v2 `door.rs:80`, exactly once per flag),
@@ -270,7 +270,7 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
   `crate::door::system::open_on_player.in_set(Phase::Gameplay)`. In `apply_register` replace the
   `Initial::Door` placeholder with `world.entity_mut(e).insert(DoorState::Closed)`. Depends on
   T016. Verification: `phase_sets_are_chained_in_order` and the T017 tests still pass.
-- [ ] T019 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/door.rs` as a bridge (data-model.md
+- [x] T019 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/door.rs` as a bridge (data-model.md
   "Bridges", FR-014/FR-015): delete `mod pure`, the `state` field and the `play_ex` call; keep
   `#[derive(GodotClass)] #[class(init, base=Area3D)] pub struct Door { base: Base<Area3D>,
   #[init(node = "DoorModel2/AnimationPlayer")] animation_player: OnReady<Gd<AnimationPlayer>> }`
@@ -287,14 +287,14 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
   `door.tscn` change at all). Verification: `grep -n 'fn process\|fn physics_process\|play_ex\|
   DoorState' door.rs` returns nothing; `grep -c 'upstream bug fix' door.rs` = 1;
   `grep -c 'Backlog #14' door.rs` = 1.
-- [ ] T020 [US2] Create `docs/v3-tradeoffs.md` with the header block from
+- [x] T020 [US2] Create `docs/v3-tradeoffs.md` with the header block from
   `contracts/ecs-api.md` §3 (title, the two-sentence intro citing constitution 1.5.1, the
   five-column table header) and row (d): `part`, `level`, `red_robot` — the engine owns scene
   instancing (`PackedScene::instantiate` + `add_child`), the ECS cannot hide it because the node
   must exist before it can be viewed, the sync layer handles it by having the spawned node's
   bridge push `Register` from `ready` (locations: `part.rs:116-117`/`:196-205`,
   `red_robot.rs:423-425`, `level.rs`'s spawner). Verification: file has the header + 1 row.
-- [ ] T021 [US2] Gates + headless: `cargo build && cargo clippy && cargo test` (150 − 3 + 5 = **152** — the three v2 door tests leave `door.rs`, five land in `door/system.rs`
+- [x] T021 [US2] Gates + headless: `cargo build && cargo clippy && cargo test` (150 − 3 + 5 = **152** — the three v2 door tests leave `door.rs`, five land in `door/system.rs`
   tests; the three v2 door tests are gone from `door.rs` and present in `door/system.rs` — none
   lost); `--headless --import`, `main.tscn`, `level.tscn` clean. Harness case (a) (research.md
   R10, quickstart.md §3): write `oxide-godot/oxide-godot/zz_ecs_parity.gd` from

@@ -40,12 +40,13 @@ func _ready() -> void:
 	observer = Node.new()
 	observer.name = "Observer"
 	observer.process_priority = -2147483648  # i32::MIN — first in every process pass (research R1)
-	add_child(observer)
+	# The script MUST be set BEFORE add_child: a script attached to a node already in the tree does
+	# not get its _ready/processing enabled, and the observer never logs (found at T021).
 	observer.set_script(load("res://zz_ecs_observer.gd"))
+	add_child(observer)
 	# zz_ecs_observer.gd (second scratch file, copied alongside this one) is exactly:
 	#   extends Node
 	#   func _process(_d: float) -> void: get_parent()._observe()
-	# Its process_priority is set above, on the node, before the script's first _process.
 	match case:
 		"a": _setup_a()
 		"b": _setup_b()
@@ -79,15 +80,19 @@ func _setup_a() -> void:
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new(); box.size = Vector3(200, 1, 200); shape.shape = box
 	floor_body.add_child(shape); floor_body.position = Vector3(0, -0.5, 0); add_child(floor_body)
-	door = load(DOOR_SCENE).instantiate(); add_child(door); door.position = Vector3(0, 0, 0)
-	door2 = load(DOOR_SCENE).instantiate(); add_child(door2); door2.position = Vector3(0, 0, 40)
+	# Positions are set BEFORE add_child: a body added at the origin sits inside door's area for
+	# its first physics step and opens it at F1 regardless of where it is moved afterwards
+	# (found at T021).
+	door = load(DOOR_SCENE).instantiate(); door.position = Vector3(0, 0, 0); add_child(door)
+	door2 = load(DOOR_SCENE).instantiate(); door2.position = Vector3(0, 0, 40); add_child(door2)
 	door_anim = door.get_node("DoorModel2/AnimationPlayer")
 	door2_anim = door2.get_node("DoorModel2/AnimationPlayer")
-	player = load(PLAYER_SCENE).instantiate(); add_child(player)
+	player = load(PLAYER_SCENE).instantiate()
 	player.position = Vector3(0, 1, -12); player.collision_layer = 1  # harness-only: bypass backlog #30's mask
+	add_child(player)
 	mover = CharacterBody3D.new()
 	var ms := CollisionShape3D.new(); var mb := BoxShape3D.new(); mb.size = Vector3(1, 2, 1); ms.shape = mb
-	mover.add_child(ms); add_child(mover); mover.position = Vector3(0, 1, 28); mover.collision_layer = 1
+	mover.add_child(ms); mover.position = Vector3(0, 1, 28); mover.collision_layer = 1; add_child(mover)
 	door_anim.animation_started.connect(func(n): _log("RAW F%d door_anim_started=%s" % [_frame(), n]))
 	door2_anim.animation_started.connect(func(n): _log("RAW F%d door2_anim_started=%s" % [_frame(), n]))
 
@@ -97,6 +102,8 @@ func _physics_process(_d: float) -> void:
 			# physics-step body entry, as bodies move in the game (FR-029 (a))
 			player.velocity = Vector3(0, 0, 6); player.move_and_slide()
 			mover.velocity = Vector3(0, 0, 6); mover.move_and_slide()
+			if Engine.get_physics_frames() <= 3 or Engine.get_physics_frames() % 30 == 0:
+				print("DIAG P%d player.z=%.3f mover.z=%.3f" % [Engine.get_physics_frames(), player.global_position.z, mover.global_position.z])
 		"c":
 			if Engine.get_physics_frames() == 5:
 				# physics-step instancing, as red_robot.rs:423-425 does (FR-029 (c))

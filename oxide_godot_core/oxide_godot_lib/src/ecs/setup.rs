@@ -50,7 +50,9 @@ fn chained(label: impl ScheduleLabel) -> Schedule {
 }
 
 pub fn build_fixed() -> Schedule {
-    chained(Fixed)
+    let mut schedule = chained(Fixed);
+    schedule.add_systems(crate::door::system::open_on_player.in_set(Phase::Gameplay));
+    schedule
 }
 
 pub fn build_frame() -> Schedule {
