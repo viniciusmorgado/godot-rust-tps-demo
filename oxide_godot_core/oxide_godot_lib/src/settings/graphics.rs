@@ -195,8 +195,8 @@ impl GraphicsSettings {
     pub fn default_for(metalfx_supported: bool) -> Self {
         Self {
             display_mode: WindowMode::EXCLUSIVE_FULLSCREEN,
-            vsync: VSyncMode::ENABLED,
-            max_fps: 0,
+            vsync: VSyncMode::DISABLED,
+            max_fps: 0, // Unlimited
             resolution_scale: 1.0,
             scale_filter: if metalfx_supported {
                 ScaleFilter::MetalFxTemporal
@@ -204,13 +204,13 @@ impl GraphicsSettings {
                 ScaleFilter::Fsr2
             },
             taa: false,
-            msaa: Msaa::DISABLED,
-            screen_space_aa: ScreenSpaceAa::DISABLED,
+            msaa: Msaa::MSAA_8X,
+            screen_space_aa: ScreenSpaceAa::SMAA,
             shadow_mapping: true,
-            gi_type: GiType::VoxelGi,
-            gi_quality: GiQuality::Low,
-            ssao_quality: SsaoQuality::Medium,
-            ssil_quality: SsilQuality::Disabled,
+            gi_type: GiType::Sdfgi,
+            gi_quality: GiQuality::High,
+            ssao_quality: SsaoQuality::High,
+            ssil_quality: SsilQuality::High,
             bloom: true,
             volumetric_fog: true,
         }
