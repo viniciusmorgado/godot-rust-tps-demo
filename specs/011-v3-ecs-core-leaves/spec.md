@@ -495,7 +495,9 @@ vanish when their animation ends.
   yields no target and no write. (Scenario 2, US4.)
 - **FR-025**: `SyncOut` MUST call `light_rays.look_at(target)` for each entity with a target
   (engine-backed, glue by the 1.4.1 rule); `Changed<T>` MAY gate the write; per blast per frame
-  the engine calls MUST be at most v2's three. `blast` has NO pure gameplay system, and
+  the engine calls MUST be at most v2's three, EXCLUDING the FR-009 root validity sweep (one
+  `is_instance_valid` per registered entity per run, mandated by the spec itself and shared by
+  every entity kind — plan review, 2026-09-18). `blast` has NO pure gameplay system, and
   `docs/v3-tradeoffs.md` MUST say why. (Scenario 3, US4.)
 - **FR-026**: `BlastAnimationFinished` MUST flag the entity for removal (unknown id dropped),
   and `SyncOut` MUST `queue_free()` the node. (Scenario 4, US4.)
