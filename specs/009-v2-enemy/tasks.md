@@ -257,7 +257,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `--fixed-fps 60`). Verification: (a) identical dumps on both trees (no backlog item in this
   commit changes any OBSERVABLE trace — #16/#18 are unobservable by construction); (b)
   identical `dead`/signal-count/removal-frame-count on both trees.
-- [ ] T025 [US1] 🛑 **STOP — user visual checkpoint 1**. Ask the user to run the game and
+- [x] T025 [US1] 🛑 **STOP — user visual checkpoint 1**. Ask the user to run the game and
   confirm: a robot detects the player, turns to face, prepares, aims, fires its laser (impact
   effect visible; camera shakes if the laser hits the player), and — after 5 hits — dies, its
   three parts fly apart, and it vanishes roughly 10 seconds later. Also ask the user to NOTE —
@@ -275,7 +275,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Commit 3 — `part.rs`
 
-- [ ] T026 [P] [US2] In `oxide_godot_core/oxide_godot_lib/src/part.rs`, add an inline
+- [x] T026 [P] [US2] In `oxide_godot_core/oxide_godot_lib/src/part.rs`, add an inline
   `mod pure { ... }` with `fade_curve(counter: f32, disappearing_time: f32) -> f32`
   (`(counter / disappearing_time).powi(2)` — `part.rs:54`), `should_destroy(counter: f32,
   disappearing_time: f32) -> bool` (`counter >= disappearing_time - 0.2` — `:57`),
@@ -283,13 +283,13 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   .normalized() * 2.0 - Vector3::ONE) * 10.0` — `:90-93`, three ALREADY-SAMPLED `[0.0, 1.0)`
   inputs, RNG stays in glue), `wait_time(lifetime: f32, lifetime_random: f32, r: f32) -> f32`
   (`lifetime + lifetime_random * r` — `:95`, one already-sampled input).
-- [ ] T027 [US2] Add `#[cfg(test)] mod tests` inside `mod pure`: `fade_curve` reproduces the
+- [x] T027 [US2] Add `#[cfg(test)] mod tests` inside `mod pure`: `fade_curve` reproduces the
   squared ratio for a representative counter/time pair; `should_destroy` is `false` just below
   `disappearing_time - 0.2` and `true` at/above it; `random_angular_velocity` reproduces the
   exact formula for representative `r1`/`r2`/`r3` inputs, confirming the result is NOT
   renormalized after the `* 2.0 - Vector3::ONE` shift (matches `v1` bit for bit); `wait_time`
   reproduces the formula for a representative `lifetime`/`lifetime_random`/`r` triple.
-- [ ] T028 [US2] Rename `_mat`/`_disappearing_counter` to `material: Option<Gd<Material>>`/
+- [x] T028 [US2] Rename `_mat`/`_disappearing_counter` to `material: Option<Gd<Material>>`/
   `disappearing_counter: f32` (Rust naming, `v1`'s GDScript-style names dropped — neither is
   exported/replicated either way, no surface change). Add `synchronizer: OnReady<Gd<
   MultiplayerSynchronizer>>` (`#[init(node = "MultiplayerSynchronizer")]`), `col1`/`col2:
@@ -300,7 +300,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `PartShield1`/`2` vs `PartHead`, only the INDEX `0` is stable), `part_disappear_scene: Gd<
   PackedScene>` via `#[init(val = load("res://enemies/red_robot/parts/part_disappear_effect/
   part_disappear.tscn"))]` (bare field, V2-C precedent).
-- [ ] T029 [US2] Rewrite `ready()`: the per-instance surface-material override (upstream bug fix
+- [x] T029 [US2] Rewrite `ready()`: the per-instance surface-material override (upstream bug fix
   #2) stays EXACTLY where it is, with its `// upstream bug fix` comment, UNMODIFIED — only the
   `MeshInstance3D` lookup it starts from now reads `self.model_mesh` (T028) instead of
   `get_node_as::<Node>("Model").get_child(0)` inline. Rewrite `process(&mut self, delta: f64)`:
@@ -308,7 +308,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   `self.set_fade_value(...)`; `self.disappearing_counter += delta as f32`;
   `pure::should_destroy(...)` → if `true`, RPC `destroy` and `self.base_mut()
   .set_process(false)` (unchanged effects, `:53-61`).
-- [ ] T030 [US2] Rewrite `explode(&mut self)`: the synchronizer-visibility toggle and the
+- [x] T030 [US2] Rewrite `explode(&mut self)`: the synchronizer-visibility toggle and the
   non-server early return stay in their EXACT current order (`:80-86`, unchanged); `self.col1`/
   `self.col2` (T028's `OnReady` fields, were `get_node_as` per call) `.set_disabled(false)`;
   linear velocity `3.0 * Vector3::UP` (unchanged literal); `pure::random_angular_velocity`
@@ -317,7 +317,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   block awaiting `create_timer(wait as f64).signals().timeout().to_future()`, then
   `is_instance_valid()` before `self.base_mut().set_process(true)` (backlog #5-style async,
   replacing the `connect_other` chain at `:96-101`).
-- [ ] T031 [US2] Rewrite `destroy(&mut self)`: instantiate `self.part_disappear_scene` (T028's
+- [x] T031 [US2] Rewrite `destroy(&mut self)`: instantiate `self.part_disappear_scene` (T028's
   preloaded field, was `load()` per call) via `.instantiate_as::<CpuParticles3D>()`; resolve the
   puff's parent per research.md R7's 3-hop walk — `self.base().get_parent()` (→ `Death`)
   `.and_then(|d| d.get_parent())` (→ the `EnemyRobot`) `.and_then(|r| r.get_parent())` (→ the
@@ -327,7 +327,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
   .base().get_global_transform().origin)` (unchanged); a `godot::task::spawn` block awaiting
   `create_timer(0.2).signals().timeout().to_future()`, then `is_instance_valid()` before
   `self.base_mut().queue_free()` (replacing the `connect_other` chain at `:113-118`).
-- [ ] T032 [US2] Gates + headless. Grep (SC-004, this module's half): `grep -n connect_other
+- [x] T032 [US2] Gates + headless. Grep (SC-004, this module's half): `grep -n connect_other
   oxide_godot_core/oxide_godot_lib/src/part.rs` → no matches. Commit: `part: pure fade/lifetime,
   OnReady resources incl. from_base_fn Model child, async waits, puff parented under the robot's
   own parent; closes backlog #15`.
