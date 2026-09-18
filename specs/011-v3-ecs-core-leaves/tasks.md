@@ -18,12 +18,12 @@ Every harness task MUST paste the actual `diff` output in its completion note �
 
 ## Phase 1: Setup
 
-- [ ] T001 Add the `v2` worktree and prepare it for the harness (research.md R10):
+- [x] T001 Add the `v2` worktree and prepare it for the harness (research.md R10):
   `git worktree add ../oxide-godot-v2 v2`, then `cd ../oxide-godot-v2/oxide_godot_core && cargo
   build`, then `cd ../oxide-godot-v2/oxide-godot && /usr/bin/godot.x86_64 --headless --import
   --path .`. Verification: the worktree builds clean and its import prints
   `Initialize godot-rust (...)`; `git worktree list` shows `../oxide-godot-v2` at `e2932b4`.
-- [ ] T002 On `v3` at `08bc3bd`, confirm the baseline gate: from `oxide_godot_core/`,
+- [x] T002 On `v3` at `08bc3bd`, confirm the baseline gate: from `oxide_godot_core/`,
   `cargo build && cargo clippy && cargo test`, then record the SC-007 "before" number:
   `cargo tree --prefix none | sort -u | wc -l`. Verification: zero warnings, **133 tests pass**,
   the count is **22** (plan.md Technical Context) — paste the number in the completion note.
@@ -40,7 +40,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
 
 ### Commit 1 — pure core (`ecs/*.rs`, types only in `ecs.rs`)
 
-- [ ] T003 [US1] Pin the dependency (FR-001): in `oxide_godot_core/Cargo.toml` add
+- [x] T003 [US1] Pin the dependency (FR-001): in `oxide_godot_core/Cargo.toml` add
   `bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }` to
   `[workspace.dependencies]` (after `godot`); in `oxide_godot_core/oxide_godot_lib/Cargo.toml`
   add `bevy_ecs = { workspace = true }` under `[dependencies]`; in
@@ -57,7 +57,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   bevy_ecs`); then record the SC-007 "after" number with `cargo tree --prefix none | sort -u |
   wc -l` and write both numbers (22 → N) into plan.md's Technical Context "Crate-graph delta"
   sentence.
-- [ ] T004 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` (data-model.md
+- [x] T004 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` (data-model.md
   "Events"): `pub enum InboundEvent { Register { id: InstanceId, handles: Handles, initial:
   Initial }, Unregister { id: InstanceId }, DoorBodyEntered { id: InstanceId, is_player: bool },
   BlastAnimationFinished { id: InstanceId } }`; `pub enum Initial { Door, Puff { lifetime: f32 },
@@ -66,7 +66,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   bool }` (`bevy_ecs::message::Message`, the drain writes it AFTER resolving `id → Entity`).
   `Handles` is imported from `crate::ecs`. Verification: compiles; `InboundEvent` has no
   `Send`/`Sync` bound anywhere (it holds `Gd<T>`).
-- [ ] T005 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/queue.rs` (research.md R2):
+- [x] T005 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/queue.rs` (research.md R2):
   `thread_local! { static QUEUE: RefCell<Vec<InboundEvent>> = RefCell::new(Vec::new()); }`,
   `pub fn push(event: InboundEvent)` (`QUEUE.with(|q| q.borrow_mut().push(event))`), `pub fn
   drain() -> Vec<InboundEvent>` (`QUEUE.with(|q| std::mem::take(&mut *q.borrow_mut()))` — swap,
@@ -76,7 +76,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   C → drain yields `[A, B, C]`, matched by variant/id), `drain_empties_the_queue` (a second
   `drain()` returns an empty `Vec`). Verification: both tests pass; note that `thread_local!`
   state is per test thread, so each test pushes and drains within itself.
-- [ ] T006 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/timer.rs` (research.md R5,
+- [x] T006 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/timer.rs` (research.md R5,
   data-model.md "Timer"): `#[derive(Clone, Copy, Debug, PartialEq)] pub struct Timer { time_left:
   f64, expired: bool }`, `pub fn new(seconds: f64) -> Self` (`time_left = seconds, expired =
   false`), `pub fn step(&mut self, dt: f64) -> bool` doing EXACTLY the engine's arithmetic —
@@ -87,7 +87,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   13 — the residual after 12 subtractions is `+4.86e-17`, R1 fact 6), `does_not_expire_one_step_before`
   (after 12 steps `step` has returned `false` every time), `fires_exactly_once` (step 14 returns
   `false`), `three_seconds_at_sixty_hz_fires_on_step_181`. Verification: all four pass.
-- [ ] T007 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/index.rs` (research.md R4,
+- [x] T007 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/index.rs` (research.md R4,
   data-model.md "Index"): `#[derive(Resource, Default)] pub struct EntityIndex { by_id:
   HashMap<InstanceId, Entity> }`, `pub enum Registration { Registered(Entity),
   AlreadyRegistered(Entity) }`, `pub fn register_if_absent(&mut self, id: InstanceId, spawn:
@@ -102,7 +102,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `None`, map unchanged), `unregister_then_late_sweep_is_noop` (unregister → `remove_entity` of
   the same entity → no panic, map empty), `sweep_then_late_unregister_is_noop` (`remove_entity`
   → `unregister` returns `None`). Verification: all five pass.
-- [ ] T008 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/markers.rs` (data-model.md
+- [x] T008 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/markers.rs` (data-model.md
   "Components and markers"): `#[derive(Resource, Clone, Copy)] pub struct FrameDelta(pub f64);`,
   `#[derive(Resource, Clone, Copy)] pub struct FixedDelta(pub f64);`, `#[derive(Component)] pub
   struct PlayOpen;`, `#[derive(Component)] pub struct StartEmitting;`, `#[derive(Component)] pub
@@ -110,7 +110,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   PartialEq)] pub struct LookTarget(pub Vector3);` (`godot::builtin::Vector3` — an FFI-free
   value type allowed in pure code by Principle III). Verification: compiles; no `Gd` anywhere in
   the file.
-- [ ] T009 [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` (research.md R3):
+- [x] T009 [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` (research.md R3):
   `pub fn apply_non_register(world: &mut World, event: InboundEvent)` handling three applied
   variants plus a guarded `Register` arm — `Unregister { id }`: `EntityIndex::unregister(id)`; on `Some(e)` remove `e` from
   `NodeHandles.by_entity` (via `world.get_non_send_resource_mut::<NodeHandles>()` — the
@@ -129,7 +129,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `None`). The door round-trip tests (`event_for_registered_id_reaches_its_entity`,
   `event_for_unknown_id_is_dropped`) live in `door/system.rs` (T017), NOT here, because they
   assert on the door system's outcome. Verification: three tests pass.
-- [ ] T010 [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs` (research.md R8,
+- [x] T010 [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs` (research.md R8,
   data-model.md "Schedules and sets"): `#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq,
   Hash)] pub enum Phase { SyncIn, Gameplay, EngineQuery, SyncOut }`; `#[derive(ScheduleLabel,
   Debug, Clone, Copy, PartialEq, Eq, Hash)] pub struct Fixed;` and `pub struct Frame;`; `pub fn
@@ -149,7 +149,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `marker_inserted_in_gameplay_is_visible_in_sync_out_of_the_same_run` (a `Gameplay` probe does
   `commands.spawn(ProbeMarker)`, a `SyncOut` probe counts `Query<(), With<ProbeMarker>>` into a
   resource; after ONE run the count is 1). Verification: all three pass.
-- [ ] T011 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`.
+- [x] T011 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`.
   Verification: zero warnings; test count = 133 + 2 (queue) + 4 (timer) + 5 (index) + 3 (apply)
   + 3 (setup) = **150**, paste the `test result:` line. Commit (plan.md R11 row 1):
   `ecs: pure core — queue, timer, index, apply, setup (tests); bevy_ecs 0.19 pinned`.

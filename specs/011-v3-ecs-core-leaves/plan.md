@@ -35,8 +35,10 @@ NEW: `bevy_ecs = { version = "0.19", default-features = false, features = ["std"
 `[workspace.dependencies]`, inherited with `{ workspace = true }` (FR-001). Resolves to 0.19.1
 (`bevy_ecs-0.19.1` in the local registry; 0.20 is `-rc`, forbidden). MSRV 1.95 ≤ 1.98. No
 `bevy_reflect`, `async_executor`, `multi_threaded`. Crate-graph delta (SC-007): baseline
-`cargo tree --prefix none | sort -u | wc -l` = 22 on `85186f6` (2026-09-18); the after-value is
-measured and written here in commit 1.
+`cargo tree --prefix none | sort -u | wc -l` = 22 on `85186f6` (2026-09-18); measured in commit 1
+(2026-09-18): **77** after the pin, i.e. **+55** lines (unique crate names: 66; the extra lines are
+second versions of crates already in `godot`'s graph). The spec's "at most 44" (SC-007) was the
+probe crate's figure and is exceeded by the real graph — reported, not hidden.
 
 **Storage**: N/A (no persisted state; `Settings` untouched).
 

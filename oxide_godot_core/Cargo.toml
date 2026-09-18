@@ -5,3 +5,4 @@ members = ["oxide_godot_lib"]
 # Convention: ALL template dependencies live in [workspace.dependencies] below and are inherited via `{ workspace = true }` in the member crate — never declare a dependency directly in a member's [dependencies]/[dev-dependencies].
 [workspace.dependencies]
 godot = { version = "0.5.5", features = ["experimental-threads"] }
+bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }

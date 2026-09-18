@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 godot = { workspace = true }
+bevy_ecs = { workspace = true }
 
 [lib]
 crate-type = ["cdylib"]

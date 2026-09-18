@@ -1,6 +1,7 @@
 use godot::prelude::*;
 
 mod debug_label;
+pub mod ecs;
 mod part_disappear;
 mod blast;
 mod camera_noise_shake;
