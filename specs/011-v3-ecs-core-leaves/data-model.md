@@ -155,7 +155,9 @@ Tests — blast (`ecs/apply.rs`, FR-012/FR-026): `blast_animation_finished_marks
 
 Tests — setup (`ecs/setup.rs`): `both_schedules_run_on_an_empty_world`,
 `phase_sets_are_chained_in_order` (a probe system per set writes to a `Vec` resource; the order
-observed is `SyncIn, Gameplay, EngineQuery, SyncOut`).
+observed is `SyncIn, Gameplay, EngineQuery, SyncOut`),
+`marker_inserted_in_gameplay_is_visible_in_sync_out_of_the_same_run` (pins bevy's
+`auto_insert_apply_deferred` default, research R6 / analyze M3).
 
 ## Schedules and sets (`ecs/setup.rs`)
 
@@ -175,10 +177,12 @@ construction (research R8/R9), so `setup.rs` is testable without Godot.
 
 | Class (base) | `ready` pushes | `exit_tree` pushes | Handlers | Preserved surface |
 |---|---|---|---|---|
-| `Door` (`Area3D`) | `Register { id, Handles::Door { root: self.to_gd(), anim }, Initial::Door }` — `anim` from `#[init(node = "DoorModel2/AnimationPlayer")]` under the upstream bug fix comment (`door.rs:60-63`) | `Unregister { id }` | `#[func] fn _on_door_body_entered(&mut self, body: Gd<Node3D>)` → `try_cast::<Player>()` (backlog #14 comment kept, `door.rs:73-75`) → push `DoorBodyEntered` | `door.tscn:35` connection; type name `Door` |
-| `PartDisappear` (`CpuParticles3D`) | `mini_blasts.set_emitting(true)` (v2 `:15`, one-shot); `Register { id, Handles::Puff { root: self.to_gd() }, Initial::Puff { lifetime: self.base().get_lifetime() } }` | `Unregister { id }` | none | type name `PartDisappear` (`part_disappear.tscn:42`) |
-| `Blast` (`Node3D`) | camera = `get_tree().get_root().get_camera_3d()` (v2 `:19`); `animation_player.signals().animation_finished().connect_other(&self.to_gd(), Self::_on_animation_finished)` — `connect_other`, NOT `connect_self`: in gdext 0.5.5 `connect_self` hands the receiver `&mut C` where `C` is the signal's EMITTER (`typed_signal.rs:265-268`, here the `AnimationPlayer`); receiving a child's signal on the parent is `connect_other` (`:299`), which captures a strong `Gd<Blast>` inside the child's connection — harmless for a `Node` (manual memory: `queue_free` frees it regardless, and the child dies with it); `Register { id, Handles::Blast { root: self.to_gd(), light_rays, camera }, Initial::Blast }` | `Unregister { id }` | `#[func] fn _on_animation_finished(&mut self, _name: StringName)` → push `BlastAnimationFinished` (the `StringName` parameter is required by the signal's signature; it is not used) | type name `Blast` (`impact_effect.tscn:169`) |
+| `Door` (`Area3D`) | `Register { id, Handles::Door { root: self.to_gd().upcast::<Area3D>(), anim }, Initial::Door }` — `anim` from `#[init(node = "DoorModel2/AnimationPlayer")]` under the upstream bug fix comment (`door.rs:60-63`) | `Unregister { id }` | `#[func] fn _on_door_body_entered(&mut self, body: Gd<Node3D>)` → `try_cast::<Player>()` (backlog #14 comment kept, `door.rs:73-75`) → push `DoorBodyEntered` | `door.tscn:35` connection; type name `Door` |
+| `PartDisappear` (`CpuParticles3D`) | `mini_blasts.set_emitting(true)` (v2 `:15`, one-shot); `Register { id, Handles::Puff { root: self.to_gd().upcast::<CpuParticles3D>() }, Initial::Puff { lifetime: self.base().get_lifetime() } }` | `Unregister { id }` | none | type name `PartDisappear` (`part_disappear.tscn:42`) |
+| `Blast` (`Node3D`) | camera = `get_tree().get_root().get_camera_3d()` (v2 `:19`); `animation_player.signals().animation_finished().connect_other(&self.to_gd(), Self::_on_animation_finished)` — `connect_other`, NOT `connect_self`: in gdext 0.5.5 `connect_self` hands the receiver `&mut C` where `C` is the signal's EMITTER (`typed_signal.rs:265-268`, here the `AnimationPlayer`); receiving a child's signal on the parent is `connect_other` (`:299`), which captures a strong `Gd<Blast>` inside the child's connection — harmless for a `Node` (manual memory: `queue_free` frees it regardless, and the child dies with it); `Register { id, Handles::Blast { root: self.to_gd().upcast::<Node3D>(), light_rays, camera }, Initial::Blast }` | `Unregister { id }` | `#[func] fn _on_animation_finished(&mut self, _name: StringName)` → push `BlastAnimationFinished` (the `StringName` parameter is required by the signal's signature; it is not used) | type name `Blast` (`impact_effect.tscn:169`) |
 
 `id` is always `self.base().instance_id()` (`Gd::instance_id`, `gd.rs:301`, through
-`WithBaseField::base`, `traits.rs:420`). None of the three has `process`/`physics_process`, an
+`WithBaseField::base`, `traits.rs:420`). `self.to_gd()` returns `Gd<Self>` (the bridge class), so
+every root handle is upcast to the engine type the `Handles` variant declares (`Gd::upcast`,
+`gd.rs:425`) — analyze B1, 2026-09-18. None of the three has `process`/`physics_process`, an
 `Entity` field, or any access to `EcsWorld`.

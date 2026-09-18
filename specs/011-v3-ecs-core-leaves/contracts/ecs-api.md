@@ -82,7 +82,20 @@ code; the spawned node's bridge registers itself from `ready`.
 
 ## 4. Harness contract files
 
-- `zz_ecs_parity.gd` — the three-case parity harness with its observer (research R10).
+- `zz_ecs_parity.gd` — the three-case parity harness with its observer (research R10). Its
+  scene `zz_ecs_parity.tscn` is these six lines (Godot rewrites `uid`s on import; fine for a
+  scratch file):
+
+  ```text
+  [gd_scene load_steps=2 format=3]
+
+  [ext_resource type="Script" path="res://zz_ecs_parity.gd" id="1"]
+
+  [node name="ZzEcsParity" type="Node3D"]
+  script = ExtResource("1")
+  ```
+
+  `zz_ecs_observer.gd` is the two-line script quoted inside `zz_ecs_parity.gd`'s `_ready`.
 - `zz_order_probe.gd` — the R1 experiment (autoload + scene scripts merged into one documented
   file), so the priority decision can be re-verified on any future engine version.
 

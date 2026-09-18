@@ -201,7 +201,7 @@ last; the harness runs after commits 3, 4, 5 with a STOP for the user's visual c
 
 | # | Commit | Gate + validation |
 |---|---|---|
-| 1 | `ecs: pure core — queue, timer, index, apply, setup (tests); bevy_ecs 0.19 pinned` | gates; `cargo tree` delta recorded here (SC-007) |
+| 1 | `ecs: pure core — queue, timer, index, apply, setup (tests); bevy_ecs 0.19 pinned` | gates; `cargo tree` delta recorded in this plan's Technical Context, so `plan.md` is part of commit 1 (SC-007) |
 | 2 | `ecs: EcsWorld autoload + driver (priorities i32::MAX) + sync systems; ecs_world.tscn; project.godot autoload` | gates + headless import/`main.tscn`/`level.tscn` + scratch autoload check; R1 output in the commit body |
 | 3 | `door: bridge + open_on_player system (v2 on_body preserved, 3 tests + round-trip); docs/v3-tradeoffs.md created (entry d)` | gates + headless + harness (a) on both trees |
 | 4 | `part_disappear: bridge + DisappearPhase/Timer system; tradeoffs entry (a)` | gates + headless + harness (b); **STOP: checkpoint (1)** |
@@ -213,7 +213,7 @@ last; the harness runs after commits 3, 4, 5 with a STOP for the user's visual c
 *No constitution violation. One spec-internal tension, recorded and resolved by the user at plan
 review:*
 
-| Item | Why it exists | Resolution proposed |
+| Item | Why it exists | Resolution |
 |---|---|---|
 | FR-025 ("per blast per frame the engine calls MUST be at most v2's three") vs FR-009 (`SyncIn` validity sweep of every registered entity) | v2 makes 3 explicit engine calls per blast per frame (`blast.rs:42-47`). v3 makes the same 3 (camera validity + transform, both shared among blasts caching the same camera; `look_at` only when the target changed) PLUS the root validity check FR-009 mandates — 4 for a lone blast, ≤ 3 amortized from two concurrent blasts (research R7). Dropping the frame-schedule sweep would leave `look_at` unguarded against a node freed between the physics step and the frame's `SyncOut`. | RESOLVED at plan review (2026-09-18, user-approved): FR-009 kept; FR-025 amended in spec.md with the clause "excluding the FR-009 root validity sweep". The implementation still reports the measured count (3 + sweep for a lone blast, ≤ 3 + sweep amortized). |
 

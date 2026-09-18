@@ -429,8 +429,9 @@ vanish when their animation ends.
   for entities flagged for removal by a system; `free()` is forbidden in the sync layer; no
   gameplay system calls the engine. (Scenario 8, US1.)
 - **FR-011**: A generic timer component MUST exist, stepped by a system in the frame schedule
-  with the frame delta (`f64`), expiring exactly once on the first step at which accumulated
-  elapsed ≥ duration, and never again unless reset. (Scenario 9, US1.)
+  with the frame delta (`f64`), counting `time_left` down with the engine's own
+  `SceneTreeTimer` arithmetic (`time_left -= dt`, fires when `<= 0`), expiring exactly once on the
+  first step that reaches zero and never again unless reset. (Scenario 9, US1.)
 - **FR-012**: Pure, Godot-free unit tests MUST cover: FIFO drain order; register/unregister
   idempotence and the unknown-id no-op; the two `exit_tree`-after-despawn orders; timer
   boundary expiry, one-step-before non-expiry, and no double fire; and every gameplay system
@@ -457,10 +458,13 @@ vanish when their animation ends.
   signature (`door.tscn:35` unedited) and MUST only compute `is_player` via
   `body.try_cast::<Player>().is_ok()` (backlog #14 comment kept) and push
   `DoorBodyEntered { id, is_player }`. (Scenario 1, US2.)
-- **FR-016**: A gameplay system MUST consume `DoorBodyEntered`, resolve the entity by id (drop
-  the event if unknown), and apply the v2 `on_body` decision (`door.rs:18-23`, moved into the
-  ECS module) to the `DoorState` component, flagging the entity to play the open animation when
-  the decision says so; the flag is consumed in the same tick. (Scenarios 3, 4, 5, US2.)
+- **FR-016**: The drain MUST resolve `DoorBodyEntered`'s `InstanceId` to its entity (an unknown
+  id is dropped silently) and hand the resolved event to the gameplay layer; a gameplay system
+  MUST consume it and apply the v2 `on_body` decision (`door.rs:18-23`, moved into the ECS
+  module) to the `DoorState` component, flagging the entity to play the open animation when the
+  decision says so; the flag is consumed in the same tick (the marker inserted by the gameplay
+  system MUST be visible to `SyncOut` of the same schedule run — analyze M3, 2026-09-18).
+  (Scenarios 3, 4, 5, US2.)
 - **FR-017**: `SyncOut` MUST play `doorsimple_opening` on the flagged entity's `AnimationPlayer`
   exactly once per flag. (Scenario 3, US2.)
 - **FR-018**: The three v2 door tests MUST be preserved as system tests (same three cases), and
@@ -550,8 +554,8 @@ vanish when their animation ends.
 - **Bridge**: the Rust class of a gameplay scene root (`Door`, `PartDisappear`, `Blast`) —
   `ready` registers, `exit_tree` unregisters, handlers push events; no per-frame callbacks, no
   `Entity`, no World access.
-- **Timer component**: duration + accumulated elapsed, stepped by the frame schedule, expiring
-  exactly once.
+- **Timer component**: `time_left` counted down with the engine's subtractive arithmetic,
+  stepped by the frame schedule, expiring exactly once.
 - **`DoorState`** (`Closed`/`Open`) with a consumed "play open animation" flag;
   **`DisappearPhase`** (`WaitingToEmit(timer)` / `Emitting(timer)`) with a "remove" flag;
   **look target** (`Vector3`) written by `SyncIn`, read by `SyncOut`; **removal flag** consumed
@@ -569,7 +573,8 @@ vanish when their animation ends.
   boundaries and no-double-fire, door system ×4, disappear phases ×3, blast removal ×1) and none
   removed — total at or above 148 (133 baseline + 15).
 - **SC-002**: `grep -rn 'fn process\|fn physics_process'` over `door.rs`, `part_disappear.rs`,
-  `blast.rs` returns nothing; over the whole crate, `run_schedule` appears only in `ecs.rs`;
+  `blast.rs` returns nothing; over the whole crate, `Schedule::run`/`run_schedule` appear only in
+  `ecs.rs`;
   `godot::task::spawn` no longer appears in the three modules.
 - **SC-003**: Headless import prints `Initialize godot-rust ...` and a scratch scene resolving
   `EcsWorld` by name prints its class; headless `level.tscn` and `main.tscn` show zero new

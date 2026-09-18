@@ -2,10 +2,10 @@
 
 **Input**: Design documents from `/specs/011-v3-ecs-core-leaves/` (spec.md, plan.md, research.md
 R1–R11, data-model.md, contracts/ecs-api.md, contracts/zz_ecs_parity.gd,
-contracts/zz_order_probe.gd, quickstart.md — all at commit `8a7f5d9`).
+contracts/zz_order_probe.gd, quickstart.md — all at commit `08bc3bd`).
 
-**Branch**: `v3` — local commits only, **never** `git push`. **Baseline**: `8a7f5d9`
-(constitution 1.5.1 at `85186f6`, spec `e746e28`, plan `8a7f5d9`), **133 tests**.
+**Branch**: `v3` — local commits only, **never** `git push`. **Baseline**: `08bc3bd`
+(constitution 1.5.1 at `85186f6`, spec `e746e28`, plan `8a7f5d9`, tasks `08bc3bd`), **133 tests**.
 
 **Tests**: requested by the spec (FR-012, FR-018, FR-022; Principle III: pure logic and every
 gameplay system MUST be `cargo test`-covered without Godot). Named test cases below are the
@@ -23,7 +23,7 @@ Every harness task MUST paste the actual `diff` output in its completion note �
   build`, then `cd ../oxide-godot-v2/oxide-godot && /usr/bin/godot.x86_64 --headless --import
   --path .`. Verification: the worktree builds clean and its import prints
   `Initialize godot-rust (...)`; `git worktree list` shows `../oxide-godot-v2` at `e2932b4`.
-- [ ] T002 On `v3` at `8a7f5d9`, confirm the baseline gate: from `oxide_godot_core/`,
+- [ ] T002 On `v3` at `08bc3bd`, confirm the baseline gate: from `oxide_godot_core/`,
   `cargo build && cargo clippy && cargo test`, then record the SC-007 "before" number:
   `cargo tree --prefix none | sort -u | wc -l`. Verification: zero warnings, **133 tests pass**,
   the count is **22** (plan.md Technical Context) — paste the number in the completion note.
@@ -111,8 +111,8 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   value type allowed in pure code by Principle III). Verification: compiles; no `Gd` anywhere in
   the file.
 - [ ] T009 [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` (research.md R3):
-  `pub fn apply_non_register(world: &mut World, event: InboundEvent)` handling exactly three
-  variants — `Unregister { id }`: `EntityIndex::unregister(id)`; on `Some(e)` remove `e` from
+  `pub fn apply_non_register(world: &mut World, event: InboundEvent)` handling three applied
+  variants plus a guarded `Register` arm — `Unregister { id }`: `EntityIndex::unregister(id)`; on `Some(e)` remove `e` from
   `NodeHandles.by_entity` (via `world.get_non_send_resource_mut::<NodeHandles>()` — the
   `Option`-returning accessor, so the step is skipped when the resource is absent and tests need
   not insert it; the non-`get_` form panics on a missing resource) and `world.despawn(e)`; `DoorBodyEntered { id,
@@ -129,7 +129,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `None`). The door round-trip tests (`event_for_registered_id_reaches_its_entity`,
   `event_for_unknown_id_is_dropped`) live in `door/system.rs` (T017), NOT here, because they
   assert on the door system's outcome. Verification: three tests pass.
-- [ ] T010 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs` (research.md R8,
+- [ ] T010 [US1] Create `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs` (research.md R8,
   data-model.md "Schedules and sets"): `#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq,
   Hash)] pub enum Phase { SyncIn, Gameplay, EngineQuery, SyncOut }`; `#[derive(ScheduleLabel,
   Debug, Clone, Copy, PartialEq, Eq, Hash)] pub struct Fixed;` and `pub struct Frame;`; `pub fn
@@ -137,15 +137,21 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `insert_non_send_resource`, `Messages::<DoorBodyEntered>::default()`, `FrameDelta(0.0)`,
   `FixedDelta(0.0)`); `pub fn build_fixed() -> Schedule` and `pub fn build_frame() -> Schedule`
   (`Schedule::new(Fixed)`/`Schedule::new(Frame)` then `configure_sets((Phase::SyncIn,
-  Phase::Gameplay, Phase::EngineQuery, Phase::SyncOut).chain())`; no systems added yet — the
-  gameplay systems join in T016/T023 and the engine systems in `ecs.rs::add_engine_systems`,
-  T012). Tests: `both_schedules_run_on_an_empty_world` (`build_fixed().run(&mut build_world())`
-  and the frame twin, no panic), `phase_sets_are_chained_in_order` (add one probe system per
-  set pushing its `Phase` into a `Vec<Phase>` resource, run, assert `[SyncIn, Gameplay,
-  EngineQuery, SyncOut]`). Verification: both pass.
+  Phase::Gameplay, Phase::EngineQuery, Phase::SyncOut).chain())`; keep bevy's
+  `ScheduleBuildSettings::auto_insert_apply_deferred` at its default `true` and say so in a
+  comment — it is what makes a marker inserted through `Commands` in `Gameplay` visible to
+  `SyncOut` of the SAME run (research.md R6; `schedule/schedule.rs:1605`, `:1629`); no systems
+  added yet — the gameplay systems join in T018/T024 and the engine systems in
+  `ecs.rs::add_engine_systems`, T012). Tests: `both_schedules_run_on_an_empty_world`
+  (`build_fixed().run(&mut build_world())` and the frame twin, no panic),
+  `phase_sets_are_chained_in_order` (one probe system per set pushing its `Phase` into a
+  `Vec<Phase>` resource, run, assert `[SyncIn, Gameplay, EngineQuery, SyncOut]`), and
+  `marker_inserted_in_gameplay_is_visible_in_sync_out_of_the_same_run` (a `Gameplay` probe does
+  `commands.spawn(ProbeMarker)`, a `SyncOut` probe counts `Query<(), With<ProbeMarker>>` into a
+  resource; after ONE run the count is 1). Verification: all three pass.
 - [ ] T011 [US1] Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`.
   Verification: zero warnings; test count = 133 + 2 (queue) + 4 (timer) + 5 (index) + 3 (apply)
-  + 2 (setup) = **149**, paste the `test result:` line. Commit (plan.md R11 row 1):
+  + 3 (setup) = **150**, paste the `test result:` line. Commit (plan.md R11 row 1):
   `ecs: pure core — queue, timer, index, apply, setup (tests); bevy_ecs 0.19 pinned`.
 
 ### Commit 2 — `EcsWorld` autoload + driver + sync systems
@@ -195,12 +201,12 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule)` registering
   `sweep_dead_nodes.in_set(Phase::SyncIn)` and `sync_out_remove.in_set(Phase::SyncOut)` in BOTH
   schedules (`sync_out_door`, `sync_out_puff`, `sync_in_blast`, `sync_out_blast` are added by
-  T018, T024, T028). Verification: `grep -n 'free()' ecs.rs` shows only `queue_free()`.
+  T018, T024, T030). Verification: `grep -n 'free()' ecs.rs` shows only `queue_free()`.
 - [ ] T015 [US1] Register the autoload (FR-002): create `oxide-godot/oxide-godot/ecs/ecs_world.tscn`
   with exactly `[gd_scene format=3]` + blank line + `[node name="EcsWorld" type="EcsWorld"]`
   (mirror of `menu/settings.tscn`); in `oxide-godot/oxide-godot/project.godot` add
   `EcsWorld="*res://ecs/ecs_world.tscn"` on the line after `Settings="*res://menu/settings.tscn"`
-  in `[autoload]`. Gates: `cargo build && cargo clippy && cargo test` (149 tests still). Headless
+  in `[autoload]`. Gates: `cargo build && cargo clippy && cargo test` (150 tests still). Headless
   (from `oxide-godot/oxide-godot/`): `/usr/bin/godot.x86_64 --headless --import --path .`
   (expect `Initialize godot-rust (...)`, no new error beyond `CLAUDE.md`'s catalog); a scratch
   `zz_autoload_check.tscn` (root `Node` with an inline script:
@@ -271,7 +277,7 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
   with the two-line upstream bug fix comment above the field kept VERBATIM (`door.rs:60-61`);
   `#[godot_api] impl IArea3D for Door { fn ready(&mut self) { let id = self.base().instance_id();
   crate::ecs::queue::push(InboundEvent::Register { id, handles: Handles::Door { root:
-  self.to_gd(), anim: self.animation_player.clone() }, initial: Initial::Door }); } fn
+  self.to_gd().upcast::<Area3D>(), anim: self.animation_player.clone() }, initial: Initial::Door }); } fn
   exit_tree(&mut self) { crate::ecs::queue::push(InboundEvent::Unregister { id:
   self.base().instance_id() }); } }` — NO `process`/`physics_process`; `#[godot_api] impl Door {
   #[func] fn _on_door_body_entered(&mut self, body: Gd<Node3D>) { /* backlog #14 comment kept
@@ -288,21 +294,27 @@ frame on both trees, once, for the `Player` body and never for the non-player bo
   must exist before it can be viewed, the sync layer handles it by having the spawned node's
   bridge push `Register` from `ready` (locations: `part.rs:116-117`/`:196-205`,
   `red_robot.rs:423-425`, `level.rs`'s spawner). Verification: file has the header + 1 row.
-- [ ] T021 [US2] Gates + headless: `cargo build && cargo clippy && cargo test` (149 + 5 = **154**
+- [ ] T021 [US2] Gates + headless: `cargo build && cargo clippy && cargo test` (150 − 3 + 5 = **152** — the three v2 door tests leave `door.rs`, five land in `door/system.rs`
   tests; the three v2 door tests are gone from `door.rs` and present in `door/system.rs` — none
   lost); `--headless --import`, `main.tscn`, `level.tscn` clean. Harness case (a) (research.md
   R10, quickstart.md §3): write `oxide-godot/oxide-godot/zz_ecs_parity.gd` from
   `contracts/zz_ecs_parity.gd`, `zz_ecs_observer.gd` (the 2-line script quoted in the contract's
-  `_ready`), and `zz_ecs_parity.tscn` (one `Node3D` root with the script); copy the same three
+  `_ready`), and `zz_ecs_parity.tscn` — exactly the six lines in contracts/ecs-api.md §4
+  (`[gd_scene load_steps=2 format=3]`, the `ext_resource` Script line, the `Node3D` root with
+  `script = ExtResource("1")`); copy the same three
   files into `../oxide-godot-v2/oxide-godot/`; run `--headless --path . --fixed-fps 60
   --quit-after 400 zz_ecs_parity.tscn -- --case=a` on both trees with `XDG_DATA_HOME=/tmp/xdg-v2`
   and `/tmp/xdg-v3`; `diff` the two `zz_ecs_parity_a.log` files AND the `grep '^RAW'` subsets
-  (the exact commands in R10; adjust the `app_userdata/<name>` path to `project.godot`'s
-  `config/name`). If the `Player` body never raises `body_entered` (R1's last paragraph: a
-  teleported body did not), drive it with `velocity` + `move_and_slide()` as the contract does
-  and, if still silent, instance `player.tscn`'s body at `collision_layer = 1` and confirm the
-  door's `collision_mask` covers it on BOTH trees — a harness-only adjustment, never a
-  `door.tscn` edit. **Paste the actual diff output in the completion note — never write
+  (the exact commands in R10; the `user://` directory is
+  `$XDG_DATA_HOME/godot/app_userdata/Third-Person Shooter Demo/` — `project.godot:13`'s `config/name`,
+  quote the path). The contract already drives the `Player` with `velocity` + `move_and_slide()`
+  at `collision_layer = 1`. If `body_entered` still never fires on EITHER tree (R1's teleported
+  probe body never did), escalate in this order and log each answer: (1) `door.monitoring` and
+  `door.get_overlapping_bodies()` printed per physics frame from the harness — is the body ever
+  overlapping?; (2) if never, the body is not reaching the area: log its `global_position` per
+  frame and fix the harness geometry (floor height, door position, speed); (3) if overlapping but
+  no signal, check `door.tscn`'s `collision_mask` against the scratch body's layer on BOTH trees.
+  All harness-only; never a `door.tscn` edit. **Paste the actual diff output in the completion note — never write
   "identical" without the diff.** Delete the `zz_*` files (and `.uid`s) from both trees.
   Commit (R11 row 3): `door: bridge + open_on_player system (v2 on_body preserved, 3 tests +
   round-trip); docs/v3-tradeoffs.md created (entry d)`.
@@ -363,7 +375,7 @@ visual checkpoint (1).
   Base<CpuParticles3D>, #[init(node = "MiniBlasts")] mini_blasts: OnReady<Gd<CpuParticles3D>> }`;
   `impl ICpuParticles3D`: `ready` → `self.mini_blasts.set_emitting(true);` (v2 `:15`, one-shot,
   kept) then `push(InboundEvent::Register { id: self.base().instance_id(), handles:
-  Handles::Puff { root: self.to_gd() }, initial: Initial::Puff { lifetime:
+  Handles::Puff { root: self.to_gd().upcast::<CpuParticles3D>() }, initial: Initial::Puff { lifetime:
   self.base().get_lifetime() } })`; `exit_tree` → `push(Unregister { id })`. Delete the
   `godot::task::spawn` block and its comment (`part_disappear.rs:17-46`); no
   `process`/`physics_process`. Verification: `grep -n 'task::spawn\|create_timer\|fn process'
@@ -373,8 +385,8 @@ visual checkpoint (1).
   itself; the sync layer feeds `FrameDelta` from `EcsWorld::process` and the `Timer` component
   reproduces `SceneTree::process_timers`' subtractive arithmetic (research.md R5); location
   `ecs/timer.rs`, `part_disappear/system.rs`. Verification: 2 rows.
-- [ ] T027 [US3] Gates + headless: `cargo build && cargo clippy && cargo test` (154 + 4 =
-  **158**); `--headless --import`, `main.tscn`, `level.tscn` clean. Harness case (b) on both
+- [ ] T027 [US3] Gates + headless: `cargo build && cargo clippy && cargo test` (152 + 4 =
+  **156**); `--headless --import`, `main.tscn`, `level.tscn` clean. Harness case (b) on both
   trees exactly as T021 did for (a) (`--case=b`; the puff is instanced from a
   `SceneTreeTimer.timeout` callback — FR-029 (b)); diff the observer lines AND the RAW lines.
   Expected per research.md R5: observer lines identical; RAW `puff_tree_exited` (and the
@@ -412,7 +424,8 @@ checkpoint (2).
   .to_gd(), Self::_on_animation_finished);` — `connect_other`, NOT `connect_self` (in gdext 0.5.5
   `connect_self`'s receiver is the EMITTER, `typed_signal.rs:265-268`; the parent receiving a
   child's signal is `connect_other`, `:299`); then `push(Register { id, handles: Handles::Blast {
-  root: self.to_gd(), light_rays: self.light_rays.clone(), camera }, initial: Initial::Blast })`;
+  root: self.to_gd().upcast::<Node3D>(), light_rays: self.light_rays.clone(), camera }, initial: Initial::Blast })`
+  (`self.to_gd()` is `Gd<Blast>`; the variant wants the engine type — `Gd::upcast`, `gd.rs:425`; same in T019/T025);
   `exit_tree` → `push(Unregister { id })`. `#[godot_api] impl Blast { #[func] fn
   _on_animation_finished(&mut self, _name: StringName) { push(InboundEvent::BlastAnimationFinished
   { id: self.base().instance_id() }); } }` (the `StringName` parameter matches the signal's
@@ -450,7 +463,7 @@ checkpoint (2).
   `Changed`; measured explicit engine calls per blast per frame: 3 (v2's count) + the FR-009
   sweep for a lone blast, ≤ 3 + sweep amortized from two concurrent blasts — matching FR-025
   as amended (locations `ecs.rs::sync_in_blast`/`sync_out_blast`). Verification: 4 rows.
-- [ ] T032 [US4] Gates + headless: `cargo build && cargo clippy && cargo test` (**158**, no new
+- [ ] T032 [US4] Gates + headless: `cargo build && cargo clippy && cargo test` (**156**, no new
   pure tests in this commit — the blast's drain test landed in T009); `--headless --import`,
   `main.tscn`, `level.tscn` clean (a laser hit is not scriptable headless; the harness covers
   it). Harness case (c) on both trees exactly as T021 did (`--case=c`; the blast is instanced
@@ -501,19 +514,19 @@ checkpoint (2).
 - [ ] T037 Run quickstart.md §5's SC-006 grep list verbatim and paste every output: no
   `fn process`/`fn physics_process` in `door.rs`/`part_disappear.rs`/`blast.rs`; `run_schedule`/
   `.run(&mut` only in `ecs.rs`; no `godot::task::spawn` in the three modules; no
-  `get_autoload_by_name`/`/root/EcsWorld` in Rust (or only typed uses); `git diff 8a7f5d9 --
+  `get_autoload_by_name`/`/root/EcsWorld` in Rust (or only typed uses); `git diff 08bc3bd --
   oxide_godot_core/oxide_godot_lib/src/{settings,menu,main_scene,level,debug_label,part,bullet,
   red_robot}* | wc -l` = 0; `grep -n 'Gd<' ecs/markers.rs door/system.rs part_disappear/system.rs`
   returns nothing (components and gameplay systems hold no engine handle). Report the residual
   dynamic-access list for the three modules: none.
 - [ ] T038 Final gates + headless recipe one more time (`cargo build && cargo clippy && cargo
   test`; `--headless --import`; `--headless main.tscn`/`level.tscn`). Report the final test count
-  (SC-001: expect **158** = 133 + 25; the spec's floor is ≥ 148). Commit (R11 row 6):
+  (SC-001: expect **156** = 133 + 23; the spec's floor is ≥ 148). Commit (R11 row 6):
   `CLAUDE.md: Port conventions (v3); spec: measured timing differences filled;
   docs/v3-tradeoffs.md complete`.
 - [ ] T039 Remove the harness worktree and verify cleanliness: `git worktree remove
   ../oxide-godot-v2 && git worktree prune`; `find . ../oxide-godot-v2 -name 'zz_*' 2>/dev/null`
-  returns nothing; `git status` clean on `v3`; `git log --oneline 8a7f5d9..HEAD` shows exactly
+  returns nothing; `git status` clean on `v3`; `git log --oneline 08bc3bd..HEAD` shows exactly
   the six milestone commits; nothing pushed (`git status -sb` shows no upstream ahead/behind
   line that implies a push).
 
@@ -529,9 +542,9 @@ checkpoint (2).
   blocks the next phase until the user confirms; the harness run precedes each STOP.
 - Within commit 1: T003 (crate pin, `ecs.rs` types, `lib.rs`) first; then T004 (`event.rs`) —
   needed by T005 (`queue.rs`) and T009 (`apply.rs`); T005, T006 (`timer.rs`), T007 (`index.rs`),
-  T008 (`markers.rs`), T010 (`setup.rs`) are `[P]` (disjoint files, no dependency among them
-  beyond T003/T004); T009 after T004 + T007 + T008; T010 after T004 + T007 + T008 (it inserts
-  `Messages<DoorBodyEntered>`, `EntityIndex`, the deltas); T011 last.
+  T008 (`markers.rs`) are `[P]` (disjoint files, no dependency among them beyond T003/T004);
+  T009 and T010 after T004 + T007 + T008 (T010's `build_world` inserts `Messages<DoorBodyEntered>`,
+  `EntityIndex`, the deltas — so it is NOT `[P]`); T011 last.
 - Within commit 2: T012 → T013 → T014 (same file, in order) → T015 (scene + autoload + headless
   + probe re-run + commit).
 - Within commit 3: T016 `[P]` with T020 (`docs/v3-tradeoffs.md`); T017 after T016; T018 after
@@ -551,8 +564,7 @@ Task: "T005 ecs/queue.rs — push/drain + 2 tests"
 Task: "T006 ecs/timer.rs — Timer::step (subtractive) + 4 tests"
 Task: "T007 ecs/index.rs — EntityIndex + 5 tests"
 Task: "T008 ecs/markers.rs — resources + markers"
-Task: "T010 ecs/setup.rs — Phase sets, build_* + 2 tests"   # needs T007/T008 types only for build_world
-# then T009 (apply.rs, needs event/index/markers), then T011 (gate + commit).
+# then T009 (apply.rs) and T010 (setup.rs, 3 tests) — both need event/index/markers — then T011 (gate + commit).
 ```
 
 ## Implementation Strategy

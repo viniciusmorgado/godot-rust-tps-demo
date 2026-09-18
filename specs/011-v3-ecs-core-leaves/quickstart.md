@@ -1,7 +1,7 @@
 # Quickstart: Milestone V3-A — validating the ECS core and the three leaf effects
 
 Prerequisites: `CLAUDE.md` toolchain (Godot 4.7.2 at `/usr/bin/godot.x86_64`, stable Rust
-1.98), branch `v3` at or after `85186f6`, a `v2` worktree for the parity runs
+1.98), branch `v3` at or after `08bc3bd` (the milestone baseline), a `v2` worktree for the parity runs
 (research.md R10). Paths below are from the repository root.
 
 ## 1. Gates (before every commit)
@@ -10,8 +10,9 @@ Prerequisites: `CLAUDE.md` toolchain (Godot 4.7.2 at `/usr/bin/godot.x86_64`, st
 cd oxide_godot_core && cargo build && cargo clippy && cargo test
 ```
 
-Expected after commit 1: build/clippy clean, test count ≥ 133 + the new pure tests (queue 2,
-index 5, timer 4, apply 2, setup 2 → ≥ 148 by the end of the milestone, SC-001). After commit
+Expected after commit 1: build/clippy clean, 150 tests (133 + queue 2, timer 4, index 5, apply 3,
+setup 3); after commit 3: 152 (the three v2 door tests leave `door.rs`, five land in
+`door/system.rs`); after commit 4 and to the end: 156 (SC-001's floor is ≥ 148). After commit
 1 also record the crate-graph delta (SC-007):
 
 ```sh
@@ -65,7 +66,7 @@ grep -n 'fn process\|fn physics_process' oxide_godot_core/oxide_godot_lib/src/{d
 grep -rn 'run_schedule\|\.run(&mut' oxide_godot_core/oxide_godot_lib/src | grep -v '^.*ecs.rs'                    # expect nothing outside ecs.rs
 grep -rn 'godot::task::spawn' oxide_godot_core/oxide_godot_lib/src/{door,part_disappear,blast}.rs                # expect nothing
 grep -rn 'get_autoload_by_name\|/root/EcsWorld' oxide_godot_core/oxide_godot_lib/src                             # expect nothing (or only typed uses)
-git diff 85186f6 -- oxide_godot_core/oxide_godot_lib/src/{settings,menu,main_scene,level,debug_label,part,bullet,red_robot}* | wc -l   # expect 0
+git diff 08bc3bd -- oxide_godot_core/oxide_godot_lib/src/{settings,menu,main_scene,level,debug_label,part,bullet,red_robot}* | wc -l   # expect 0
 grep -c '^| ' docs/v3-tradeoffs.md    # ≥ 5 (header + 4 entries)
 grep -n '^| 30 ' docs/v2-backlog.md   # still "open — deferred"
 ```

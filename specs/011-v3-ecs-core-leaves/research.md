@@ -239,9 +239,16 @@ paragraph).
 (`Query<(Entity, ...), With<PlayOpen>>` → act → `commands.entity(e).remove::<PlayOpen>()`,
 `EntityCommands::remove` at `system/commands/mod.rs:1726`). `Remove` → `queue_free()` on the
 root handle, `by_entity.remove`, `by_id.remove`, `commands.entity(e).despawn()`
-(`mod.rs:1906`). A marker cannot persist across ticks because the SAME schedule run that acts
-on it removes it, and commands are applied at the end of `Schedule::run` — the next run starts
-with the marker gone; a bool field would need a second write-back and could be forgotten.
+(`mod.rs:1906`). **Same-run visibility is a stated dependency, not luck**: a marker inserted
+through `Commands` in `Phase::Gameplay` is seen by `SyncOut` of the SAME run only because bevy
+inserts an `ApplyDeferred` sync point between ordered systems with deferred parameters —
+`ScheduleBuildSettings::auto_insert_apply_deferred`, default `true` (`schedule/schedule.rs:1605`,
+`:1629`; applied at `:523`) — and the chained sets give exactly that ordering. The same fact makes
+`LookTarget` inserted in `SyncIn` visible to `SyncOut` (R7, "the first frame always writes").
+`setup.rs` keeps the default explicitly and a third setup test pins it (T010): a `Gameplay` probe
+inserts a marker via `Commands`, a `SyncOut` probe must observe it in the same run. A marker
+cannot persist across ticks because the SAME run that acts on it removes it; a bool field would
+need a second write-back and could be forgotten.
 Three markers, not one enum, because `SyncOut` acts on each with a different engine call and
 `With<T>` filters are the ECS-native way to select them.
 
@@ -292,12 +299,19 @@ Recorded in plan.md Complexity Tracking as a spec-internal tension; resolved at 
 
 ```rust
 #[derive(GodotClass)]
-#[class(init, base=Node)]
+#[class(base=Node)]            // no `init`: the constructor is written by hand (below)
 pub struct EcsWorld {
     base: Base<Node>,
-    #[init(val = setup::build_world())]     world: World,
-    #[init(val = setup::build_fixed())]     fixed: Schedule,
-    #[init(val = setup::build_frame())]     frame: Schedule,
+    world: World,
+    fixed: Schedule,
+    frame: Schedule,
+}
+// in `impl INode for EcsWorld`:
+fn init(base: Base<Node>) -> Self {
+    let mut fixed = setup::build_fixed();
+    let mut frame = setup::build_frame();
+    add_engine_systems(&mut fixed, &mut frame);   // both schedules together — two independent
+    Self { base, world: setup::build_world(), fixed, frame }   // #[init(val)] could not do this
 }
 ```
 
@@ -313,6 +327,7 @@ are added to the schedules by glue in `ecs.rs` (`add_engine_systems(&mut fixed, 
 so `setup.rs` stays testable without Godot.
 
 **Driver** (`ecs.rs`, `INode for EcsWorld`):
+- `init`: the hand-written constructor above (tasks T012).
 - `ready`: `set_process_priority(i32::MAX)`, `set_physics_process_priority(i32::MAX)` (R1).
 - `physics_process(dt)`: `world.insert_resource(FixedDelta(dt))`; `messages::<DoorBodyEntered>
   ().update()`; `for ev in queue::drain() { apply(&mut world, ev) }`; `fixed.run(&mut world)`.
@@ -435,22 +450,25 @@ cp specs/011-v3-ecs-core-leaves/contracts/zz_ecs_parity.gd ../oxide-godot-v2/oxi
 for c in a b c; do
   ( cd ../oxide-godot-v2/oxide-godot && XDG_DATA_HOME=/tmp/xdg-v2 /usr/bin/godot.x86_64 --headless --path . --fixed-fps 60 --quit-after 400 zz_ecs_parity.tscn -- --case=$c )
   ( cd oxide-godot                    && XDG_DATA_HOME=/tmp/xdg-v3 /usr/bin/godot.x86_64 --headless --path . --fixed-fps 60 --quit-after 400 zz_ecs_parity.tscn -- --case=$c )
-  diff /tmp/xdg-v2/godot/app_userdata/oxide-godot/zz_ecs_parity_$c.log /tmp/xdg-v3/godot/app_userdata/oxide-godot/zz_ecs_parity_$c.log && echo "case $c: IDENTICAL"
-  diff <(grep '^RAW' /tmp/xdg-v2/godot/app_userdata/oxide-godot/zz_ecs_parity_$c.log) <(grep '^RAW' /tmp/xdg-v3/godot/app_userdata/oxide-godot/zz_ecs_parity_$c.log) || echo "case $c: RAW stamps differ (record in the timing table)"
+  diff "/tmp/xdg-v2/godot/app_userdata/Third-Person Shooter Demo/zz_ecs_parity_$c.log" "/tmp/xdg-v3/godot/app_userdata/Third-Person Shooter Demo/zz_ecs_parity_$c.log" && echo "case $c: IDENTICAL"
+  diff <(grep '^RAW' "/tmp/xdg-v2/godot/app_userdata/Third-Person Shooter Demo/zz_ecs_parity_$c.log") <(grep '^RAW' "/tmp/xdg-v3/godot/app_userdata/Third-Person Shooter Demo/zz_ecs_parity_$c.log") || echo "case $c: RAW stamps differ (record in the timing table)"
 done
 ```
 
 The observer lines are the parity evidence (SC-004); the RAW diff feeds the spec's timing table
 (FR-030). The `user://` path under a split `XDG_DATA_HOME` is
-`$XDG_DATA_HOME/godot/app_userdata/<project name>/` (the project name is `oxide-godot` in both
-trees — the `config/name` line of `project.godot`; confirm at harness time and adjust the
-`diff` paths if it differs). Scratch files are removed from both trees after the diff.
+`$XDG_DATA_HOME/godot/app_userdata/Third-Person Shooter Demo/` — `project.godot:13` is
+`config/name="Third-Person Shooter Demo"` in both trees (NOT the repository name), hence the
+quoted paths in the commands above. Scratch files are removed from both trees after the diff.
+Precision note (analyze m10): the observer prints `Basis` with GDScript's `str()`; both trees run
+the same engine binary, so the formatting is identical and the diff is a valid parity check at
+`str()`'s print precision — differences below it are not observable by this harness.
 
 ## R11 — Commit plan
 
 | # | Commit | Files | Gate + validation |
 |---|---|---|---|
-| 1 | `ecs: pure core — queue, timer, index, apply, setup (tests)` | `Cargo.toml` (workspace pin `bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }`), `oxide_godot_lib/Cargo.toml` (`bevy_ecs = { workspace = true }`), `src/lib.rs` (`mod ecs;`), `src/ecs/{queue,event,timer,index,apply,setup,markers}.rs`, `src/ecs.rs` (types only, no class yet) | `cargo build && cargo clippy && cargo test` (new tests pass); **this commit measures SC-007**: `cargo tree --prefix none \| sort -u \| wc -l` before (22 on `85186f6`, measured 2026-09-18 — the spec's "14" came from a probe crate, see SC-007) and after, the delta recorded in plan.md's Technical Context |
+| 1 | `ecs: pure core — queue, timer, index, apply, setup (tests)` | `Cargo.toml` (workspace pin `bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }`), `oxide_godot_lib/Cargo.toml` (`bevy_ecs = { workspace = true }`), `src/lib.rs` (`mod ecs;`), `src/ecs/{queue,event,timer,index,apply,setup,markers}.rs`, `src/ecs.rs` (types only, no class yet), `specs/011-v3-ecs-core-leaves/plan.md` (SC-007 delta written into Technical Context) | `cargo build && cargo clippy && cargo test` (new tests pass); **this commit measures SC-007**: `cargo tree --prefix none \| sort -u \| wc -l` before (22 on `85186f6`, measured 2026-09-18 — the spec's "14" came from a probe crate, see SC-007) and after, the delta recorded in plan.md's Technical Context |
 | 2 | `ecs: EcsWorld autoload + driver (priorities i32::MAX) + sync systems; ecs_world.tscn; project.godot autoload` | `src/ecs.rs`, `oxide-godot/ecs/ecs_world.tscn`, `oxide-godot/project.godot` | gates + headless import (`Initialize godot-rust`) + a scratch scene printing `/root/EcsWorld`'s class + headless `main.tscn`/`level.tscn` clean; R1's experiment output pasted into the commit message body |
 | 3 | `door: bridge + open_on_player system (v2 on_body preserved, 3 tests + round-trip)` | `src/door.rs`, `src/door/system.rs`, `docs/v3-tradeoffs.md` (created, header + entry d) | gates + headless; harness case (a) on both trees; no visual checkpoint (orphaned scene) |
 | 4 | `part_disappear: bridge + DisappearPhase/Timer system (tests: boundaries, order, no double fire)` | `src/part_disappear.rs`, `src/part_disappear/system.rs`, `docs/v3-tradeoffs.md` (entry a) | gates + headless; harness case (b); **STOP — visual checkpoint (1)** |
