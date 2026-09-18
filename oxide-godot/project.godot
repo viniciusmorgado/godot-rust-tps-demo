@@ -23,6 +23,7 @@ buses/default_bus_layout="uid://vtdn63d3ksc2"
 [autoload]
 
 Settings="*res://menu/settings.tscn"
+EcsWorld="*res://ecs/ecs_world.tscn"
 
 [display]
 

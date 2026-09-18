@@ -156,7 +156,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
 
 ### Commit 2 — `EcsWorld` autoload + driver + sync systems
 
-- [ ] T012 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add the class and the driver
+- [x] T012 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add the class and the driver
   (research.md R8): `#[derive(GodotClass)] #[class(base=Node)] pub struct EcsWorld { base:
   Base<Node>, world: World, fixed: Schedule, frame: Schedule }` — NO `#[class(init)]`: the two
   schedules must be built and then passed together to `add_engine_systems`, which two independent
@@ -174,7 +174,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   same with `FrameDelta`, no `Messages::update`, `self.frame.run(...)`. `#[godot_api] impl
   EcsWorld {}` stays empty (no `#[func]` needed). Verification: `run_schedule`/`.run(&mut` appear
   only in this file (SC-002).
-- [ ] T013 [US1] In the same `ecs.rs` add `fn apply_register(world: &mut World, id: InstanceId,
+- [x] T013 [US1] In the same `ecs.rs` add `fn apply_register(world: &mut World, id: InstanceId,
   handles: Handles, initial: Initial)` (research.md R4, FR-008): if `!handles.root_valid()` →
   return (registration dropped, Edge Cases); `match world.resource_mut::<EntityIndex>()
   .register_if_absent(id, || world.spawn_empty().id())` — on `AlreadyRegistered(_)` return
@@ -189,7 +189,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `Initial::Blast` → `BlastTag`; then `world.non_send_resource_mut::<NodeHandles>().by_entity
   .insert(e, handles)`. Verification: compiles; the function is the ONLY place that inserts into
   `NodeHandles.by_entity`.
-- [ ] T014 [US1] In the same `ecs.rs` add the two engine systems shared by both schedules
+- [x] T014 [US1] In the same `ecs.rs` add the two engine systems shared by both schedules
   (research.md R4/R6): `fn sweep_dead_nodes(mut handles: NonSendMut<NodeHandles>, mut index:
   ResMut<EntityIndex>, mut commands: Commands)` — collect every `(entity, handles)` whose
   `root_valid()` is `false`, remove each from `by_entity` and `index.remove_entity(e)`, then
@@ -202,7 +202,7 @@ ECS submodules with no Godot; headless import loads the extension and instantiat
   `sweep_dead_nodes.in_set(Phase::SyncIn)` and `sync_out_remove.in_set(Phase::SyncOut)` in BOTH
   schedules (`sync_out_door`, `sync_out_puff`, `sync_in_blast`, `sync_out_blast` are added by
   T018, T024, T030). Verification: `grep -n 'free()' ecs.rs` shows only `queue_free()`.
-- [ ] T015 [US1] Register the autoload (FR-002): create `oxide-godot/oxide-godot/ecs/ecs_world.tscn`
+- [x] T015 [US1] Register the autoload (FR-002): create `oxide-godot/oxide-godot/ecs/ecs_world.tscn`
   with exactly `[gd_scene format=3]` + blank line + `[node name="EcsWorld" type="EcsWorld"]`
   (mirror of `menu/settings.tscn`); in `oxide-godot/oxide-godot/project.godot` add
   `EcsWorld="*res://ecs/ecs_world.tscn"` on the line after `Settings="*res://menu/settings.tscn"`
