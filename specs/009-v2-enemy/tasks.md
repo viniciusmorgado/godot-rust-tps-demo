@@ -334,7 +334,7 @@ visual checkpoints are STOP tasks — confirmed by the user, not the implementer
 
 ### Harness + checkpoint
 
-- [ ] T033 [US2] Re-run harness case (b) (T023/T024's script, unchanged) on both trees — now
+- [x] T033 [US2] Re-run harness case (b) (T023/T024's script, unchanged) on both trees — now
   that `part.rs` is remodeled, extend the dump to include each of the 3 parts' `fade_value`
   trace, the frame each part's `destroy` RPC fires, the puff's resolved PARENT PATH per part,
   and the puff's WORLD POSITION per part. Verification: `fade_value` traces, destroy frames, and
