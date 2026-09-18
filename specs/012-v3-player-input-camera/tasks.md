@@ -148,7 +148,7 @@ commit 3).
 
 ### Commit 2 — `player/system.rs`, `player/sync.rs`, `player.rs`, `player_input/system.rs`, `player_input/sync.rs`, `player_input.rs`, `camera_noise_shake.rs` (accessors only), `ecs.rs`, `player.tscn:592`, `docs/v3-tradeoffs.md`
 
-- [ ] T009 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/player/system.rs` (pure; declare
+- [x] T009 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/player/system.rs` (pure; declare
   `pub(crate) mod system;` in `player.rs`; `player/model.rs` untouched): `pub fn tick_decide(tuning:
   Res<Tuning<PlayerTuning>>, dt: Res<FixedDelta>, q: Query<(&InputFrameC, &BodyState, &Orientation,
   &mut Motion, &mut AirborneTime, &mut TickIntents), With<Simulates>>)` — per entity, in v2's
@@ -187,7 +187,7 @@ commit 3).
   `settle_flags_respawn_below_threshold` (`origin_y = -41` → true; `-39` → false),
   `replay_builds_v2_plans_for_all_four_animations`. Verification: 9 tests pass; no
   `godot::classes` import in the file.
-- [ ] T010 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/player_input/system.rs` (pure;
+- [x] T010 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/player_input/system.rs` (pure;
   `pub(crate) mod system;` in `player_input.rs`; `player_input/model.rs` untouched): `pub fn
   input_decide(tuning: Res<Tuning<PlayerInputTuning>>, dt: Res<FrameDelta>, q:
   Query<(&InputSnapshotC, &CameraFrame, &mut PendingMouseLook, &mut AimStateC, &mut FrameIntents,
@@ -209,7 +209,7 @@ commit 3).
   `aim_hold_and_toggle_reach_v2_cues` (hold past 0.4 s then release → `Far`; tap → `Toggled`,
   no cue), `fade_alpha_follows_height` (`parent_y = -32` → 1.0; above −17 → decays),
   `jump_just_pressed_sets_intent_for_one_frame`. Verification: 5 tests pass; no `godot::classes`.
-- [ ] T011 [US1] Create `oxide_godot_core/oxide_godot_lib/src/player/sync.rs` (glue; `pub(crate)
+- [x] T011 [US1] Create `oxide_godot_core/oxide_godot_lib/src/player/sync.rs` (glue; `pub(crate)
   mod sync;` in `player.rs`) with: `fn sync_in_player(input_tuning: Res<Tuning<PlayerInputTuning>>,
   handles: NonSend<NodeHandles>, q: Query<(Entity, &mut JumpQueued, Has<Simulates>),
   With<PlayerTag>>, commands: Commands)` — for
@@ -264,7 +264,7 @@ commit 3).
   tick); LAST for EVERY `PlayerTag` entity: `anim_tree.advance(dt.0)` (R1, option B). Depends on T009,
   T005. Verification: compiles; `grep -n 'free()' player/sync.rs` empty; every `bind_mut()` scope
   ends before the next engine call.
-- [ ] T012 [US2] Create `oxide_godot_core/oxide_godot_lib/src/player_input/sync.rs` (glue;
+- [x] T012 [US2] Create `oxide_godot_core/oxide_godot_lib/src/player_input/sync.rs` (glue;
   `pub(crate) mod sync;`): `fn sync_in_input(handles: NonSend<NodeHandles>, q: Query<(Entity,
   Has<OwnsInput>), With<PlayerTag>>, commands: Commands)` — on `OwnsInput`: the ten `Input`
   reads into `InputSnapshotC` in v2's order (`player_input.rs:76-90`), `CameraFrame { parent_y:
@@ -285,13 +285,13 @@ commit 3).
   `color_rect.set_modulate` with `a = intents.fade_alpha` (`:145-147`); if `intents.jump_pressed`
   → `input.rpc("jump", &[])` (`:111-113`). Depends on T010, T005. Verification: compiles; the
   raycast happens after the rotation writes in the same system.
-- [ ] T013 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake.rs` add ONLY two
+- [x] T013 [P] [US1] In `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake.rs` add ONLY two
   `pub(crate)` accessors on the (still v2) class: `fn noises(&self) -> [Gd<FastNoiseLite>; 3]`
   (clones of `noise_yaw`, `noise_pitch`, `noise_roll`, `:17-22`) and `fn start_rotation(&self) ->
   Vector3` (`:14`, captured in `ready` `:41`) — read by `Player.ready` (T014); the class's
   `process`/`add_trauma` stay for this commit (R10: commit 2 keeps the v2 trauma path).
   Verification: `git diff` of the file shows only the two accessors.
-- [ ] T014 [US1] Rewrite `oxide_godot_core/oxide_godot_lib/src/player.rs` as the root bridge
+- [x] T014 [US1] Rewrite `oxide_godot_core/oxide_godot_lib/src/player.rs` as the root bridge
   (data-model.md "Bridges"): keep `Animations` (`:12-19`), the eleven `OnReady` handles (`:48-68`),
   `bullet_scene` (`:72-73`, backlog #28 comment kept), `#[export] #[var(set = set_player_id)]
   player_id` + `set_player_id` (`:75-78`, `:125-131`, untouched), `#[export] current_animation`
@@ -318,7 +318,7 @@ commit 3).
   physics_process\|fn process\|apply_input\|apply_anim' player.rs` empty; `grep -c 'call_remote'
   player.rs` = 3; `grep -c 'call_local' player.rs` = 2; `level.rs`, `red_robot.rs`, `hittable.rs`
   still compile unchanged.
-- [ ] T015 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/player_input.rs` as the input
+- [x] T015 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/player_input.rs` as the input
   sub-bridge: keep the four `#[export] pub(crate)` fields (`:32-39`), the six `#[export]
   OnEditor` refs with their names (`:44-55`; `node_paths` in `player.tscn:339` unedited), `parent`
   and `parent_rid` (`:26-29`, `parent_rid` made `pub(crate)`); ADD `#[init(val =
@@ -333,7 +333,7 @@ commit 3).
   *self.root_id })` (`:161-164`). Depends on T012. Verification: `grep -n 'fn process\|jumping\|
   get_aim_rotation\|rotate_camera' player_input.rs` empty; the four `#[export]` fields and the six
   refs unchanged (`git diff` shows no attribute line removed).
-- [ ] T016 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs`'s `add_engine_systems` register:
+- [x] T016 [US1] In `oxide_godot_core/oxide_godot_lib/src/ecs.rs`'s `add_engine_systems` register:
   fixed — `player::sync::sync_in_player.in_set(Phase::SyncIn).after(sweep_dead_nodes)`,
   `orient_and_anim.in_set(Phase::EngineQueryOrient)`, `move_body.in_set(Phase::EngineQueryMove)`,
   `sync_out_player.in_set(Phase::SyncOut).before(sync_out_remove)`; frame —
@@ -344,11 +344,11 @@ commit 3).
   `build_frame` adds `player_input::system::input_decide.in_set(Phase::Gameplay)`. Depends on
   T011, T012. Verification: `setup.rs` tests still pass (the pure systems compile into the
   schedules built by the tests — they need the `Tuning`/delta resources `build_world` inserts).
-- [ ] T017 [US4] Edit `oxide-godot/player/player.tscn` line 592 from `callback_mode_process = 0` to
+- [x] T017 [US4] Edit `oxide-godot/player/player.tscn` line 592 from `callback_mode_process = 0` to
   `callback_mode_process = 2` (the `AnimationTree` → MANUAL; research R1, option B; the
   milestone's ONE scene edit). Verification: `git diff oxide-godot/player/player.tscn` shows
   exactly that one changed line (the `AnimationPlayer` at `:577` stays `0`).
-- [ ] T018 [US1] Append to `docs/v3-tradeoffs.md` the rows (contracts/player-entity.md §5): root
+- [x] T018 [US1] Append to `docs/v3-tradeoffs.md` the rows (contracts/player-entity.md §5): root
   motion read from the `AnimationTree` (`orient_and_anim`); `move_and_slide` + post-move origin
   (`move_body`); crosshair raycast after the in-set camera rotation (`camera_and_ray`);
   `slerp`/`looking_at` engine-backed math (`orient_and_anim`); bullet instancing from the tick
@@ -356,7 +356,7 @@ commit 3).
   `player.tscn:592`, with R1's `M(n).rm == S(n+1).rm` evidence); replication as projection (the
   §2 table); RPC timing — `jump`/`land`/`shoot` `call_remote`, local effects inline in the fixed
   `SyncOut` (option (b), R2). Verification: 5 + 8 = 13 rows.
-- [ ] T019 [US1] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
+- [x] T019 [US1] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
   warnings; **177** = 163 + 9 (player/system) + 5 (player_input/system); the 16 + 13 model tests
   still listed by name; paste the `test result:` line. Headless: import (`Initialize godot-rust`),
   `main/main.tscn` ×2, `level/level.tscn` clean vs `CLAUDE.md`'s catalog. Harness (research R9,

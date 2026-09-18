@@ -589,7 +589,7 @@ animation_path = NodePath("../AnimationTree")
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=607396885]
 root_node = NodePath("../PlayerModel")
 root_motion_track = NodePath("Robot_Skeleton/Skeleton3D:root")
-callback_mode_process = 0
+callback_mode_process = 2
 tree_root = SubResource("30")
 anim_player = NodePath("../PlayerModel/AnimationPlayer")
 parameters/aim/add_amount = 0.0

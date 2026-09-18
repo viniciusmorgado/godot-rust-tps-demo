@@ -60,6 +60,17 @@ impl ICamera3D for CameraNoiseShake {
 }
 
 impl CameraNoiseShake {
+    /// The three noises (`noise_yaw`, `noise_pitch`, `noise_roll`), read once by `Player.ready`
+    /// into the entity's handles (specs/012 research R5).
+    pub(crate) fn noises(&self) -> [Gd<FastNoiseLite>; 3] {
+        [self.noise_yaw.clone(), self.noise_pitch.clone(), self.noise_roll.clone()]
+    }
+
+    /// The rest rotation captured in `ready`, read once by `Player.ready` (specs/012 research R5).
+    pub(crate) fn start_rotation(&self) -> Vector3 {
+        self.start_rotation
+    }
+
     // Add trauma to start/continue the shake.
     pub(crate) fn add_trauma(&mut self, amount: f64) {
         let tuning = CameraShakeTuning::default();

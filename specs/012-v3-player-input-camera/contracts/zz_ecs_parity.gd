@@ -28,6 +28,14 @@ var last_origin_y := 0.0
 
 func _ready() -> void:
 	seed(1)  # FIRST: CameraNoiseShake draws randi() when player.tscn is instantiated below
+	# Real joypads on the host pollute the actions (move_*/view_* are bound to joypad axes and
+	# jump/aim/shoot/move_* to joypad buttons in project.godot; stick drift and stray button
+	# events differ per run and per tree): unbind EVERY joypad event before the first input flush
+	# (this _ready precedes it), so only Input.action_press/release below drive the actions. No
+	# Input.action_release here: it raises just_released, which toggles aim on in v1's logic.
+	for a in InputMap.get_actions():
+		for ev in InputMap.action_get_events(a):
+			if ev is InputEventJoypadMotion or ev is InputEventJoypadButton: InputMap.action_erase_event(a, ev)
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--case="):
 			case = a.substr(len("--case="))

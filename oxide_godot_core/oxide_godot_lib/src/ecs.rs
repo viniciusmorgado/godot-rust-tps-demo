@@ -377,4 +377,16 @@ pub fn add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule) {
     frame.add_systems(sync_out_puff.in_set(Phase::SyncOut).before(sync_out_remove));
     frame.add_systems(sync_in_blast.in_set(Phase::SyncIn).after(sweep_dead_nodes));
     frame.add_systems(sync_out_blast.in_set(Phase::SyncOut).before(sync_out_remove));
+    // The player (specs/012 research R7): the fixed tick's sync/query members and the frame run's.
+    fixed.add_systems(crate::player::sync::sync_in_player.in_set(Phase::SyncIn).after(sweep_dead_nodes));
+    fixed.add_systems(crate::player::sync::orient_and_anim.in_set(Phase::EngineQueryOrient));
+    fixed.add_systems(crate::player::sync::move_body.in_set(Phase::EngineQueryMove));
+    fixed.add_systems(crate::player::sync::sync_out_player.in_set(Phase::SyncOut).before(sync_out_remove));
+    frame.add_systems(
+        crate::player_input::sync::sync_in_input.in_set(Phase::SyncIn).after(sweep_dead_nodes),
+    );
+    frame.add_systems(crate::player_input::sync::camera_and_ray.in_set(Phase::EngineQuery));
+    frame.add_systems(
+        crate::player_input::sync::sync_out_input.in_set(Phase::SyncOut).before(sync_out_remove),
+    );
 }

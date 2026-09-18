@@ -75,6 +75,9 @@ pub fn build_fixed() -> Schedule {
             .chain(),
     );
     schedule.add_systems(crate::door::system::open_on_player.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::player::system::tick_decide.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::player::system::tick_integrate.in_set(Phase::GameplayIntegrate));
+    schedule.add_systems(crate::player::system::tick_settle.in_set(Phase::GameplaySettle));
     schedule
 }
 
@@ -82,6 +85,7 @@ pub fn build_frame() -> Schedule {
     let mut schedule = Schedule::new(Frame);
     schedule.configure_sets((Phase::SyncIn, Phase::Gameplay, Phase::EngineQuery, Phase::SyncOut).chain());
     schedule.add_systems(crate::part_disappear::system::advance.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::player_input::system::input_decide.in_set(Phase::Gameplay));
     schedule
 }
 
@@ -128,7 +132,9 @@ mod tests {
     fn phase_sets_are_chained_in_order() {
         let mut world = build_world();
         world.insert_resource(Trace::default());
-        let mut schedule = build_fixed();
+        // V3-B: the four-set chain now lives in the FRAME schedule only (the fixed chain has no
+        // `EngineQuery` member, so a probe in it would be unordered there).
+        let mut schedule = build_frame();
         // Added in REVERSE order so the observed order can only come from the chained sets.
         schedule.add_systems(probe_sync_out.in_set(Phase::SyncOut));
         schedule.add_systems(probe_engine_query.in_set(Phase::EngineQuery));
