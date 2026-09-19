@@ -90,6 +90,7 @@ the robot's five replicated fields) — the guard-dropped-before-engine-call rul
 #[derive(Component, Clone, Copy)] pub struct AimBlend(pub Vector2);                       // :482-485 → component (FR-016)
 #[derive(Component)] pub struct ShootRequested;                                           // :35-36, :335-338 (marker from the drain)
 #[derive(Component, Clone, Copy)] pub struct RobotFrame { pub global_transform: Transform3D, pub gravity: Vector3, pub velocity: Vector3, pub player_origin: Option<Vector3>, pub ray_from: Transform3D, pub ray_mesh: Transform3D, pub ray_mesh_z: f32, pub laser_colliding: bool, pub laser_point: Vector3 }  // SyncIn snapshot
+#[derive(Component, Clone, Copy)] pub struct LaserBuffer { pub colliding: bool, pub point: Vector3 }   // this run's laser read; RobotFrame.laser_* = the previous run's (research R8 one-step buffer, V3-C Session 3)
 #[derive(Component, Clone, Copy)] pub struct ReplayRobot { pub state: State, pub target_position: Vector3, pub aim_preparing: f32 }  // :134 (non-Simulates)
 #[derive(Component, Clone, Default)] pub struct RobotIntents { pub idle_branch: bool, pub raycast: Option<(Vector3, Vector3)>, pub shoot: bool, pub clip: Option<f32>, pub play_shoot: bool, pub anim: Option<AnimDecision>, pub hit: bool, pub just_died: bool }
 #[derive(Clone, Copy, Debug, PartialEq)] pub struct AnimDecision { pub request: &'static str, pub aim: Option<(f32, Vector2)> }   // :469-488 (blend_amount, blend_position)
@@ -199,11 +200,11 @@ New:
 - `part/system.rs` (5): `attached_part_does_nothing`, `waiting_timer_expiry_starts_fading`,
   `fading_writes_fade_curve_each_frame`, `fading_destroys_at_t_minus_0_2_once`,
   `destroyed_timer_expiry_marks_remove`.
-- `red_robot/system.rs` (14): `no_player_branch_uses_idle_velocity_and_zero_target`,
+- `red_robot/system.rs` (16, incl. `robot_that_just_died_is_not_advanced`, `remote_hit_decrements_client_health_and_dies_at_zero`): `no_player_branch_uses_idle_velocity_and_zero_target`,
   `approach_requests_raycast_only_when_facing_and_countdown_expiring`,
   `approach_to_aim_when_raycast_sees_player`, `aim_branch_clips_at_1000_when_laser_not_colliding`,
   `aim_to_shooting_emits_play_shoot`, `aim_lost_resumes_approach`,
-  `animation_decided_from_the_post_step_state`, `aim_blend_steps_from_the_component`,
+  `animation_decision_uses_the_post_step_state`, `aim_blend_steps_from_the_component`,
   `integrate_matches_model_twin`, `shoot_requested_sets_shoot_intent_once`,
   `replay_builds_animation_from_replicated_fields`, `robot_hit_apply_ignores_dead_robot`,
   `pending_trauma_expiry_flags_trauma_due`, `removal_timer_expiry_marks_remove`.

@@ -777,19 +777,34 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
 
 ## Measured timing differences
 
-Filled during implementation, before the closing commit. An empty table means the five harness
-diffs (and the US4 experiment) were empty.
+Filled during implementation (V3-C commits `df380ad` and `30ec952`, whose bodies paste the
+diffs). `P<n>` = the physics probe at `i32::MIN` (start of physics step n); `F<n>` = the observer
+at `i32::MIN` (start of frame n's process pass).
 
 | Case | Signal / timer | `v2` frame | `v3` frame | Delta | Cause |
 |---|---|---|---|---|---|
-| (to be measured) | | | | | |
+| (c) bullet expiry (`df380ad`) | the bullet node's last physics step after the animation method track `destroy` | last probe line P390, freed at F390 | one more probe line P391, freed at F390 | +1 physics step of node lifetime, same observer frame | The method track's `destroy` is a deferred call flushed after the process pass — after the driver — so v2's `queue_free` happened in that flush while v3's `BulletDestroy` is drained by the NEXT fixed run and `sync_out_remove`'s `queue_free` lands at the end of that step. Proven by a reverted experiment (`queue_free` from the bridge made the diff empty). |
+| (a)/(e)/R1 re-run (`30ec952`) | the projected `EnemyRobot.state` after an event that arrives AFTER the driver's run in its step (detection-area entry at step 10; the `resume_approach` method track) | `RAW P11 state=1`, `RAW P612 state=1` (R1: `S11 state=1`) | `RAW P12 state=1`, `RAW P613 state=1` (R1: `S11 state=0`) | +1 probe read for the field only | v2 wrote the node field inside the signal/method callback; v3 drains the event at the next fixed run's start and projects the component at that run's end. The DECISIONS coincide: P12 `target=(0, 0.05, 8) node=walk`, P371 Aim, P432 Shooting, F430/F671 `ShootAnimation.playing`, F566 blast, identical on both trees. |
+| (b) robot shot to death (`30ec952`) | the three puffs' free frames (`harness_children` decrements) | F581, F611, F731 | F582, F612, F732 | +1 frame | The puff is instanced from the part's frame `SyncOut` and registered by the next run, so its `0.2 s` + `2·lifetime` timers start one frame after v2's, whose puff registered inside `process` before that frame's timer pass. The puff spawn frames (F388, F418, F538) are identical. |
+| (b) robot shot to death (`30ec952`) | the robot's free after the 10 s removal timer | `RAW P767 robot_freed` (F765 `harness_children=3`) | `RAW P766 robot_freed` (F765 `harness_children=3`) | −1 physics step at the probe, same observer frame | `RemovalTimer` expires in the frame run and `sync_out_remove` queue-frees inside it, so the node is gone before the next physics step; v2's `SceneTreeTimer` callback queue-freed after the frame's delete flush, so its node survived the next step's callbacks. The parts' free steps (P402, P432, P552) are identical. |
 
-Candidates the harness must settle: the robot's `hit` applied in the same fixed run through
-`RobotHitLocal` (option (B): expected identical, including the parts' first moving step); the part's `Waiting`/`Destroyed` timers as tick timers
-instead of `SceneTreeTimer`s (V3-A's arithmetic: same step expected); the trauma pushed one
-schedule run after the 0.1 s timer; `resume_approach` from the method track applied at the next
-fixed run's drain; the blast/puff instanced from `SyncOut` at the end of the phase instead of
-inside the callback (same iteration).
+Identical (no row): case (b)'s hits P47/P77/P107/P137, the death P167 with identical part angular
+velocities, every part position/velocity/fade line and the parts' free steps; case (d)
+md5-identical (`344d5688a…`, 754 lines: blast F557, trauma arrival F565); case (e)'s root motion
+and origin at every step; case (a)'s every decision; the R1 re-run except the `MODE` header and
+the projected-state line above. Backlog #31 (FR-023) produced NO difference in case (a): the
+harness player is static and never leaves the detection area, so the sanctioned change is
+unmeasured by the harness — it is covered by the unit tests
+`robot_player_seen_resets_counters_on_entry` / `robot_player_seen_none_sets_idle_without_reset`
+(`ecs/apply.rs`) and by checkpoint (1). One consequence surfaced by the original case (d): a
+`test_shoot` robot's zeroed `shoot_countdown` is overwritten by FR-023's reset on entry, so it
+no longer pre-checks immediately when the player is already inside (v2 did); the harness case
+was made FR-023-neutral (`30ec952`, deviation 2) and the debug knob's change is recorded here.
+
+The candidates listed at planning time settled as: the same-run `hit` — identical (option (B));
+the part's `Waiting`/`Destroyed` timers — identical steps; the trauma push — identical arrival
+(F565); `resume_approach` at the next drain — the projected-state row; the blast from `SyncOut` —
+identical frame; the puff from `SyncOut` — the +1 frame row.
 
 ## Assumptions
 

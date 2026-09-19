@@ -259,6 +259,68 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
   name it with a `type` alias carrying the lifetimes (`type SyncOutPlayerQuery<'w, 's> =
   Query<'w, 's, (Entity, &'static Orientation, …), With<PlayerTag>>;`) and take
   `mut players: SyncOutPlayerQuery` — no `#[allow]`.
+- **Entity-to-entity communication (V3-C)**: SAME-run through `Messages<M>` — written by one
+  system and read by a later system of the same or a later set with an explicit `.after`
+  (`RobotHitLocal`: `bullet_settle` → `robot_hit_apply`, both `GameplaySettle`; `update()` once
+  at the start of each fixed run, before the drain; a message read in its run never survives, an
+  unread one is dropped after two updates). CROSS-run through the queue (`AddTrauma` from a
+  timer, `RobotHit`/`PartFx`/`BulletFx` from the network). Corollary of the `call_remote` rule:
+  an effect that must land in the SAME run as its cause goes through a message, never the queue
+  (a push made during a run is drained by the NEXT run).
+- **Cross-entity access from a `SyncOut` system (V3-C)**: the robot's death explodes its parts
+  — another entity's NODE through the robot's own `Gd<Part>` handles (`RobotHandles.parts`,
+  cloned OUT of the map before the loop so the map is free), the other entity's `NodeHandles`
+  entry through `EntityIndex` (`synchronizer`, `col1`, `col2`), the other entity's COMPONENT
+  through a disjoint `Query<&mut PartPhase, Without<RobotTag>>` beside the robot query. The
+  spec-sanctioned exception to "components → engine" (specs/013 research R5); the parts never
+  draw or decide for themselves.
+- **Engine RNG in glue (V3-C)**: `randi()`/`randf()` are engine calls, drawn in the SYNC system
+  in v2's order — the robot's thirteen draws (reaction `randi()`, then per part in scene order
+  `randf()` ×3 angular + ×1 wait) live in `sync_out_robot`'s death branch; pure code takes the
+  sampled values (`random_angular_velocity(r1, r2, r3)`, `wait_time(.., r)`). Never draw in pure
+  code nor in a handler that could run on a different peer than v2's — seeded parity (`seed(1)`)
+  is proven by case (b)'s identical `angular` RAW lines.
+- **Engine-updated children (V3-C, research R8 Fact 2)**: a live `RayCast3D` child (and a
+  PHYSICS-mode `AnimationTree`) updates AFTER its parent's priority-0 `_physics_process` and
+  BEFORE the `i32::MAX` driver, so a `SyncIn` read is one step NEWER than v2's read inside the
+  parent. Reproduce v2 either with a one-step buffer — `LaserBuffer`: this run's read stored,
+  the previous run's consumed by `RobotFrame.laser_*` — or by driving the child from the tick
+  (the tree: MANUAL + `advance`). The laser ray LOOKED disabled (`enabled = false` in the scene)
+  but the shoot animation's track enables it (`red_robot.tscn:10399`, track 14) — check the
+  animation tracks before concluding a node is inert; harness (d) caught it (the clip one frame
+  early and off in the third decimal; bit-identical with the buffer).
+- **Timers that push (V3-C)**: a timer component stepped by the frame run may end in an event
+  — `PendingTrauma` → `TraumaDue` marker (frame `Gameplay`) → `queue::push(AddTrauma)` (frame
+  `SyncOut`) → applied by the next run's drain, as v2's `SceneTreeTimer` callback pushed after
+  the process pass. A timer CREATED in a fixed run (`PendingTrauma`, `RemovalTimer`, the part's
+  `Waiting`) is first stepped by that iteration's frame run — the same step count as a
+  `SceneTreeTimer` created in the physics phase (harness (b): the parts' fade and free steps
+  identical).
+- **`advance` and death (V3-C)**: the tree is advanced for every live entity EXCEPT in the run
+  it dies — `should_advance(dead, just_died)`; `AnimationMixer::advance()` ignores `active`
+  (Godot 4.7 `animation_mixer.cpp:2112-2114`), so setting the tree inactive is not enough.
+- **Interacting engine moves (V3-C)**: when two entities' engine moves interact (the robot's
+  `move_and_slide`, the bullet's `move_and_collide` into it), order them as v2's tree order did —
+  `move_robot.in_set(EngineQueryMove).before(move_bullet)`; bevy leaves two systems of one set
+  unordered.
+- **Second `AnimationTree` (V3-C)**: the R1 twin on the robot confirmed the player's finding —
+  `M(n).rm == S(n+1).rm` (M12 0.000016 = S13, M200 0.014937 = S201); v2 PHYSICS == v3 MANUAL +
+  `advance` line by line (601 lines), re-run on the real build after the `.tscn` edit.
+- **Harness additions (V3-C)**: `is_instance_valid(node)` BEFORE reading any property of a node
+  that may be freed (research R2's lesson); `x != null` is FALSE for a freed object in GDScript 4
+  — track liveness with flags; log tree-root child counts RELATIVE to the initial count (v3's
+  root holds the `EcsWorld` autoload); spawn scripted bullets from the PROCESS pass — a node added
+  by a physics callback at `i32::MIN` is moved in that same step by the driver but only in the
+  next step by v2; scripted bullets rather than direct `hit()` calls once `hit` is `call_remote`
+  (its local path is the message); `test_shoot` no longer forces an immediate first pre-check
+  after backlog #31 — FR-023's reset on detection-area entry overwrites its zeroed countdown
+  (harness (d) follows the 6 s sequence instead); the scratch files go in the Godot project
+  directory `oxide-godot/oxide-godot/`, never the repository root.
+- **`HitKind` (V3-C)**: the `Send` projection of `HitTarget` — resolve where the engine answer is
+  (`hittable::kind_of` in `move_bullet`, right after `move_and_collide`), carry ids in components
+  (`Collided { hit: Option<HitKind> }`), re-fetch the typed handle by id to call the engine
+  (`HitKind::rpc_hit` → `Gd::<T>::try_from_instance_id` → the one `HitTarget::rpc_hit`; a freed
+  target is a no-op).
 
 ## API notes (gdext 0.5.5)
 

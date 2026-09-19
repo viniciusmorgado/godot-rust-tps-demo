@@ -207,7 +207,7 @@ clones of the three part handles) BEFORE the loop, so the map is free for the pa
 | Set | System | Reads / writes (shape) | v2 lines |
 |---|---|---|---|
 | `SyncIn` | `sync_in_robot` (glue, `red_robot/sync.rs`) | every robot: `RobotFrame { global_transform, gravity, velocity, ray_from_transform, ray_mesh_transform, ray_mesh_z, laser_colliding, laser_point, player_origin: Option<Vector3> }` — the tracked player's origin via `Gd::<Node3D>::try_from_instance_id(id)` (decision, Assumption (6): one FFI lookup + one `get_global_transform`, no `EntityIndex`/`NodeHandles` borrow in `SyncIn`, and it works for a player that is not an ECS entity — none exists after V3-B, but the lookup is the one v2 made, `:153`); non-`Simulates`: `ReplayRobot { state, target_position, aim_preparing }` from `root.bind()` | `:153`, `:164`, `:180-181`, `:199-202`, `:249-250`, `:478`, `:493`; `:134` |
-| `Gameplay` | `robot_decide` (pure, `red_robot/system.rs`) | `Simulates`, not `Dead`: the no-player branch (`target = ZERO`, `idle_velocity`, `idle_branch = true`); else `target = player_origin`; `state_at_start`; `Approach`: local angle → `facing && shoot_countdown_will_expire` → `raycast = Some((ray_from.origin, target + UP))`; `Aim | Shooting`: `max_dist` from the laser snapshot (a constant 1000: R8) → `clip = Some(max_dist)`; `Aim && aim_countdown_will_expire` → `raycast`; `ShootRequested` marker → `shoot = true` (removed) | `:138-151`, `:160-184`, `:197-223` |
+| `Gameplay` | `robot_decide` (pure, `red_robot/system.rs`) | `Simulates`, not `Dead`: the no-player branch (`target = ZERO`, `idle_velocity`, `idle_branch = true`); else `target = player_origin`; `state_at_start`; `Approach`: local angle → `facing && shoot_countdown_will_expire` → `raycast = Some((ray_from.origin, target + UP))`; `Aim | Shooting`: `max_dist` from the laser snapshot (the previous run's read, R8's one-step buffer) → `clip = Some(max_dist)`; `Aim && aim_countdown_will_expire` → `raycast`; `ShootRequested` marker → `shoot = true` (removed) | `:138-151`, `:160-184`, `:197-223` |
 | `EngineQueryOrient` | `robot_query` (glue) | `raycast` → `raycast_to` (`:363-382`) → `sees_player = collider id == tracked id`; `shoot` → the shoot raycast along `ray_from.basis.col_b()` for 1000 m → `ShotResult { max_dist, hit: Option<(position, Option<InstanceId>)> }`; root motion → `RootMotion` (previous `advance`'s value, R1) | `:177-183`, `:216-222`, `:399-409`, `:241-244` |
 | `GameplayIntegrate` | `robot_step_and_animate` (pure) | `model::step(state_at_start, counters, dt, inputs { angle, sees_player }, tuning)` → `RobotState`, counters, `cmds` (`RpcPlayShoot` → `play_shoot` intent; `ResumeApproach` → already applied by `step`); THEN the animation decision on the NEW state and counters: `transition_request`, `aim_blend_amount`, `cannon_angles` from the `RayMesh` snapshot, `aim_blend_step` on `AimBlend` → `AnimDecision`; THEN `integrate_root_motion` (or `idle_velocity` on the idle branch) → `Orientation`, `Velocity`; non-`Simulates`: the replay `AnimDecision` from `ReplayRobot` (`animate` on the replicated fields) | `:186-196`, `:225-235`, `:238` → `:456-490`, `:245-251`, `:146`; `:134` |
 | `EngineQueryMove` | `move_robot` (glue) | `set_velocity`, `set_up_direction(UP)`, `move_and_slide` (also on the idle branch) | `:147-149`, `:253-255` |
@@ -289,15 +289,21 @@ backlog #15 comment moves with the function.
 
 ## R8 — The laser `RayCast3D` and the engine-update ordering (EXPERIMENTS, Assumption (2))
 
-**Fact 1**: the laser `RayCast` node is `enabled = false` (`red_robot.tscn:10762-10766`,
-`target_position = (0, 0, -1000)`, mask 3). A disabled `RayCast3D` never updates itself, so v2's
-`laser_raycast.is_colliding()` (`red_robot.rs:200`) is always `false` and `max_dist` is always
-`1000.0` (`:199-204`): `_clip_ray(1000.0)` every Aim/Shooting step. Verified by the R1 scene with
-`ZZ_PROBE=zz_r3` (`contracts/zz_r1_robot.gd`'s R3 probes): `colliding=false` at every step from
-S300 to S520 through `state=2` (Aim, from S371) and `state=3` (Shooting, from S432). Decision:
-`sync_in_robot` reads `is_colliding()`/`get_collision_point()` exactly as v2 did (two reads per
-Aim/Shooting step, kept for parity and for a future scene that enables the ray) and `robot_decide`
-derives `max_dist` from the snapshot — placement is irrelevant for a disabled ray.
+**Fact 1 (corrected in V3-C Session 3, commit `30ec952` deviation 3)**: the laser `RayCast`
+node is `enabled = false` in the scene (`red_robot.tscn:10762-10766`, `target_position =
+(0, 0, -1000)`, mask 3) BUT the shoot animation animates `RayCast:enabled` (`red_robot.tscn:10399`,
+track 14 of `ShootAnimation`), so the ray is LIVE during Aim/Shooting and v2's
+`laser_raycast.is_colliding()` (`red_robot.rs:200`) becomes `true` there (harness (d): the clip
+drops from 1000 to about 0.86 m from F516 on both trees — the ray hits the robot's own geometry
+as the cannon swings). The planning-time experiment (`ZZ_PROBE=zz_r3`, S300–S520) ended just
+before the ray went live and wrongly concluded that the read was a constant. Decision:
+`sync_in_robot` reads `is_colliding()`/`get_collision_point()` every run into `LaserBuffer` (this
+run's read) and fills `RobotFrame.laser_colliding`/`laser_point` from the PREVIOUS run's buffer —
+Fact 2's one-step buffer — because the live ray updates after the robot's priority-0 slot and
+before the driver: without the buffer v3's clip started one frame early and differed in the third
+decimal (v2 paired the current `ray_from` origin with the previous step's collision point); with
+it, case (d) is bit-identical (md5 `344d5688a…`). `robot_decide` derives `max_dist` from the
+snapshot as before.
 
 **Fact 2 — the general rule** (`contracts/zz_r3_order.gd`): a live `RayCast3D` CHILD updates
 AFTER its parent's priority-0 `_physics_process` and BEFORE the `i32::MAX` driver:
@@ -316,7 +322,7 @@ one-step relation R1 found for the tree. Rule for `CLAUDE.md` (commit 4): when a
 engine-updated child (`RayCast3D` internal physics update, `AnimationTree` in PHYSICS mode), a
 `SyncIn` read at `i32::MAX` is one step NEWER than v2's read inside the parent's callback; to
 reproduce v2, either drive the child from the tick (the tree: MANUAL + `advance`) or keep a
-one-step buffer (`prev`/`curr`) in the snapshot. The laser needs neither (Fact 1).
+one-step buffer (`prev`/`curr`) in the snapshot. The laser needs the buffer (Fact 1, corrected).
 
 **Timers created in a fixed run, stepped by the frame run** (analyze finding 12): `PendingTrauma`,
 `RemovalTimer` and the part's `Waiting` are created in the fixed `SyncOut` of iteration N and first

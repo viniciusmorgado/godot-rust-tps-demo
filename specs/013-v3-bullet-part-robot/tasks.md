@@ -589,7 +589,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
 
 ## Phase 5: Polish — commit 4
 
-- [ ] T028 [P] Extend `CLAUDE.md`'s "Port conventions (v3)" with: entity-to-entity communication
+- [x] T028 [P] Extend `CLAUDE.md`'s "Port conventions (v3)" with: entity-to-entity communication
   — inside ONE run through `Messages` ordered across sets (`RobotHitLocal`: `bullet_settle` →
   `robot_hit_apply.after(..)` in `GameplaySettle`, `update()` at the start of each fixed run) versus
   across runs through the queue (`AddTrauma` from a timer), and the corollary of option (b): an RPC
@@ -605,14 +605,14 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   `is_instance_valid` BEFORE reading a part and "the Godot project directory, not the repository
   root" for the scratch files; the three new probe scripts as re-verification tools.
   Verification: `grep -c 'RobotHitLocal' CLAUDE.md` ≥ 1.
-- [ ] T029 [P] Fill `specs/013-v3-bullet-part-robot/spec.md`'s "Measured timing differences" table
+- [x] T029 [P] Fill `specs/013-v3-bullet-part-robot/spec.md`'s "Measured timing differences" table
   from the five diffs of T015/T025: one row per differing frame with cause — the #31 rows (if case
   (a) showed a re-entry) cite FR-023 as the sanctioned change; the empty cases are recorded below
   the table with the commit hashes where their diffs are pasted; no `(to be measured)` left. Align
   `data-model.md` "Tests by name" with the names that landed (`grep -A1 '#\[test\]'` per file) and
   its signatures with the code where T019/T022 refined them. Verification: `grep -c '(to be
   measured)' spec.md` = 0.
-- [ ] T030 Run quickstart.md §5's grep list VERBATIM and paste every output (no `fn process`/
+- [x] T030 Run quickstart.md §5's grep list VERBATIM and paste every output (no `fn process`/
   `fn physics_process` in the three bridges; no `godot::task::spawn`/`bind_mut::<EcsWorld>`/
   `get_autoload_by_name::<EcsWorld>` in the three modules; no `godot::classes` in the three
   `system.rs`; `red_robot/model.rs` diff-empty against `30d1a4d`; the two inline `mod pure` diffs
@@ -622,7 +622,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   level.rs flying_forklift.rs settings.rs settings/ menu.rs menu/ main_scene.rs debug_label.rs`);
   `red_robot.tscn` diff = the one line and no other scene changed; tradeoffs ≥ 23; backlog #29/#30
   open and #31 done). If a grep reveals a violation, STOP and report.
-- [ ] T031 Final gates + headless (`cargo build && cargo clippy && cargo test` → **214**; import;
+- [x] T031 Final gates + headless (`cargo build && cargo clippy && cargo test` → **214**; import;
   `main.tscn`; `level.tscn`); commit (R11 row 4) with a body (gate line, the grep outputs summary,
   the timing-table rows as written): `CLAUDE.md: entity-to-entity messages vs queue,
   engine-updated children rule, RNG in glue; spec: timing table; tradeoffs complete`.
