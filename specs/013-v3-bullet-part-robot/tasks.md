@@ -626,7 +626,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   `main.tscn`; `level.tscn`); commit (R11 row 4) with a body (gate line, the grep outputs summary,
   the timing-table rows as written): `CLAUDE.md: entity-to-entity messages vs queue,
   engine-updated children rule, RNG in glue; spec: timing table; tradeoffs complete`.
-- [ ] T032 Cleanup and count: `git worktree remove ../oxide-godot-v2 && git worktree prune`;
+- [x] T032 Cleanup and count: `git worktree remove ../oxide-godot-v2 && git worktree prune`;
   `find . -name 'zz_*' -not -path '*/specs/*'` returns nothing; `git status` clean;
   `git log --oneline <tasks-commit>..HEAD` where `<tasks-commit>` is the commit that added this
   file (`git log --format=%h --diff-filter=A -- specs/013-v3-bullet-part-robot/tasks.md`) — state
