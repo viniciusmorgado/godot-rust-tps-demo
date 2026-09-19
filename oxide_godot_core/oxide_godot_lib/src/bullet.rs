@@ -1,12 +1,16 @@
-use crate::hittable;
+//! The bullet's bridge (constitution 1.5.2 "ECS shape (v3)"; specs/013 contracts
+//! enemy-entities.md): `ready` registers the entity with its handles, `exit_tree` unregisters, the
+//! RPC/method-track handlers push events. No per-tick logic: the tick is `bullet/system.rs`
+//! (pure) + `bullet/sync.rs` (engine).
+
+use crate::ecs::event::{BulletFx, InboundEvent, Initial};
+use crate::ecs::{BulletHandles, Handles, queue};
 use crate::settings::Settings;
-use godot::classes::{
-    AnimationPlayer, CharacterBody3D, CollisionShape3D, ICharacterBody3D, KinematicCollision3D,
-    Node3D, OmniLight3D,
-};
+use godot::classes::{AnimationPlayer, CharacterBody3D, CollisionShape3D, ICharacterBody3D, OmniLight3D};
 use godot::prelude::*;
 
-use pure::BulletState;
+pub(crate) mod sync;
+pub(crate) mod system;
 
 /// Replaces `hit: bool` + `time_alive: f32` (an invalid-state-admitting pair — nothing stopped
 /// `time_alive` from continuing to count down after `hit` was already `true`).
@@ -65,9 +69,6 @@ pub(crate) mod pure {
 pub struct Bullet {
     base: Base<CharacterBody3D>,
 
-    #[init(val = BulletState::Flying { time_alive: 5.0 })]
-    state: BulletState,
-
     #[init(node = "AnimationPlayer")]
     animation_player: OnReady<Gd<AnimationPlayer>>,
     #[init(node = "CollisionShape3D")]
@@ -85,71 +86,48 @@ impl Bullet {
 
 #[godot_api]
 impl ICharacterBody3D for Bullet {
+    /// v2's one-shot setup (`bullet.rs:88-93`: the collision shape off on a non-server peer; the
+    /// `set_physics_process(false)` is moot — there is no callback) and the registration. The
+    /// `Settings` read of v2's `explode` (`:143`) happens ONCE here and travels with the handles.
     fn ready(&mut self) {
-        if !self.base().get_multiplayer().unwrap().is_server() {
-            self.base_mut().set_physics_process(false);
+        let simulates = self.base().get_multiplayer().unwrap().is_server();
+        if !simulates {
             self.collision_shape.set_disabled(true);
         }
+        let shadow_mapping = self.settings.bind().graphics().shadow_mapping;
+
+        queue::push(InboundEvent::Register {
+            id: self.base().instance_id(),
+            handles: Handles::Bullet(Box::new(BulletHandles {
+                root: self.to_gd(),
+                anim: self.animation_player.clone(),
+                collision: self.collision_shape.clone(),
+                light: self.omni_light.clone(),
+                shadow_mapping,
+            })),
+            initial: Initial::Bullet { shadow_mapping, simulates },
+        });
     }
 
-    fn physics_process(&mut self, delta: f64) {
-        // Mirrors v1's `if self.hit { return; }` — an already-exploded bullet does nothing on
-        // later frames.
-        if self.state == BulletState::Exploded {
-            return;
-        }
-
-        let dt = delta as f32;
-        let (new_state, expired) = pure::step(self.state, dt);
-        self.state = new_state;
-        if expired {
-            self.base_mut().rpc("explode", &[]);
-        }
-
-        // The expiry frame itself still moves/collides — v1 never returns early here, only on
-        // LATER frames once `hit` (now `state == Exploded`) was already true at frame start.
-        let displacement: Vector3 =
-            -dt * Self::VELOCITY * self.base().get_transform().basis.col_c();
-        let col: Option<Gd<KinematicCollision3D>> = self.base_mut().move_and_collide(displacement);
-        if let Some(col) = col {
-            let collider: Option<Gd<Node3D>> =
-                col.get_collider().and_then(|c| c.try_cast::<Node3D>().ok());
-            if let Some(collider) = collider
-                && let Some(mut target) = hittable::resolve(collider)
-            {
-                target.rpc_hit();
-            }
-            self.collision_shape.set_disabled(true);
-            // Backlog #13: suppress the duplicate `explode` when this same tick already
-            // exploded the bullet via expiry above.
-            if matches!(self.state, BulletState::Flying { .. }) {
-                self.base_mut().rpc("explode", &[]);
-            }
-            // v1's trailing `self.hit = true` (bullet.rs:61) — unconditional, so a
-            // non-expired bullet that just collided stops moving/colliding from here on.
-            self.state = BulletState::Exploded;
-        }
+    fn exit_tree(&mut self) {
+        queue::push(InboundEvent::Unregister { id: self.base().instance_id() });
     }
 }
 
 #[godot_api]
 impl Bullet {
-    #[rpc(authority, call_local, unreliable)]
+    /// Remote peers only (spec FR-004, option (b)): the simulating peer applies the explosion's
+    /// local effects inline in its fixed `SyncOut`; here the effect is queued for this peer's
+    /// frame run (`sync_out_bullet_frame`).
+    #[rpc(authority, call_remote, unreliable)]
     fn explode(&mut self) {
-        self.animation_player.play_ex().name("explode").done();
-
-        // Only enable shadows for the explosion, as the moving light
-        // is very small and doesn't noticeably benefit from shadow mapping.
-        if self.settings.bind().graphics().shadow_mapping {
-            self.omni_light.set_shadow(true);
-        }
+        queue::push(InboundEvent::BulletFx { root_id: self.base().instance_id(), fx: BulletFx::Explode });
     }
 
+    /// The `explode` animation's method track (`bullet.tscn:92-104`), on every peer; the drain
+    /// frees only a `Simulates` entity (v2 `bullet.rs:150-153`).
     #[func]
     fn destroy(&mut self) {
-        if !self.base().get_multiplayer().unwrap().is_server() {
-            return;
-        }
-        self.base_mut().queue_free();
+        queue::push(InboundEvent::BulletDestroy { root_id: self.base().instance_id() });
     }
 }

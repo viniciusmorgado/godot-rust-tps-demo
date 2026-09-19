@@ -188,7 +188,7 @@ through `HitKind::rpc_hit`).
 
 ### Commit 2 — `bullet/system.rs`, `bullet/sync.rs`, `bullet.rs`, `ecs.rs`/`ecs/setup.rs` (registration), `docs/v3-tradeoffs.md`
 
-- [ ] T010 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/bullet/system.rs` (pure; declare
+- [x] T010 [P] [US1] Create `oxide_godot_core/oxide_godot_lib/src/bullet/system.rs` (pure; declare
   `pub(crate) mod system;` in `bullet.rs`; `mod pure` untouched): `pub fn bullet_step(dt:
   Res<FixedDelta>, q: Query<(&mut BulletStateC, &mut BulletIntents), With<Simulates>>)` — per
   entity: `intents = BulletIntents { active: state != Exploded, ..default }` (`bullet.rs:98-100`);
@@ -208,7 +208,7 @@ through `HitKind::rpc_hit`).
   once, state `Exploded` — the settle sees `Exploded` and does not re-flag; assert by checking the
   intents after both), `exploded_bullet_is_inactive` (`Exploded` → `active = false`, no explode).
   Verification: 5 tests pass; no `godot::classes` import.
-- [ ] T011 [US1] Create `oxide_godot_core/oxide_godot_lib/src/bullet/sync.rs` (glue; `pub(crate)
+- [x] T011 [US1] Create `oxide_godot_core/oxide_godot_lib/src/bullet/sync.rs` (glue; `pub(crate)
   mod sync;`): `fn sync_in_bullet(handles: NonSend<NodeHandles>, q: Query<Entity, (With<BulletTag>,
   With<Simulates>)>, commands: Commands)` → `BulletBasisZ(p.root.get_transform().basis.col_c())`
   (`bullet.rs:112`); `fn move_bullet(dt: Res<FixedDelta>, handles: NonSendMut<NodeHandles>, q:
@@ -227,7 +227,7 @@ through `HitKind::rpc_hit`).
   NonSendMut<NodeHandles>, q: Query<(Entity, &mut PendingBulletFx), Without<Simulates>>)` (frame
   `SyncOut`): drain → play `explode` + shadow (`:139-145`). Depends on T010, T008. Verification:
   compiles; `grep -n 'free()' bullet/sync.rs` empty.
-- [ ] T012 [US1] Rewrite `oxide_godot_core/oxide_godot_lib/src/bullet.rs` as the bridge
+- [x] T012 [US1] Rewrite `oxide_godot_core/oxide_godot_lib/src/bullet.rs` as the bridge
   (data-model.md "Bridges"): keep `pub(crate) mod pure` (body untouched), `VELOCITY` (`:83`), the
   three `OnReady` handles (`:71-76`) and the typed `Settings` (`:78-79`); DELETE the `state` field
   (`:68-69`) and `physics_process` (`:95-132`). `ready` (`:88-93`): non-server → `collision_shape.
@@ -242,17 +242,17 @@ through `HitKind::rpc_hit`).
   `grep -n 'fn physics_process\|fn process' bullet.rs` empty; `grep -c call_remote bullet.rs` = 1;
   `git diff -- bullet.rs | grep '^-' | grep -c 'mod pure'` = 1 and the only `mod pure` change is the
   visibility token (T005).
-- [ ] T013 [US1] Registration: in `oxide_godot_core/oxide_godot_lib/src/ecs.rs`'s
+- [x] T013 [US1] Registration: in `oxide_godot_core/oxide_godot_lib/src/ecs.rs`'s
   `add_engine_systems` (fixed) `bullet::sync::sync_in_bullet.in_set(Phase::SyncIn).after(sweep_dead_nodes)`,
   `move_bullet.in_set(Phase::EngineQueryMove)`, `sync_out_bullet.in_set(Phase::SyncOut).before(sync_out_remove)`;
   (frame) `sync_out_bullet_frame.in_set(Phase::SyncOut).before(sync_out_remove)`. In
   `ecs/setup.rs::build_fixed`: `bullet::system::bullet_step.in_set(Phase::Gameplay)`,
   `bullet_settle.in_set(Phase::GameplaySettle)`. Depends on T011. Verification: setup tests pass
   (the pure systems need `FixedDelta` and `Messages<RobotHitLocal>`, both in `build_world`).
-- [ ] T014 [US1] Append to `docs/v3-tradeoffs.md` the row: `bullet` — `move_and_collide` and the
+- [x] T014 [US1] Append to `docs/v3-tradeoffs.md` the row: `bullet` — `move_and_collide` and the
   collider resolved into `HitKind` (`move_bullet`, `EngineQueryMove`; the collision answer is
   consumed by `bullet_settle`; `HitKind::rpc_hit` from `SyncOut`). Verification: 15 rows.
-- [ ] T015 [US1] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
+- [x] T015 [US1] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
   warnings; **192** = 187 + 5 (bullet/system); the 3 `pure` tests still listed by name; paste the
   `test result:` line. Headless: import (`Initialize godot-rust`), `main/main.tscn` ×2,
   `level/level.tscn` clean vs `CLAUDE.md`'s catalog. Harness (research R10, quickstart §3): write

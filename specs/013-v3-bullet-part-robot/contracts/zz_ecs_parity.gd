@@ -33,6 +33,8 @@ var part_valid := [true, true, true]
 var bullet: CharacterBody3D
 var bullet_anim: AnimationPlayer
 var bullet_shape: CollisionShape3D
+var bullet_alive := false   # `x != null` is FALSE for a freed object (GDScript 4): flags, as part_valid
+var robot_alive := false
 var last_health := 5
 var last_dead := false
 var last_state := -1
@@ -65,7 +67,7 @@ func _ready() -> void:
 	var cs := CollisionShape3D.new(); var box := BoxShape3D.new(); box.size = Vector3(200, 1, 200); cs.shape = box
 	floor_body.add_child(cs); floor_body.position = Vector3(0, -0.5, 0); add_child(floor_body)
 	if case != "c":
-		robot = load(ROBOT_SCENE).instantiate()
+		robot = load(ROBOT_SCENE).instantiate(); robot_alive = true
 		robot.position = Vector3(0, 0.05, 0)                # facing +Z (red_robot/model.rs:90-95)
 		if case == "d": robot.test_shoot = true            # → shoot_countdown = 0 at ready, shoot() on the first step
 		add_child(robot)
@@ -90,8 +92,15 @@ func _add_player(pz: float) -> void:
 
 # The player's spawn path (player/sync.rs::orient_and_anim): instantiate, add_child under the
 # harness root, set_global_position, look_at (the bullet flies along -basis.z, bullet.rs:112).
+# Case (b) calls it from the PROCESS pass (_observe), not from the physics probe (V3-C Session 2
+# lesson): a node added by a physics callback at i32::MIN is moved in that SAME step by v3's
+# driver (it runs later in the pass, at i32::MAX) but only in the NEXT step by v2 (a node added
+# during the physics pass is not in that pass's list) — every hit, the death and the parts came
+# one step earlier on v3, and the parts' physics diverged in the last digit ~48 steps after the
+# death. Spawned from the process pass, the first move is the next step on both trees (as the
+# game's spawn from the player's fixed tick is) and the (b) logs are bit-identical.
 func _spawn_bullet(from: Vector3, target: Vector3) -> void:
-	bullet = load(BULLET_SCENE).instantiate()
+	bullet = load(BULLET_SCENE).instantiate(); bullet_alive = true
 	add_child(bullet)
 	bullet.set_global_position(from)
 	bullet.look_at(target)
@@ -115,14 +124,16 @@ func _observe() -> void:
 				if rc != last_root_children:
 					_log("RAW F%d root_children=%d (blast spawn)" % [f, rc]); last_root_children = rc
 		"b":
+			if f >= 30 and f % 30 == 0 and death_step < 0 and is_instance_valid(robot):
+				_spawn_bullet(Vector3(0, 1.2, 6), robot.global_position + Vector3(0, 1.2, 0)); _log("RAW F%d bullet_spawned" % f)
 			var sc := get_child_count()
 			if sc != last_self_children:
 				_log("RAW F%d harness_children=%d (bullet/puff spawn or free)" % [f, sc]); last_self_children = sc
 		"c":
 			if is_instance_valid(bullet):
 				_log("F%d origin=%s anim=%s disabled=%s" % [f, bullet.global_position, bullet_anim.current_animation, bullet_shape.disabled])
-			elif bullet != null:
-				_log("RAW F%d bullet_freed" % f); bullet = null
+			elif bullet_alive:
+				_log("RAW F%d bullet_freed" % f); bullet_alive = false
 		"d":
 			var rc := get_tree().get_root().get_child_count()
 			if rc != last_root_children:
@@ -148,9 +159,6 @@ func _observe_physics() -> void:
 			if is_instance_valid(robot) and s <= 300:
 				_log("P%d rm=%s origin=%s state=%d node=%s" % [s, anim_tree.get_root_motion_position(), robot.global_position, robot.state, anim_tree.get("parameters/state/current_state")])
 		"b":
-			if s >= 30 and s % 30 == 0 and death_step < 0:
-				_spawn_bullet(Vector3(0, 1.2, 6), robot.global_position + Vector3(0, 1.2, 0))
-				_log("RAW P%d bullet_spawned" % s)
 			if is_instance_valid(robot):
 				if robot.health != last_health:
 					_log("RAW P%d health=%d" % [s, robot.health]); last_health = robot.health
@@ -165,8 +173,8 @@ func _observe_physics() -> void:
 						var q = parts[i]
 						line += " | p%d pos=%s lv=%s av=%s fade=%.6f" % [i, q.global_position, q.linear_velocity, q.angular_velocity, q.fade_value]
 				_log(line)
-			elif robot != null:
-				_log("RAW P%d robot_freed" % s); robot = null
+			elif robot_alive:
+				_log("RAW P%d robot_freed" % s); robot_alive = false
 		"c":
 			if is_instance_valid(bullet):
 				_log("P%d origin=%s" % [s, bullet.global_position])

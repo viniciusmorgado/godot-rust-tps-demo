@@ -539,4 +539,13 @@ pub fn add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule) {
         crate::camera_noise_shake::sync::sync_out_shake.in_set(Phase::SyncOut).before(sync_out_remove),
     );
     frame.add_systems(crate::player::sync::apply_player_fx.in_set(Phase::SyncOut).before(sync_out_remove));
+    // The bullet (specs/013 research R7): the fixed tick's sync/query members and the frame
+    // run's remote-`explode` applier. `move_bullet` is ordered after the robot's `move_robot`
+    // (v2's tree order, `level.tscn`) from commit 3 on, where `move_robot` is registered.
+    fixed.add_systems(crate::bullet::sync::sync_in_bullet.in_set(Phase::SyncIn).after(sweep_dead_nodes));
+    fixed.add_systems(crate::bullet::sync::move_bullet.in_set(Phase::EngineQueryMove));
+    fixed.add_systems(crate::bullet::sync::sync_out_bullet.in_set(Phase::SyncOut).before(sync_out_remove));
+    frame.add_systems(
+        crate::bullet::sync::sync_out_bullet_frame.in_set(Phase::SyncOut).before(sync_out_remove),
+    );
 }

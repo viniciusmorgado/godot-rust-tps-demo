@@ -82,6 +82,8 @@ pub fn build_fixed() -> Schedule {
     schedule.add_systems(crate::player::system::tick_decide.in_set(Phase::Gameplay));
     schedule.add_systems(crate::player::system::tick_integrate.in_set(Phase::GameplayIntegrate));
     schedule.add_systems(crate::player::system::tick_settle.in_set(Phase::GameplaySettle));
+    schedule.add_systems(crate::bullet::system::bullet_step.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::bullet::system::bullet_settle.in_set(Phase::GameplaySettle));
     schedule
 }
 
