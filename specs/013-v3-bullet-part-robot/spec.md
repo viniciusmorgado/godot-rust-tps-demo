@@ -29,14 +29,16 @@ with `seed(1)` first and the joypad purge.
 - **Residual dynamic access kept after this milestone** (`.rpc("name")`, the one sanctioned form,
   plus the pre-existing string-keyed engine surfaces): `rpc("explode")` on `Bullet`
   (`bullet.rs:106`, `:126`), `rpc("destroy")` on `Part` (`part.rs:143`), `rpc("play_shoot")` on
-  `EnemyRobot` (`red_robot.rs:388`), `rpc("hit")` in `hittable.rs:33`/`:36` (unchanged file);
+  `EnemyRobot` (`red_robot.rs:388`), `rpc("hit")` in `hittable.rs:33`/`:36` (the file gains a
+  local dispatch, option (B) below — the by-name RPC stays);
   the `AnimationTree::set/get` parameter paths of `red_robot.rs:285-286`, `:469-488`
   (`parameters/state/transition_request`, `parameters/aiming/blend_amount`,
   `parameters/aim/blend_position`, `parameters/hit{1..3}/request`); the `ShaderMaterial`
   parameter names `emission_cutout` (`part.rs:158`) and `clip` (`red_robot.rs:499`); the `Model`
   node path of `part.rs:110-114`. No other dynamic access is introduced. Attribute changes under
-  option (b) (FR-004): `explode` (bullet), `destroy` (part) and `play_shoot` (robot) become
-  `call_remote`; `hit` (robot) stays `call_local`.
+  option (b) (FR-004): `explode` (bullet), `destroy` (part), `play_shoot` (robot) AND `hit`
+  (robot) become `call_remote` — the robot's hit is applied locally in the SAME fixed run as the
+  bullet's collision (option (B), spec review 2026-09-19); `hit` (player) stays `call_local`.
 
 **Input**: User description: "Milestone V3-C — the enemy: `bullet`, `part`, `red_robot` over the
 ECS core. Three entity kinds over four bridges; the bullet's tick with `move_and_collide` in
@@ -58,7 +60,7 @@ against the files on 2026-09-19.
 | `bullet.rs` (inline `mod pure`, 3 tests) | 155 | `CharacterBody3D` | `physics_process` (server only, `:95-132`) | `#[rpc(authority, call_local, unreliable)] explode` (`:137-146`); `#[func] destroy` (`:148-154`, called by `bullet.tscn`'s method track at 1.5 s, `:92-104`) |
 | `part.rs` (inline `mod pure`, 5 tests) | 233 | `RigidBody3D` | `process` (`:138-146`, enabled by `explode`'s timer) | `#[func] set_fade_value` (`:151-160`); `#[func] pub(crate) explode` (`:162-192`, called TYPED by the robot, `red_robot.rs:302-304`); `#[rpc(authority, call_local, unreliable)] destroy` (`:194-215`) |
 | `red_robot.rs` + `red_robot/model.rs` (25 tests) | 511 + 569 | `CharacterBody3D` | `physics_process` (`:128-259`) | `#[signal] exploded` (`:264-265`); `#[func] resume_approach` (`:267-274`); `#[rpc(authority, call_local, unreliable)] hit` (`:276-328`); `#[rpc(authority, call_local, unreliable)] play_shoot` (`:330-333`); `#[func] shoot_check` (`:335-338`); `#[func] _on_area_body_entered/exited` (`:340-358`) |
-| `hittable.rs` | 40 | — | none | `HitTarget::{Player, Robot}`, `resolve` (`:16-24`), `rpc_hit` (`:30-39`) — UNCHANGED |
+| `hittable.rs` | 40 | — | none | `HitTarget::{Player, Robot}`, `resolve` (`:16-24`), `rpc_hit` (`:30-39`) — gains a `Send` projection `HitKind::{Player(InstanceId), Robot(InstanceId)}` and a local-dispatch path (option (B)); `rpc_hit` by name stays for the network |
 
 **`Bullet`** (`bullet.rs:63-84`): `BulletState { Flying { time_alive }, Exploded }` (`:14-18`,
 `pure::step` `:22-34`: decrement, `< 0.0` → `Exploded` + "explode now"), `VELOCITY = 20.0`
@@ -203,12 +205,19 @@ robot on the same steps.
    `GameplaySettle` decides: `hit_target = collided`, `disable_collision = collided`, `explode =
    expired || (collided && state was still Flying)` (backlog #13, `:123-127`), `state =
    Exploded` when collided (`:130`).
-3. **Given** the decisions, **When** `SyncOut` runs, **Then** it applies, in v2's order: the
-   `explode` local effects when expiry fired (`:105-107` — inline, option (b): play `explode`,
-   shadow on when `shadow_mapping`, `:139-145`); `hittable::resolve` on the collider re-fetched
-   by id → `rpc_hit()` (`:117-121`); the collision shape disabled (`:122`); the collision-driven
-   `explode` local effects (`:126`); then `rpc("explode")` — `call_remote` — once per fired
-   explode intent, reaching remote peers only.
+3. **Given** the decisions, **When** the rest of the run proceeds, **Then**: `EngineQueryMove`
+   resolved the collider right after `move_and_collide` (`hittable::resolve`, `:117-119`, an
+   engine `try_cast`) into a `Send` `HitKind::{Player(id), Robot(id)}` carried on the entity;
+   `GameplaySettle` (bullet, pure) decides the explode intents (`:123-131`, backlog #13) and,
+   for `HitKind::Robot(id)`, writes `Messages<RobotHitLocal { robot: id }>` — consumed by the
+   robot's `hit_apply` system in the SAME `GameplaySettle` set, ordered after the bullet's
+   (option (B)); `SyncOut` then applies, order-insensitively (the three writes touch different
+   nodes; v2 interleaved them around `move_and_collide`, `:105-127`): the `explode` local
+   effects once per fired intent (inline, option (b): play `explode`, shadow on when
+   `shadow_mapping`, `:139-145`), the network `rpc_hit()` for the target (`call_remote` for the
+   robot; for the player `hit` is `call_local` and its handler pushes `AddTrauma` — same
+   iteration as v2's inline `add_camera_shake_trauma`), the collision shape disabled (`:122`),
+   and `rpc("explode")` — `call_remote` — reaching remote peers only.
 4. **Given** the remote `explode` handler (client bullet, non-`Simulates`), **When** it is invoked
    from the network, **Then** it only pushes `BulletFx::Explode { id }`; the client's frame
    `SyncOut` plays `explode` and sets the shadow (`:139-145`) exactly as v2's `call_local` handler
@@ -249,11 +258,14 @@ harness case (b)'s parts fade, puff and free on the same frames on both trees.
    independently — with handles (`MultiplayerSynchronizer`, `Col1`, `Col2`, the puff scene, the
    node's own `Gd<Part>` for the setter) and the initial components `PartPhase::Attached`, the
    three exported lifetimes, `Simulates` iff `is_server()`. `exit_tree` unregisters.
-2. **Given** the robot's death (US3), **When** the drain applies `PartExplode { id,
-   angular_velocity, wait }` to the part entity, **Then** the part's `SyncOut` applies v2's
-   `explode` writes in order (`:164-175`): synchronizer visibility public, unfreeze (every peer);
-   on `Simulates`: collisions on, `linear_velocity = 3·UP`, `angular_velocity` = the event's
-   value, and the phase becomes `Waiting(Timer(wait))` — the four `randf()` draws that produced
+2. **Given** the robot's death (US3), **When** the robot's `SyncOut` death branch runs in the
+   SAME fixed run as the bullet's collision (option (B)), **Then** it applies v2's `explode`
+   writes to each part NODE through the robot's `Gd<Part>` handles, in order (`:164-175`):
+   synchronizer visibility public, unfreeze (every peer); on `Simulates`: collisions on,
+   `linear_velocity = 3·UP`, `angular_velocity` from the draws, and sets the part ENTITY's phase
+   to `Waiting(Timer(wait))` through `EntityIndex` (cross-entity component write from a
+   `SyncOut` system — allowed glue) — so the parts' velocities take effect in the same physics
+   step as v2, not one step later; the four `randf()` draws per part that produced
    `angular_velocity` and `wait` happened in the ROBOT's death branch in v2's call order (FR-014),
    not here. On non-`Simulates` the phase stays `Attached` (v2 returned at `:167-169`).
 3. **Given** `Waiting`, **When** the frame schedule steps the `Timer` (V3-A's subtractive
@@ -319,9 +331,10 @@ table); both checkpoints.
    `idle_velocity`, `:143-151`); else `target_position` = the player's origin; the angle and
    `facing`/`*_will_expire` gates decide `NeedsRaycast { from: RayFrom origin, to: target + UP }`
    (`:177-183`, `:216-222`); `max_dist` from the laser raycast snapshot (`:199-204`) and the
-   `_clip_ray` intent; `test_shoot` → the shoot intent (`:138-141`); the animation decision
-   (`transition_request`, `aim_blend_amount`, `cannon_angles`, `aim_blend_step` on `AimBlend`)
-   — all from `model.rs`, unchanged.
+   `_clip_ray` intent; `test_shoot` → the shoot intent (`:138-141`) — all from `model.rs`,
+   unchanged. NOT here: the animation decision — v2 calls `animate(delta)` AFTER `step` and
+   `apply_cmds` (`:238`), with the NEW state and counters (a robot leaving `Approach` this step
+   animates `idle` this step), so it belongs to the post-`step` pure step (scenario 4).
 4. **Given** the intents, **When** `EngineQueryOrient` runs, **Then** it performs the pre-check/aim
    raycast when flagged (`raycast_to`, `:363-382`, mask `0xFFFFFFFF`, the robot's RID excluded)
    and records `sees_player` = the collider's id equals the tracked player's id (`:506-511`);
@@ -331,7 +344,9 @@ table); both checkpoints.
    step's parameter writes (specs/012 research R1), so one query set suffices. Then a second
    `Gameplay` step (`GameplayIntegrate`'s pure half or a dedicated system — the plan pins the
    set) runs `model::step` with `sees_player` (`:186-196`, `:225-235`) → new state, counters,
-   `Cmd`s, and `integrate_root_motion` (`:245-251`); `EngineQueryMove` sets velocity/up direction
+   `Cmd`s; THEN the animation decision on the updated state (`transition_request`,
+   `aim_blend_amount`, `cannon_angles`, `aim_blend_step` on `AimBlend`, v2 `animate` `:456-490`
+   called at `:238`); THEN `integrate_root_motion` (`:245-251`); `EngineQueryMove` sets velocity/up direction
    and `move_and_slide`s (`:253-255`).
 5. **Given** the tick's outputs, **When** `SyncOut` runs, **Then** in this order: `set_global_basis`
    (`:257-258`, not on the no-player branch `:150`); the projection of `state`,
@@ -399,37 +414,43 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
 - **Bullet expiry and collision in the same step** (backlog #13, `bullet.rs:123-127`): both
   intents fire; `explode`'s local effects and the RPC are issued ONCE — the settle decision
   suppresses the collision-driven explode when expiry already fired that step.
-- **A bullet hitting a dead robot**: `rpc_hit` still dispatches (`hittable.rs`); the robot's
-  handler pushes `RobotHit`; the drain/`Gameplay` applies v2's `dead` guard (`:278-280`) — no
-  reaction, no sound, no health change.
-- **`rpc_hit` from `SyncOut` is synchronous locally**: `rpc("hit")` with `call_local` invokes
-  `Player::hit` (pushes `AddTrauma`) or `EnemyRobot::hit` (pushes `RobotHit`) inside the bullet's
-  `SyncOut` — push-never-borrows, no World access, so no double borrow. The bullet's collider is
-  carried as an `InstanceId` (a `Send` value), re-fetched with `Gd::try_from_instance_id` in
-  `SyncOut`, where `hittable::resolve` runs once; a collider freed between the query and
-  `SyncOut` (same run — impossible) would resolve to `None`.
-- **The robot's `hit` timing**: v2 applied the whole reaction and death sequence inside the
-  bullet's physics step (`rpc_hit` → `hit` synchronously). In v3 the handler pushes `RobotHit
-  { id, reaction }` — the `randi() % 3 + 1` draw happens IN THE HANDLER, at hit time, in v2's RNG
-  order (`:285`) — and the NEXT schedule run's drain applies `hit_step` (`dead` guard, health,
-  `just_died`); that run's `SyncOut` applies the reaction parameter, the hit sound and, on death,
-  v2's sequence (`:293-307`): `dead` projection, tree inactive, model hidden, `Death` visible,
-  collision off, sparks, the three `PartExplode` pushes (FR-014's draws), explosion sound, the
-  `exploded` signal emitted from glue, and on the server `RemovalTimer(10 s)` → `Remove`
-  (`:309-326`). The next run is the frame run of the same iteration (physics precedes the process
-  pass), so physics-visible effects (the parts' velocities) and replication samples land on the
-  same step as v2; an observer reading at the start of the process pass sees `health`/`dead` one
-  frame later — a timing-table entry expected in case (b), cause recorded.
+- **A bullet hitting a dead robot**: the local dispatch still reaches `hit_apply`, which runs
+  v2's `dead` guard (`:278-280`) — no reaction, no sound, no health change; the network
+  `rpc("hit")` still goes out (v2 sent it too).
+- **`rpc_hit` from `SyncOut` is synchronous locally only for the player**: `Player::hit` is
+  `call_local` and its handler pushes `AddTrauma` (push-never-borrows). The robot's `hit` is
+  `call_remote` (option (B)), so nothing runs locally from the RPC; the local path is the
+  message of the bullet's `GameplaySettle`. The bullet's collider is carried as a `Send`
+  `HitKind` resolved in `EngineQueryMove` (same run, right after `move_and_collide`); a collider
+  freed within the run is impossible (nodes are freed only by `sync_out_remove`, at the end).
+- **The robot's `hit` timing — option (B), user-approved 2026-09-19**: v2 applied the whole
+  reaction and death sequence inside the bullet's physics step (`rpc_hit` → `hit`
+  synchronously, `:117-121` → `:276-328`). Routing it through the queue would apply the death in
+  the frame run and the parts' velocities in the NEXT fixed run — one physics step late, every
+  part position off by one step for the whole fall (rejected). Instead, in the SAME fixed run:
+  the bullet's `GameplaySettle` writes `RobotHitLocal { robot }`; the robot's `hit_apply`
+  (`GameplaySettle`, ordered after the bullet's settle) runs the `dead` guard and `hit_step`
+  (`:278-290`, pure) and flags the reaction/death intents; the robot's `SyncOut` (same run)
+  draws `randi() % 3 + 1` (glue, `:285`), writes the reaction parameter, plays the hit sound
+  and, on death, applies v2's sequence (`:293-326`): `dead` projection, tree inactive, model
+  hidden, `Death` visible, collision off, sparks, the three parts exploded DIRECTLY through the
+  robot's `Gd<Part>` handles with the twelve `randf()` draws in v2's per-part order (FR-014;
+  the part entities' phases set through `EntityIndex`), explosion sound, the `exploded` signal
+  emitted from glue, and on the server `RemovalTimer(10 s)` → `Remove`. Physics effects,
+  replication samples and the observer all see the same step as v2. Remote peers receive
+  `rpc("hit")` (`call_remote`); their handler pushes `RobotHit { id }` and their frame run
+  applies the visual half (reaction — with their own `randi()`, as v2's remote handler drew
+  its own — sound, death visuals, parts' visibility/unfreeze without velocities, `:167-169`).
 - **`exploded` emitted from glue**: `level.rs`'s typed connection runs `_respawn_robot`
   synchronously inside the robot's `SyncOut`; it only spawns a `SceneTreeTimer` task (v2 code,
   unchanged) — no World access.
 - **The parts' RNG order** (FR-014): v2 drew `randi()` (reaction) then, per part in scene order
   (`PartShield1`, `PartShield2`, `PartHead`, `:302-304`), `randf()` ×3 (angular) and ×1 (wait),
-  all inside `hit`. v3 draws the `randi()` in the handler and the twelve `randf()` in the robot's
-  death branch in `SyncOut`, in the same per-part order, and carries the results in the three
-  `PartExplode` events — the part entities never draw. No other RNG consumer runs between the
-  handler and that `SyncOut` (the camera's `randi()` is at instantiation only), so the sequence
-  matches v2's for `seed(1)`. Case (b) logs each part's `angular_velocity` on its explode frame.
+  all inside `hit`. v3 draws the `randi()` and the twelve `randf()` in the robot's `SyncOut`
+  death branch of the SAME fixed run, in the same order (reaction first, then per part) — the
+  part entities never draw. No other RNG consumer runs in between (the camera's `randi()` is at
+  instantiation only), so the sequence matches v2's for `seed(1)`. Case (b) logs each part's
+  `angular_velocity` on its explode frame.
 - **The part's `Waiting` timer on the client**: never started (v2's `explode` returned before the
   timer off-server, `:167-169`); the client's part fades by replication of `fade_value` and is
   destroyed by the remote `destroy` handler's `PartFx::Destroy`.
@@ -472,17 +493,20 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
 - **FR-004**: The RPC/`#[func]` handlers MUST keep their exact names and signatures and MUST only
   push events keyed by the node's own `InstanceId`: bullet `explode` → `BulletFx::Explode`,
   `destroy` → `BulletDestroy`; part `destroy` → `PartFx::Destroy`, `explode` (kept `#[func]
-  pub(crate)`, no caller after this milestone — see FR-014; it MAY push `PartExplode` with fresh
-  draws for a hypothetical external caller, the plan decides) ; robot `hit` → `RobotHit { id,
-  reaction: u8 }` with the `randi() % 3 + 1` draw in the handler (`:285`), `play_shoot` →
+  pub(crate)`, no caller after this milestone — see FR-014; the plan decides whether it stays as
+  a thin wrapper or is removed); robot `hit` → `RobotHit { id }` (REMOTE peers only under option
+  (B); the reaction index is drawn by whoever applies it — `SyncOut` locally, the remote's frame
+  run on clients — as v2's per-peer handler drew its own), `play_shoot` →
   `RobotFx::PlayShoot`, `shoot_check` → `ShootRequested`, `resume_approach` →
   `ResumeApproachRequested`, `_on_area_body_entered/exited` → `RobotPlayerSeen { player:
   Option<InstanceId> }` after the `try_cast::<Player>` at the boundary (`:345`, `:353`).
   Attribute changes under option (b), same rationale as specs/012 FR-004: `explode` (bullet),
-  `destroy` (part) and `play_shoot` (robot) become `#[rpc(authority, call_remote, unreliable)]`
-  — their local effects are applied inline by the simulating peer's `SyncOut`; `hit` (robot)
-  keeps `call_local` (its local path is already an event, and `hittable.rs` calls it by name).
-  `set_fade_value` keeps `#[func]` and its setter role (FR-011).
+  `destroy` (part), `play_shoot` (robot) AND `hit` (robot) become `#[rpc(authority, call_remote,
+  unreliable)]` — their local effects are applied by the simulating peer inside the fixed run
+  (the robot's hit through the bullet's message, option (B)); `hit` (player) keeps `call_local`
+  (its local path is the `AddTrauma` event, same iteration). `hittable.rs` gains `HitKind`
+  (`Send` ids) and keeps `rpc_hit` for the network. `set_fade_value` keeps `#[func]` and its
+  setter role (FR-011).
 
 **The bullet tick (US1)**
 
@@ -492,24 +516,31 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   `GameplaySettle` (the hit/explode decisions of `:114-131`, backlog #13's suppression) →
   `SyncOut` (scenario 3). The bullet uses no `EngineQueryOrient`. `pure::step` and its 3 tests
   stay in `bullet.rs`'s `mod pure` untouched.
-- **FR-006**: `SyncOut` MUST apply, in v2's order: the explode local effects (play `explode`;
-  shadow when the registration's `shadow_mapping` is true, `:139-145`), `hittable::resolve` on
-  the re-fetched collider → `rpc_hit()` (`:117-121`), collision shape disabled (`:122`), and
-  `rpc("explode")` (`call_remote`) once per explode intent; the remote handler's `BulletFx::
-  Explode` is applied by the frame `SyncOut` on non-`Simulates` entities.
+- **FR-006**: `EngineQueryMove` MUST resolve the collider (`hittable::resolve`, `:117-119`)
+  into `HitKind` right after `move_and_collide`; `GameplaySettle` MUST decide the explode
+  intents (`:123-131`) and write `RobotHitLocal` for a robot target (option (B)); `SyncOut` MUST
+  apply, order-insensitively: the explode local effects (play `explode`; shadow when the
+  registration's `shadow_mapping` is true, `:139-145`), the network `rpc_hit()` (`:117-121`;
+  `call_local` for the player, `call_remote` for the robot), collision shape disabled (`:122`),
+  and `rpc("explode")` (`call_remote`) once per explode intent; the remote handler's
+  `BulletFx::Explode` is applied by the frame `SyncOut` on non-`Simulates` entities.
 - **FR-007**: `destroy` MUST become `BulletDestroy`; the drain MUST insert `Remove` only on a
   `Simulates` entity (`:150-152`); the node is freed only by `sync_out_remove`.
 
 **The part (US2)**
 
 - **FR-008**: `PartPhase { Attached, Waiting(Timer), Fading { counter }, Destroyed(Timer) }`
-  MUST be the part entity's state; `Attached → Waiting` on `PartExplode` (`Simulates`), `Waiting →
+  MUST be the part entity's state; `Attached → Waiting` when the robot's death branch explodes it
+  (`Simulates`, through `EntityIndex`; on remote peers the phase stays `Attached` — v2's client
+  parts never fade on their own, `:167-169`), `Waiting →
   Fading` on the timer (`:179-191`, V3-A's `Timer` arithmetic), `Fading → Destroyed` on
   `should_destroy` (`:142-144`), `Destroyed → Remove` on its 0.2 s timer (`:202-214`). The
   timers step on the FRAME schedule (v2's `SceneTreeTimer`s and `process` were frame-driven).
-- **FR-009**: On `PartExplode`, `SyncOut` MUST apply v2's `explode` writes in order (`:164-175`):
-  visibility public and unfreeze on every peer; on `Simulates` collisions on, `linear_velocity =
-  3·UP`, the event's `angular_velocity`; the `Waiting` timer's length is the event's `wait`.
+- **FR-009**: The robot's `SyncOut` death branch (FR-014) MUST apply v2's `explode` writes to
+  each part node in order (`:164-175`): visibility public and unfreeze on every peer; on
+  `Simulates` collisions on, `linear_velocity = 3·UP`, the drawn `angular_velocity`, and the
+  part entity's `Waiting(Timer(wait))` — all in the same fixed run as the hit (option (B)). No
+  `PartExplode` event exists.
 - **FR-010**: In `Fading`, `Gameplay` MUST call `fade_curve` and `should_destroy` unchanged
   (`:139-142`) and advance the counter by the frame delta; the 5 `pure` tests stay.
 - **FR-011**: `SyncOut` MUST write the fade through the node's setter (`root.bind_mut().
@@ -529,17 +560,22 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   `dead`, set the tree inactive, hide the model, show `Death`, disable the collision, start both
   sparks, then for each part in scene order (`PartShield1`, `PartShield2`, `PartHead`) draw
   `randf()` ×3 → `random_angular_velocity` and `randf()` ×1 → `wait_time(lifetime,
-  lifetime_random, r)` (the part's exported lifetimes, read from the part's handle) and push
-  `PartExplode { id, angular_velocity, wait }`; play the explosion sound; emit `exploded`; on the
-  server start `RemovalTimer(removal_delay)` → `Remove`. The twelve draws happen in glue, in this
-  order, so the seeded sequence matches v2 (Edge Cases).
+  lifetime_random, r)` (the part's exported lifetimes, read from the part's handle) and apply
+  FR-009's writes to that part directly (node through the `Gd<Part>` handle, entity phase through
+  `EntityIndex`); play the explosion sound; emit `exploded`; on the server start
+  `RemovalTimer(removal_delay)` → `Remove`. The reaction `randi()` precedes the twelve `randf()`;
+  all thirteen draws happen in glue in this order, so the seeded sequence matches v2 (Edge
+  Cases). The branch runs in the SAME fixed run as the bullet's collision (option (B)).
 - **FR-015**: The robot's tick MUST run on the FIXED schedule on `Simulates`, non-`Dead` entities
   with the seven sets: `SyncIn` (scenario 2) → `Gameplay` (scenario 3, pure) → `EngineQueryOrient`
   (scenario 4: the pre-check/aim raycast, the shoot raycast, the root-motion read) →
-  `GameplayIntegrate` (`model::step` with the raycast answer, `integrate_root_motion` or
-  `idle_velocity`) → `EngineQueryMove` (`set_velocity`, `set_up_direction(UP)`,
+  `GameplayIntegrate` (`model::step` with the raycast answer, THEN the animation decision on the
+  updated state — v2 `:238` after `:187`/`:226`, THEN `integrate_root_motion` or
+  `idle_velocity`; also the `hit_apply`-driven `Dead` transition is visible here, see FR-019) →
+  `EngineQueryMove` (`set_velocity`, `set_up_direction(UP)`,
   `move_and_slide`, `:253-255`; also on the no-player branch, `:146-149`) → `GameplaySettle`
-  (nothing for the robot) → `SyncOut` (scenario 5). Every `model.rs` function is called
+  (the robot's `hit_apply`, option (B), FR-019 — ordered after the bullet's settle) → `SyncOut`
+  (scenario 5, plus the hit/death branch of FR-014/FR-019). Every `model.rs` function is called
   unchanged; the 25 tests stay.
 - **FR-016**: `AimBlend(Vector2)` MUST be a component initialized once at registration from the
   scene's `parameters/aim/blend_position` (`red_robot.tscn:10785`) and stepped by
@@ -557,10 +593,15 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   root at the hit position, and `PendingTrauma(Timer(trauma_delay))` when the collider is the
   tracked player; on expiry (frame schedule) `SyncOut` pushes `AddTrauma { root_id: player,
   amount: trauma_amount }` (scenario 6).
-- **FR-019**: `RobotHit { id, reaction }` MUST be applied as the Edge Cases state: the drain (or
-  the next run's `Gameplay`, the plan pins which) runs the `dead` guard and `hit_step`
-  (`:278-290`); `SyncOut` applies the reaction parameter write and the hit sound on every hit
-  of a live robot, then FR-014 on death. The `randi()` is drawn in the handler.
+- **FR-019**: The local hit MUST be applied as the Edge Cases state (option (B)): the bullet's
+  `GameplaySettle` writes `Messages<RobotHitLocal { robot: InstanceId }>`; the robot's
+  `hit_apply` system, in `GameplaySettle` ordered after the bullet's settle, resolves the id
+  through `EntityIndex`, runs the `dead` guard and `hit_step` (`:278-290`, pure) and flags the
+  reaction/death intents; the robot's `SyncOut` of the same run draws the reaction `randi()`,
+  writes the parameter and plays the hit sound on every hit of a live robot, then FR-014 on
+  death. The remote `RobotHit { id }` (from the `call_remote` RPC) is applied by the frame run on
+  non-`Simulates` robots: reaction (own `randi()`), sound, death visuals, parts' visibility/
+  unfreeze.
 - **FR-020**: `RobotPlayerSeen` MUST set `TrackedPlayer` and the state (`Approach` on `Some`,
   `Idle` on `None`, `:345-356`) at drain time — the same physics step as v2 (the area signal is
   emitted before `_physics_process`, specs/011 research R1). `ResumeApproachRequested` MUST apply
@@ -591,13 +632,15 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   `_on_area_body_exited`, `destroy` (bullet), `explode` (part, `pub(crate)`), `set_fade_value`;
   the `#[rpc]` names `hit`, `play_shoot`, `explode` (bullet), `destroy` (part) with their
   signatures; `Bullet::VELOCITY`; the `State` enum and its `via = i64` wire values; the class
-  names `Bullet`, `Part`, `EnemyRobot`; `HitTarget`/`resolve`/`rpc_hit`.
-- **FR-025**: `hittable.rs`, `level.rs`, `player/sync.rs`, `player.rs`, `player_input*`,
+  names `Bullet`, `Part`, `EnemyRobot`; `HitTarget`/`resolve`/`rpc_hit` (additive: `HitKind`).
+- **FR-025**: `level.rs`, `player/sync.rs`, `player.rs`, `player_input*`,
   `camera_noise_shake*`, `door*`, `part_disappear*`, `blast.rs`, `flying_forklift.rs`,
   `settings*`, `menu*`, `main_scene.rs`, `debug_label.rs` MUST be untouched; the three pure
   cores (`bullet.rs`'s `mod pure`, `part.rs`'s `mod pure`, `red_robot/model.rs`) MUST be
   byte-identical except that an inline `mod pure` MAY move to `x/model.rs` verbatim if the plan
-  needs it importable (the plan decides; the tests stay by name). `red_robot.tscn` changes only
+  needs it importable (the plan decides; the tests stay by name). `hittable.rs` changes ONLY
+  additively (`HitKind`, a local-dispatch helper); `resolve`/`rpc_hit` keep their signatures.
+  `red_robot.tscn` changes only
   by FR-022's property; no other scene changes.
 - **FR-026**: Backlog: #31 per FR-023; #29 observed at checkpoint (1); #30 stays open; no v3
   backlog file.
@@ -605,8 +648,8 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
 **Cross-cutting (constitution 1.5.2 compliance)**
 
 - **FR-027**: No bridge (`Bullet`, `Part`, `EnemyRobot`) MUST have `process`/`physics_process`; no
-  engine callback MUST borrow the World (the handlers push; `rpc_hit` from `SyncOut` invokes
-  handlers that only push); engine access MUST appear only in `SyncIn`/`EngineQuery*`/`SyncOut`
+  engine callback MUST borrow the World (the handlers push; the player's `call_local` `hit`
+  invoked from the bullet's `SyncOut` only pushes); engine access MUST appear only in `SyncIn`/`EngineQuery*`/`SyncOut`
   systems and bridges; components MUST hold no `Gd<T>` (`TrackedPlayer` and the bullet's
   collider are `InstanceId`s); nodes freed only through `Remove` and `sync_out_remove` with
   `queue_free()` (bullet on the server, parts on every peer, robots on the server after 10 s);
@@ -619,9 +662,12 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   MANUAL + `advance` (second tree, US4's evidence) and `AimBlend` replacing the tree `get`;
   engine RNG draws in glue for seeded parity (the robot's death branch); the `exploded` signal
   emitted from glue for v2's `level.rs`; the blast instanced under the tree root. `CLAUDE.md`'s
-  v3 section MUST be extended with what is new: entity-to-entity events through the queue
-  (`PartExplode`, `AddTrauma` from a timer), cross-entity handle access for the tracked player,
-  the engine-RNG-in-glue rule, timers that push events on expiry.
+  v3 section MUST be extended with what is new: entity-to-entity communication inside one run
+  through `Messages` ordered across sets (`RobotHitLocal`) versus through the queue across runs
+  (`AddTrauma` from a timer), cross-entity handle and component access from a `SyncOut` system
+  (the robot exploding its parts), the engine-RNG-in-glue rule, timers that push events on
+  expiry, and the corollary of option (b): an RPC whose local effects must land in the SAME run
+  as their cause is applied through a message, never through the queue.
 - **FR-029**: Gates unchanged: `cargo build`, `cargo clippy` 0 warnings, `cargo test` green with
   the 33 pure tests preserved and at least one `run_system_once` test per new gameplay system
   (count ≥ 179 + the new tests).
@@ -667,7 +713,7 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   `ShootRequested`, `PendingTrauma(Timer)`, `RemovalTimer(Timer)`, `PendingRobotFx`, `Simulates`;
   handles the twelve nodes, the three `Gd<Part>`, the impact scene, the RID, `is_dedicated_server`.
 - **Inbound events**: `Register`/`Unregister` (each bridge), `BulletFx::Explode`, `BulletDestroy`,
-  `PartExplode { id, angular_velocity, wait }`, `PartFx::Destroy`, `RobotHit { id, reaction }`,
+  `PartFx::Destroy`, `RobotHit { id }` (remote peers only),
   `RobotFx::PlayShoot`, `ShootRequested`, `ResumeApproachRequested`, `RobotPlayerSeen { id,
   player }`, and V3-B's `AddTrauma` (pushed by the robot's trauma timer).
 - **Sets**: the seven-set fixed chain (bullet: `Gameplay`, `EngineQueryMove`, `GameplaySettle`,
@@ -712,9 +758,8 @@ diffs (and the US4 experiment) were empty.
 |---|---|---|---|---|---|
 | (to be measured) | | | | | |
 
-Candidates the harness must settle: the robot's `hit` applied by the next schedule run instead of
-inside the bullet's physics step (expected: observer-visible `health`/`dead` one frame later,
-physics and replication same step); the part's `Waiting`/`Destroyed` timers as tick timers
+Candidates the harness must settle: the robot's `hit` applied in the same fixed run through
+`RobotHitLocal` (option (B): expected identical, including the parts' first moving step); the part's `Waiting`/`Destroyed` timers as tick timers
 instead of `SceneTreeTimer`s (V3-A's arithmetic: same step expected); the trauma pushed one
 schedule run after the 0.1 s timer; `resume_approach` from the method track applied at the next
 fixed run's drain; the blast/puff instanced from `SyncOut` at the end of the phase instead of
@@ -746,9 +791,9 @@ inside the callback (same iteration).
   (case (b)'s `angular_velocity` log is the proof).
 - Exact Rust shapes (component and event names, whether intents are markers or fields, whether
   the robot's second pure step lives in `GameplayIntegrate` or a new system in that set, the
-  `RobotHit` application point — drain versus the next `Gameplay`, the tracked-player read path)
+  exact `Messages<RobotHitLocal>` update rule, the tracked-player read path)
   are plan-time decisions; the spec pins behavior and order.
 - Out of scope: `flying_forklift` (constitution 1.5.2), `level`, `menu`, `main_scene`,
-  `settings`, `debug_label`; backlog fixes other than the #31 decision; changes to `hittable.rs`
-  or `player/sync.rs`; any change to the replication configs, the `State` enum or the scenes
+  `settings`, `debug_label`; backlog fixes other than the #31 decision; changes to
+  `player/sync.rs` (`hittable.rs` changes only additively, FR-025); any change to the replication configs, the `State` enum or the scenes
   beyond FR-022.
