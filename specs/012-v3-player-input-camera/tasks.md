@@ -462,7 +462,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
 
 ## Phase 5: Polish — commit 4
 
-- [ ] T029 [P] Extend `CLAUDE.md`'s "Port conventions (v3)" with: the sub-bridge pattern (the
+- [x] T029 [P] Extend `CLAUDE.md`'s "Port conventions (v3)" with: the sub-bridge pattern (the
   root registers everything in its `ready`, children ready first; sub-bridges keep only v2's
   one-shot setup and push events keyed by `get_owner().instance_id()` resolved once); the
   seven-set fixed tick with two `EngineQuery` sets and why it respects the constitution; the
@@ -472,20 +472,20 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   rule for later modules with a tree (`red_robot`); the layout `x/system.rs` (pure) +
   `x/sync.rs` (glue); the three probe scripts as re-verification tools. Verification: `grep -c
   'call_remote' CLAUDE.md` ≥ 1.
-- [ ] T030 [P] Fill `specs/012-v3-player-input-camera/spec.md`'s "Measured timing differences"
+- [x] T030 [P] Fill `specs/012-v3-player-input-camera/spec.md`'s "Measured timing differences"
   table from the six diffs of T019/T026 (one row per differing RAW event with cause; or a single
   "no differences" row quoting the commit hashes where the empty diffs are recorded); align
   `data-model.md` with the code (the "Tests by name" list already mirrors T006/T007/T009/T010/
   T020 after the analyze-fix commit — re-check names actually landed); confirm
   `docs/v3-tradeoffs.md` has the 9 new rows (14 total). Verification: no `(to be measured)` in
   spec.md; `grep -n 'PlayerFx::Hit' specs/012-v3-player-input-camera/*.md` empty.
-- [ ] T031 Run quickstart.md §5's grep list VERBATIM and paste every output (no `process`/
+- [x] T031 Run quickstart.md §5's grep list VERBATIM and paste every output (no `process`/
   `physics_process` in the three bridges; `fn input` only in `player_input.rs`; no
   `godot::task::spawn`/`bind_mut::<EcsWorld>`/`get_autoload_by_name::<EcsWorld>` in the three
   modules; no `godot::classes` in the three `system.rs`; the three `model.rs` diff-empty against
   `abfe35a`; the excluded modules diff-empty; `player.tscn` diff = the one line; tradeoffs ≥ 14;
   backlog #6/#29 open). If a grep reveals a violation, STOP and report.
-- [ ] T032 Final gates + headless (`cargo build && cargo clippy && cargo test` → **179**; import;
+- [x] T032 Final gates + headless (`cargo build && cargo clippy && cargo test` → **179**; import;
   `main.tscn`; `level.tscn`); commit (R10 row 4): `CLAUDE.md: v3 sub-bridge pattern +
   two-EngineQuery tick; spec: measured timing differences filled; tradeoffs complete`.
 - [ ] T033 Cleanup and count: `git worktree remove ../oxide-godot-v2 && git worktree prune`;

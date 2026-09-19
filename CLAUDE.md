@@ -50,7 +50,10 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
    it disappears on a second run (specs/004 research §E.2). Same rule for the rarer burst
    `Bug in ResourceLoader logic, please report` / `Failed loading resource: ... structure.glb`
    / `Parse Error: Failed. [Resource file res://level/level.tscn:77]` during the same threaded
-   level load (seen once in V3-A Session 1, absent on reruns and on the `v2` worktree).
+   level load (seen once in V3-A Session 1; in V3-B it recurred on BOTH trees — the untouched
+   `v2` worktree showed 8/13/0 burst lines over three consecutive runs while `v3` showed 0/0/0 —
+   so it is environmental and not a regression; rerun and compare against the `v2` worktree
+   before suspecting the code).
 
 ## Port conventions (v1)
 
@@ -170,6 +173,92 @@ Untouched reference of the GDScript original: `../oxide_godot_origins/` (outside
   the observer's script BEFORE `add_child` (attached afterwards it never runs), and set a body's
   position BEFORE `add_child` (a body added at the origin overlaps whatever sits there for its
   first physics step). Delete every `zz_*` file (and `.uid`) from both trees before committing.
+- **Sub-bridges (V3-B)**: an entity that spans several nodes of one scene (`player.tscn`:
+  `Player`, its `InputSynchronizer` child, its `Camera3D` grandchild) is registered ONCE, by the
+  ROOT's `ready`, with every handle of every node — children's `ready` runs before the parent's,
+  so the root can read what they resolved (`OnEditor` refs, seeded noises, `start_rotation`)
+  through `bind()`; a sub-bridge cannot register into a root entity that does not exist yet. A
+  sub-bridge (`PlayerInputSynchronizer`, `CameraNoiseShake`) registers NOTHING, keeps only v2's
+  one-shot `ready` setup, and pushes events keyed by the root's id resolved once —
+  `#[init(val = OnReady::from_base_fn(|b| b.get_owner().unwrap().instance_id()))] root_id:
+  OnReady<InstanceId>` (`get_owner()` of a node saved in the scene is its root; no
+  `get_parent()` chain). A sub-bridge that pushes nothing has no `root_id` (the camera: trauma
+  enters through the root's `hit`/`add_camera_shake_trauma`).
+- **Two-`EngineQuery` tick (V3-B)**: one `Phase` enum, two chains. The FIXED schedule chains
+  the seven `SyncIn → Gameplay → EngineQueryOrient → GameplayIntegrate → EngineQueryMove →
+  GameplaySettle → SyncOut`; the FRAME schedule keeps the four `SyncIn → Gameplay →
+  EngineQuery → SyncOut` (`configure_sets(...).chain()` accepts a chain that omits variants;
+  a probe in a set the chain omits is UNORDERED there — `setup.rs`'s four-set test builds the
+  frame schedule for that reason). Why it still respects the constitution's rule: each
+  `EngineQuery*` set exists for a mid-tick answer a LATER `Gameplay*` system consumes — the
+  slerped orientation and the root motion before `tick_integrate`; `move_and_slide`'s post-move
+  origin before `tick_settle`'s respawn decision; the crosshair raycast (a constitution example)
+  whose answer the projection writes. An engine WRITE sits inside an `EngineQuery` set only when
+  v2's order forces it (the bullet spawn must precede `move_and_slide`: it takes `ShootFrom`'s
+  pre-move transform); every other write is `SyncOut` — the `AnimationTree` parameter writes
+  belong to `SyncOut`, immediately before `advance`, not to the query set.
+- **Sync-only pairs**: when an engine answer feeds only a write and no decision, there is no
+  `EngineQuery` member — the pure system decides in `Gameplay` and ONE `SyncOut` system reads
+  and writes (V3-A's blast: `sync_in_blast` + `sync_out_blast`; V3-B's shake: `shake_decide` →
+  `ShakePending` → `sync_out_shake` samples the three noises, computes `offsets` and sets the
+  camera rotation). `docs/v3-tradeoffs.md` records the pair, not a query set.
+- **`call_remote` rule**: an `#[rpc]` whose LOCAL effects the tick applies itself on the
+  simulating peer (`jump`/`land`/`shoot`: the fixed `SyncOut` plays the sounds, restarts the
+  particles, starts the cooldown, adds the trauma, inline in v2's order) is
+  `#[rpc(authority, call_remote, unreliable)]`: its handler runs on REMOTE peers only and pushes
+  `PlayerFx`, which that peer's frame `SyncOut` (`apply_player_fx`, `Without<Simulates>`) applies.
+  A `call_local` handler could only push an event for the NEXT run — `FireCooldown` one frame
+  late, trauma after `shake_decide`, a transient animation write that replication can sample.
+  RPCs whose local path is already an event keep `call_local` (`hit`, `add_camera_shake_trauma`
+  → `AddTrauma`, applied by the drain; the input node's `jump` → `JumpPressed`, consumed by the
+  next fixed run as v2's field was). Names and signatures never change; the attribute is the
+  recorded deviation (`docs/v3-tradeoffs.md`).
+- **Handles for user classes**: when a projection field (`#[var]`/`#[export]`) must be written
+  from a sync system, the handle is the USER class (`Gd<Player>`, `Gd<PlayerInputSynchronizer>`)
+  and the field is written through `bind_mut()` — `Deref` still reaches the engine base for the
+  engine calls. Rule: every `bind()`/`bind_mut()` guard is dropped (its own `{ }` block) before
+  any engine call that can invoke a callback (`rpc`, `play`, `start`, `add_child`); a
+  `call_local` RPC or a synchronous signal would otherwise double-borrow. A variant with many
+  handles is boxed — `Handles::Player(Box<PlayerHandles>)` — because clippy's
+  `large_enum_variant` fires on the inline struct variant (twenty `Gd`s) and the gate is zero
+  warnings without `#[allow]`; sync systems match `Handles::Player(p)` and use `p.root`, ….
+- **`AnimationTree` rule** (any later module with a tree — `red_robot`): the scene sets the
+  tree's `callback_mode_process = 2` (MANUAL, the one sanctioned `.tscn` edit, an engine
+  property) and that entity's `SyncOut` calls `anim_tree.advance(FixedDelta)` LAST, for every
+  entity of that kind on every peer (a non-simulated player animates through the replay path +
+  `advance`); the parameter writes (`apply_anim`) come immediately before it; the root motion is
+  read in the `EngineQuery*` set that integrates it. Evidence (specs/012 research R1): the
+  driver at `i32::MAX` runs AFTER a PHYSICS-mode tree's own processing, so it would read each
+  step's root motion one step early (`M(n).rm == S(n+1).rm`); MANUAL + `advance` after the tick
+  reproduced v2 line by line.
+- **`Tuning<T>` resources**: `#[derive(Resource)] pub struct Tuning<T: Send + Sync + 'static>(pub T)`
+  (`ecs/markers.rs`) wraps the model tuning structs untouched (`Tuning(PlayerTuning::default())`,
+  …, inserted by `build_world`); systems take `Res<Tuning<PlayerTuning>>` and pass `&tuning.0`
+  to the model functions.
+- **Layout per module**: `x.rs` (bridge: `ready`/`exit_tree`/handlers), `x/model.rs` (v2's pure
+  core, untouched), `x/system.rs` (pure gameplay systems + `run_system_once` tests, no
+  `godot::classes`), `x/sync.rs` (the entity's `SyncIn`/`EngineQuery*`/`SyncOut` systems);
+  `ecs.rs::add_engine_systems` and `setup.rs`'s builders only register them.
+- **Harness additions (V3-B)**: `seed(1)` is the FIRST statement of `_ready` when anything
+  draws `randi()` at instantiation (`CameraNoiseShake`'s `noise_seed`). Real joypads on the host
+  pollute the `Input` actions differently per run and per tree (`move_*`/`view_*` are bound to
+  joypad axes, `jump`/`aim`/`shoot`/`move_*` to joypad buttons): right after `seed`, erase every
+  `InputEventJoypadMotion`/`InputEventJoypadButton` from the `InputMap` (before the first input
+  flush; no `Input.action_release`, which raises `just_released` and toggles aim on). A physics
+  probe at `process_physics_priority = i32::MIN` logs `P<step>` lines at the start of every
+  physics step (script set BEFORE `add_child`). Timing facts (specs/012 research R3):
+  `Input.action_press` from a `_process` at priority 0 is visible with `just_pressed` to every
+  later node of the SAME frame; `Input.parse_input_event` from `_process` is delivered at the
+  START of the next iteration, whose `_input` runs before `_process` — v2 rotates the camera
+  there, v3 in the driver's frame run of the same iteration, so an observer at `i32::MIN` sees
+  the mouse look one frame later on v3 (specs/012 spec, timing table). The three probe scripts
+  in `specs/012-v3-player-input-camera/contracts/` (`zz_r1_probe.gd`, `zz_r3_probe.gd`,
+  `zz_ecs_parity.gd`) re-verify the tree ordering, the input timing and the parity on any future
+  engine version.
+- **bevy_ecs 0.19, clippy**: a `Query` tuple beyond ~7 items trips clippy's `type_complexity`;
+  name it with a `type` alias carrying the lifetimes (`type SyncOutPlayerQuery<'w, 's> =
+  Query<'w, 's, (Entity, &'static Orientation, …), With<PlayerTag>>;`) and take
+  `mut players: SyncOutPlayerQuery` — no `#[allow]`.
 
 ## API notes (gdext 0.5.5)
 

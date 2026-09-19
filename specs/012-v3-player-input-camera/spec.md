@@ -678,7 +678,17 @@ diffs (and the US4 experiment) were empty.
 
 | Case | Signal / timer | `v2` frame | `v3` frame | Delta | Cause |
 |---|---|---|---|---|---|
-| (to be measured) | | | | | |
+| (e) mouse look | `CameraBase.rotation.y` / `CameraRot.rotation.x` after the `InputEventMouseMotion` injected at F25 (observer at `i32::MIN`, start of the process pass) | F26 (`base_y=-0.020000 rot_x=-0.010000`) | F27 (F26 still reads `0.000000 / 0.000000`) | +1 observer frame; values identical from F27 on; RAW diff empty | Both trees receive the event at the start of iteration 26. v2 rotates the camera inside `_input`, which runs BEFORE the observer's `_process`; v3's `input` callback only pushes `MouseLook`, applied by the driver's frame run at the END of the same iteration's process pass (priority `i32::MAX`), after the observer read. Same rendered frame on both trees (rendering follows the whole process pass). Consequence for remote peers: `SceneMultiplayer::poll()` samples the replicated camera rotations at the top of `SceneTree::process` (research R2), so on v3 a mouse rotation reaches the packet one frame later than on v2 — one frame of camera-rotation latency for OTHER peers, invisible locally. Recorded in commit `d5ec363`'s body with the one-line diff (`< F26 base_y=-0.020000 rot_x=-0.010000` / `> F26 base_y=0.000000 rot_x=0.000000`). |
+
+Cases (a) walk, (b) jump+land, (c) aim+shoot and (f) fall/respawn produced empty diffs, full and
+`^RAW` (commit `d5ec363`: (a) 800 lines each; (b) `RAW F31 Jump.playing`/`RAW F92 Land.playing`;
+(c) `RAW F41 Shoot.playing`, bullets at F41/F66/F91/F116/F141 with identical transforms; (f)
+`RAW F50 floor_removed`, `RAW P223`/`P395 respawned`); case (d) camera shake and the re-runs of
+(b) and (c) after the trauma path moved to the entity produced empty diffs too (commit
+`34f7b67`: the shake starts at F31 on both trees). The US4 experiment (research R1) was empty
+by construction of option (B). All runs on the `v2` worktree at `e2932b4` and `v3`, split
+`XDG_DATA_HOME`, `--fixed-fps 60`, `seed(1)` first, joypad bindings purged (see
+`contracts/zz_ecs_parity.gd`).
 
 Candidates the harness must settle: the local RPC effects (`Jump`/`Land`/`Shoot` sounds,
 `FireCooldown.start`) applied inline by the fixed `SyncOut` (option (b): same physics step as
