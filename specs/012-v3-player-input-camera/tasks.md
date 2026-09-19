@@ -445,7 +445,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   never write "identical" without the diff.** Delete `zz_*` from both trees. Commit (R10 row 3):
   `camera_noise_shake: sub-bridge, shake systems on the player entity, AddTrauma/PlayerFx trauma
   path`.
-- [ ] T027 [US3] 🛑 **STOP 1 — user visual checkpoint (1), single player** (spec SC-005). Tell the
+- [x] T027 [US3] 🛑 **STOP 1 — user visual checkpoint (1), single player** (spec SC-005). Tell the
   user explicitly: "Checkpoint (1): please test now" — run the game, walk, jump, aim, shoot a
   robot, get hit (shake), fall off the map and respawn, all as in v2; ask whether backlog #29's
   FPS observation persists and record the answer. Do not proceed until confirmed.
