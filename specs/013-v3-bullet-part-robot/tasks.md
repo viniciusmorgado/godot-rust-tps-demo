@@ -423,7 +423,14 @@ cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests unto
   (`Simulates` or not): if `Some(anim) = intents.anim` → `p.anim_tree.set("parameters/state/
   transition_request", request)`, and if `Some((amount, blend))` → `set("parameters/aiming/blend_amount",
   amount)`, `set("parameters/aim/blend_position", blend)` (`:469-488`); LAST: `p.anim_tree.advance(dt.0)`
-  (research R1, option B). `fn sync_out_robot_frame(handles: NonSendMut<NodeHandles>, q:
+  (research R1, option B) — SKIPPED when `intents.just_died` fired in this run: v2 set the tree
+  inactive at death (`:294`) before the tree's own processing of that step, and
+  `AnimationMixer::advance()` does NOT check `active` (`animation_mixer.cpp:2112-2114` calls
+  `_process_animation` unconditionally; `AnimationTree::_blend_pre_process` neither), so an
+  `advance` here would process one step v2 never processed (the `Dead` marker only lands when
+  the run's commands apply). Test in `red_robot/system.rs` or `ecs/setup.rs`:
+  `robot_that_just_died_is_not_advanced` (a probe replacing `advance` counts calls — or assert
+  the `RobotIntents.just_died` gate in a pure helper `should_advance(dead, just_died)`). `fn sync_out_robot_frame(handles: NonSendMut<NodeHandles>, q:
   Query<(Entity, Option<&TraumaDue>, &mut PendingRobotFx, &mut PendingRobotHits, Has<Simulates>),
   With<RobotTag>>, commands: Commands)` (frame `SyncOut`): `TraumaDue(player)` → `queue::push(
   AddTrauma { root_id: player, amount: trauma_amount })` and remove the marker (v2 `:452`; the
