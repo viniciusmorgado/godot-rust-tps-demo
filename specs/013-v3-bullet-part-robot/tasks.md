@@ -12,9 +12,11 @@ at commit `9d0edec`; backlog #31 is CLOSED by FR-023).
 `run_system_once` test; the 33 pure tests — `bullet.rs` 3, `part.rs` 5, `red_robot/model.rs` 25 —
 are preserved by name). Named test cases below are the MINIMUM; a task that creates pure code
 without its named tests is incomplete. Running totals, computed from the names: 179 → **187**
-(commit 1: `ecs/apply.rs` +8) → **192** (commit 2: `bullet/system.rs` +5) → **212** (commit 3:
-`part/system.rs` +5, `red_robot/system.rs` +14, `ecs/setup.rs` +1) — the same 187/192/212 as
-plan.md's Commit Plan and data-model.md's "Tests by name".
+(commit 1: `ecs/apply.rs` +8) → **192** (commit 2: `bullet/system.rs` +5) → **214** (commit 3:
+`part/system.rs` +5, `red_robot/system.rs` +16 — the fourteen of data-model.md plus
+`robot_that_just_died_is_not_advanced` and `remote_hit_decrements_client_health_and_dies_at_zero`
+from the analyze fixes — `ecs/setup.rs` +1) — 187/192/214 (plan.md and data-model.md updated in
+the analyze-fix commit).
 
 **Organization**: one task group per commit of research R11's Commit Plan (four commits, in
 order). The two user visual checkpoints are 🛑 STOP tasks after commit 3 — confirmed by the user,
@@ -75,9 +77,10 @@ untouched; the game still runs unchanged (no bridge touched).
   `ShootRequested { root_id }`, `ResumeApproachRequested { root_id }`, `RobotPlayerSeen { root_id,
   player: Option<InstanceId> }`; the enums `#[derive(Clone, Copy, Debug, PartialEq)] pub enum
   BulletFx { Explode }`, `PartFx { Destroy }`, `RobotFx { PlayShoot }`; `Initial::Bullet {
-  shadow_mapping: bool }` (`bullet.rs:143`), `Initial::Part { lifetime: f32, lifetime_random: f32,
-  disappearing_time: f32 }` (`part.rs:86-94`), `Initial::Robot { state: State, health: i32, dead:
-  bool, test_shoot: bool, orientation: Transform3D, aim_blend: Vector2 }` (`red_robot.rs:35-47`,
+  shadow_mapping: bool, simulates: bool }` (`bullet.rs:143`, `:89`), `Initial::Part { lifetime: f32,
+  lifetime_random: f32, disappearing_time: f32, simulates: bool }` (`part.rs:86-94`, `:167`),
+  `Initial::Robot { state: State, health: i32, dead: bool, test_shoot: bool, orientation:
+  Transform3D, aim_blend: Vector2, simulates: bool }` (`red_robot.rs:35-47`, `:133`;
   `:110-117`; `aim_blend` = the tree's `parameters/aim/blend_position` at `ready`,
   `red_robot.tscn:10785`; `use crate::red_robot::State`); `#[derive(Message, Clone, Copy)] pub
   struct RobotHitLocal { pub robot: InstanceId }` (research R4). Extend `queue.rs`'s test helper
@@ -135,8 +138,9 @@ untouched; the game still runs unchanged (no bridge touched).
   aim_prepare_time`, `shoot_countdown == shoot_wait`, `aim_countdown` still 0.3, `TrackedPlayer ==
   Some(id)`), `robot_player_seen_none_sets_idle_without_reset` (`None` → `Idle`, counters
   unchanged, `TrackedPlayer == None`). The `ResumeApproachRequested` arm is covered by
-  `resume_approach_requested_resets_state_and_counters` — fold it into the eighth test's file as
-  an assertion block if the count would exceed eight; the named eight are the minimum. Depends on
+  `resume_approach_requested_resets_state_and_counters`, asserted as a block INSIDE
+  `robot_player_seen_resets_counters_on_entry` (same reset formula, same file) so the file stays at
+  eight named tests. Depends on
   T004, T005, T006. Verification: eight tests pass.
 - [ ] T008 In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `Handles::Bullet(Box<BulletHandles>)`,
   `Handles::Part(Box<PartHandles>)`, `Handles::Robot(Box<RobotHandles>)` with the field lists of
@@ -159,8 +163,8 @@ untouched; the game still runs unchanged (no bridge touched).
   `Velocity(ZERO)`, `AimBlend`, `RobotIntents::default()`, `RaycastAnswers::default()`,
   `PendingTrauma::default()`, `RemovalTimer::default()`, `PendingRobotFx::default()`,
   `PendingRobotHits::default()`, `ShootRequested` iff `test_shoot` (`:138-141`); `Simulates` iff
-  `simulates` on all three — add `simulates: bool` to the three `Initial` variants in T004 if the
-  registration reads it from `Initial` as V3-B did); and in `EcsWorld::physics_process`
+  `initial.simulates` on all three (the field is in the variants, T004, as V3-B's `Initial::Player`);
+  and in `EcsWorld::physics_process`
   `self.world.resource_mut::<Messages<RobotHitLocal>>().update()` right after `DoorBodyEntered`'s
   (`ecs.rs`, before the drain). Depends on T004, T005. Verification: compiles; `apply_register` is
   still the only writer of `NodeHandles.by_entity`.
@@ -278,7 +282,7 @@ follow in commit 3.
 
 **Goal**: FR-008…FR-023 (backlog #31 closed by FR-023), FR-004 (robot and part halves). One
 commit: the robot's death explodes the parts directly and `Part::explode` is removed, so the two
-cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests untouched; harness
+cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests untouched; harness
 (a), (b), (d), (e) identical except (a)'s sanctioned #31 difference; both visual checkpoints.
 
 ### Commit 3 — `part/system.rs`, `red_robot/system.rs`, `part/sync.rs`, `red_robot/sync.rs`, `part.rs`, `red_robot.rs`, `ecs.rs`/`ecs/setup.rs`, `red_robot.tscn:10782`, `docs/v3-tradeoffs.md`, `docs/v2-backlog.md`
@@ -393,7 +397,7 @@ cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests unto
   &TargetPosition, &Health, &RobotCountersC, &RobotIntents, &RaycastAnswers, &TrackedPlayer, &mut
   PendingTrauma, &mut RemovalTimer, Has<Simulates>, Has<Dead>), With<RobotTag>`) — per entity, in
   THIS order (spec scenario 5, research R5/R6): on `Simulates` && !`Dead`: unless `idle_branch`
-  `p.model_root_set_global_basis` i.e. `p.root.set_global_basis(orientation.basis)` (`:257-258`);
+  `p.root.set_global_basis(orientation.basis)` (`:257-258`);
   `{ let mut g = p.root.bind_mut(); g.state = ..; g.target_position = ..; g.health = ..;
   g.aim_preparing = counters.aim_preparing; }` (guard dropped); if `play_shoot` →
   `p.shoot_anim.play_ex().name("shoot").done()` (`:331-332`) then `p.root.rpc("play_shoot", &[])`
@@ -423,26 +427,36 @@ cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests unto
   (`Simulates` or not): if `Some(anim) = intents.anim` → `p.anim_tree.set("parameters/state/
   transition_request", request)`, and if `Some((amount, blend))` → `set("parameters/aiming/blend_amount",
   amount)`, `set("parameters/aim/blend_position", blend)` (`:469-488`); LAST: `p.anim_tree.advance(dt.0)`
-  (research R1, option B) — SKIPPED when `intents.just_died` fired in this run: v2 set the tree
-  inactive at death (`:294`) before the tree's own processing of that step, and
-  `AnimationMixer::advance()` does NOT check `active` (`animation_mixer.cpp:2112-2114` calls
-  `_process_animation` unconditionally; `AnimationTree::_blend_pre_process` neither), so an
-  `advance` here would process one step v2 never processed (the `Dead` marker only lands when
-  the run's commands apply). Test in `red_robot/system.rs` or `ecs/setup.rs`:
-  `robot_that_just_died_is_not_advanced` (a probe replacing `advance` counts calls — or assert
-  the `RobotIntents.just_died` gate in a pure helper `should_advance(dead, just_died)`). `fn sync_out_robot_frame(handles: NonSendMut<NodeHandles>, q:
+  (research R1, option B) — SKIPPED when `intents.just_died` fired in this run (spec FR-022 as
+  amended): v2 set the tree inactive at death (`:294`), and `AnimationMixer::advance()` does NOT
+  check `active` (Godot 4.7 `scene/animation/animation_mixer.cpp:2112-2114` calls
+  `_process_animation` unconditionally; `AnimationTree::_blend_pre_process` neither — verified
+  against the fetched 4.7 sources on 2026-09-19); whether v2's tree processed that exact step
+  depended on tree order (robot before bullet: it did not), so the skip is the simpler,
+  harmless choice (the model is hidden and the tree never read again). Test in
+  `red_robot/system.rs`: `robot_that_just_died_is_not_advanced` asserting the pure gate
+  `should_advance(dead: bool, just_died: bool) -> bool` (`!dead && !just_died`) — the fifteenth
+  test of that file. `fn sync_out_robot_frame(handles: NonSendMut<NodeHandles>, q:
   Query<(Entity, Option<&TraumaDue>, &mut PendingRobotFx, &mut PendingRobotHits, Has<Simulates>),
   With<RobotTag>>, commands: Commands)` (frame `SyncOut`): `TraumaDue(player)` → `queue::push(
   AddTrauma { root_id: player, amount: trauma_amount })` and remove the marker (v2 `:452`; the
-  player entity's V3-B arm applies it at the next drain); non-`Simulates`: for each pending hit
-  (`PendingRobotHits` → 0): the reaction `randi()` + parameter + `hit_sound.play()` (v2's remote
-  `call_local` handler drew its own, `:285-287`) and, if `p.root.bind().dead` is now true and the
-  death visuals were not yet applied (a `DeathVisualsApplied` marker, inserted once): tree inactive,
-  model hidden, `Death` visible, collision off, sparks, the parts' `set_visibility_public(true)` +
-  `set_freeze_enabled(false)` (the every-peer half of `part.rs:164-166`, no velocities `:167-169`);
-  `PendingRobotFx` → `PlayShoot` → `shoot_anim.play("shoot")`. Depends on T017, T008. Verification:
-  compiles; `grep -n 'free()' red_robot/sync.rs` empty; `grep -c 'randf()' red_robot/sync.rs` = 4
-  (the per-part draws) and `grep -c 'randi()' red_robot/sync.rs` = 2 (local + remote reaction).
+  player entity's V3-B arm applies it at the next drain); non-`Simulates` (analyze BLOCKER 1:
+  `health`/`dead` are spawn-only, `red_robot.tscn:31-33`/`:40-42` — the client keeps its OWN
+  count, as v2's per-peer `call_local` handler did, `:278-307`): for each pending hit
+  (`PendingRobotHits` → 0), on a robot that is not `Dead`: `hit_step` on the client's `Health`
+  (`:289-290`, the pure fn — the query carries `&mut Health`), the reaction `randi()` + parameter
+  + `hit_sound.play()` (`:285-287`), and on `just_died`: `{ p.root.bind_mut().dead = true; }`,
+  `p.anim_tree.set_active(false)`, model hidden, `Death` visible, collision off, sparks (`:293-300`),
+  the parts' `set_visibility_public(true)` + `set_freeze_enabled(false)` (the every-peer half of
+  `part.rs:164-166`, no velocities `:167-169`), `p.explosion_sound.play()` and
+  `p.root.signals().exploded().emit()` (`:306-307`, every peer in v2; no client listener today),
+  and `commands.entity(e).insert(Dead)` — no `DeathVisualsApplied` marker: `Dead` gates it;
+  `PendingRobotFx` → `PlayShoot` → `shoot_anim.play("shoot")`. Test (`red_robot/system.rs`, pure
+  half): `remote_hit_decrements_client_health_and_dies_at_zero` (five hits on `Health(5)` on a
+  non-`Simulates` entity → `Health(0)` and the death intent exactly once; a sixth is ignored) —
+  the sixteenth test of that file. Depends on T017, T008. Verification: compiles; `grep -n
+  'free()' red_robot/sync.rs` empty; `grep -c 'randf()' red_robot/sync.rs` = 4 (the per-part
+  draws) and `grep -c 'randi()' red_robot/sync.rs` = 2 (local + remote reaction).
 - [ ] T020 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/part.rs` as the bridge: keep
   `pub(crate) mod pure` (body untouched), the four `#[export]`s (`:86-97`), the handles
   (`:101-118`, the model-mesh-by-index comment kept), `material`; `ready` = v2 `:123-136` minus
@@ -485,7 +499,13 @@ cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests unto
   still compile unchanged.
 - [ ] T022 [US3] Registration + the R4 test: in `ecs.rs`'s `add_engine_systems` (fixed)
   `red_robot::sync::sync_in_robot.in_set(Phase::SyncIn).after(sweep_dead_nodes)`,
-  `robot_query.in_set(Phase::EngineQueryOrient)`, `move_robot.in_set(Phase::EngineQueryMove)`,
+  `robot_query.in_set(Phase::EngineQueryOrient)`, `move_robot.in_set(Phase::EngineQueryMove)
+  .before(crate::bullet::sync::move_bullet)` (analyze MAJOR 2: in v2 the robots — spawned under
+  `SpawnedNodes` at level start, `level.rs:138` — precede the bullets in tree order, so the robot's
+  `move_and_slide` ran before the bullet's `move_and_collide` every step and the bullet collided
+  with the robot's POST-move body; bevy leaves two systems in one set unordered, so the order is
+  pinned; v2's exception — a robot respawned after a bullet already existed — is not reproduced,
+  recorded in the tradeoffs row),
   `sync_out_robot.in_set(Phase::SyncOut).before(sync_out_remove)`; (frame)
   `part::sync::sync_out_part.in_set(Phase::SyncOut).before(sync_out_remove)`,
   `red_robot::sync::sync_out_robot_frame.in_set(Phase::SyncOut).before(sync_out_remove)`. In
@@ -527,7 +547,7 @@ cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests unto
   and this commit (the drain resets the counters on detection-area entry). Verification: 23
   rows; `grep -n '^| 31 ' docs/v2-backlog.md` shows the done marker.
 - [ ] T025 [US3] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
-  warnings; **212** = 192 + 5 (part/system) + 14 (red_robot/system) + 1 (setup); the 5 + 25 pure
+  warnings; **214** = 192 + 5 (part/system) + 16 (red_robot/system) + 1 (setup); the 5 + 25 pure
   tests still listed by name; paste the `test result:` line. Headless: import, `main/main.tscn`
   ×2, `level/level.tscn` clean vs `CLAUDE.md`'s catalog. Harness on BOTH trees as T015 (the four
   scratch files into both Godot project directories): cases (a) `--quit-after 900`, (b) 900, (d)
@@ -602,7 +622,7 @@ cannot be split. **Independent Test**: 212 tests with the 5 + 25 pure tests unto
   level.rs flying_forklift.rs settings.rs settings/ menu.rs menu/ main_scene.rs debug_label.rs`);
   `red_robot.tscn` diff = the one line and no other scene changed; tradeoffs ≥ 23; backlog #29/#30
   open and #31 done). If a grep reveals a violation, STOP and report.
-- [ ] T031 Final gates + headless (`cargo build && cargo clippy && cargo test` → **212**; import;
+- [ ] T031 Final gates + headless (`cargo build && cargo clippy && cargo test` → **214**; import;
   `main.tscn`; `level.tscn`); commit (R11 row 4) with a body (gate line, the grep outputs summary,
   the timing-table rows as written): `CLAUDE.md: entity-to-entity messages vs queue,
   engine-updated children rule, RNG in glue; spec: timing table; tradeoffs complete`.

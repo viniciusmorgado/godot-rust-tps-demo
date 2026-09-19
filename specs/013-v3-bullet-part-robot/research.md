@@ -220,10 +220,13 @@ system, released by `sync_out_remove`). `sync_out_robot_frame` (glue, `SyncOut`)
 `queue::push(AddTrauma { root_id: tracked player, amount: 13.0 })` (V3-B's arm applies it to the
 player entity at the next run's drain — v2's `add_camera_shake_trauma` does the same push since
 V3-B), and the remote `RobotFx` application on non-`Simulates` robots: `Hit` → reaction (own
-`randi()`, as v2's remote `call_local` handler drew its own), sound, and if the replicated `dead`
-is now true the death visuals (tree inactive, model hidden, `Death` visible, collision off,
-sparks; the parts' visibility public + unfreeze — the every-peer half of `part.rs:164-166`,
-without velocities: `:167-169`); `PlayShoot` → `shoot_anim.play("shoot")`. The `ShootAnimation`'s
+`randi()`, as v2's remote `call_local` handler drew its own), sound — and, because `health`/`dead`
+are SPAWN-ONLY replicated (`red_robot.tscn:31-33`, `:40-42`, analyze BLOCKER 1), the client runs
+v2's own handler logic on ITS components: `hit_step` on its `Health` (`:289-290`) and at zero its
+own death sequence — `Dead`, tree inactive, model hidden, `Death` visible, collision off, sparks,
+the parts' visibility public + unfreeze (the every-peer half of `part.rs:164-166`, without
+velocities: `:167-169`), explosion sound, `exploded` emit (`:306-307`); `PlayShoot` →
+`shoot_anim.play("shoot")`. The `ShootAnimation`'s
 method tracks (`red_robot.tscn:10283-10297`: `shoot_check`, `resume_approach`) fire during that
 `AnimationPlayer`'s idle processing, before the driver in tree order, so their pushes are drained
 by the same pass's frame run: `ShootRequested` marker (consumed by the next fixed run's
@@ -315,6 +318,20 @@ engine-updated child (`RayCast3D` internal physics update, `AnimationTree` in PH
 reproduce v2, either drive the child from the tick (the tree: MANUAL + `advance`) or keep a
 one-step buffer (`prev`/`curr`) in the snapshot. The laser needs neither (Fact 1).
 
+**Timers created in a fixed run, stepped by the frame run** (analyze finding 12): `PendingTrauma`,
+`RemovalTimer` and the part's `Waiting` are created in the fixed `SyncOut` of iteration N and first
+stepped by iteration N's frame run; v2's `SceneTreeTimer`s created inside the physics step were
+first stepped by iteration N's `process_timers` (V3-A R1 fact 5 covers timers created DURING the
+timer pass; a timer created in the physics phase precedes `timers.back()` and is stepped that same
+frame). Same step count on both trees — the harness confirms.
+
+**The tracked player's origin** (analyze finding 13): `sync_in_robot` reads it at `SyncIn`, before
+the player's `move_body` of the same run; v2 read it inside the robot's `physics_process`
+(`:153`), i.e. post-move only when the player preceded the robot in tree order (in the game the
+player is spawned after the robots — `level.rs:180` after `:138` — so v2 also read the PRE-move
+origin; the harness adds the player after the robot too). Equivalent; recorded in the tradeoffs
+row.
+
 ## R9 — Engine-call budget (a record, not a goal)
 
 Read from the code, explicit calls per entity per step. Bullet (flying, no hit): v2 =
@@ -359,7 +376,7 @@ call but v2's V3-B path already pushes.
 |---|---|---|---|
 | 1 | `ecs + hittable: HitKind, enemy events/drain arms, RobotHitLocal message, components, Handles/Initial variants (tests)` | `hittable.rs` (+`HitKind`, `kind_of`, `HitKind::rpc_hit`), `ecs/event.rs`, `ecs/markers.rs`, `ecs/apply.rs`, `ecs/setup.rs` (`Messages<RobotHitLocal>`, `Tuning(RobotTuning)`), `ecs.rs` (`BulletHandles`/`PartHandles`/`RobotHandles`, `apply_register` arms, `sync_out_remove` arms, the `update()` call) | gates (179 + 8 drain-arm tests = 187); headless sanity |
 | 2 | `bullet: bridge over the ECS core — fixed tick with move_and_collide in EngineQueryMove, HitKind, explode call_remote` | `bullet.rs`, `bullet/system.rs`, `bullet/sync.rs`, `ecs.rs`/`ecs/setup.rs` (registration), `docs/v3-tradeoffs.md` (row: `move_and_collide` + collider resolution) | gates (+5 = 192); headless; harness (c) both trees. Playable: bullets hit v2 robots through `HitKind::rpc_hit` → the robot's v2 `call_local` `hit` runs locally as today; `RobotHitLocal` has no consumer yet and is dropped one run later (R4 (3)) |
-| 3 | `part + red_robot: bridges, part phase machine on the frame schedule, robot seven-set tick with same-run hit (RobotHitLocal), robot AnimationTree MANUAL + advance (R1 option B)` | `part.rs`, `part/system.rs`, `part/sync.rs`, `red_robot.rs`, `red_robot/system.rs`, `red_robot/sync.rs`, `ecs.rs`/`ecs/setup.rs` (registration, `.after(bullet_settle)`), `red_robot.tscn:10782`, `docs/v3-tradeoffs.md` (rows: part, puff, raycasts, laser, second tree + AimBlend, RNG in glue, `exploded` from glue, blast) — the two cannot be split: the robot's death explodes the parts directly and `Part::explode` is removed | gates (+20 = 212); headless; harness (a), (b), (d), (e) both trees; **STOP 1** single player; **STOP 2** multiplayer |
+| 3 | `part + red_robot: bridges, part phase machine on the frame schedule, robot seven-set tick with same-run hit (RobotHitLocal), robot AnimationTree MANUAL + advance (R1 option B); move_robot ordered before move_bullet in EngineQueryMove (v2 tree order: robots under SpawnedNodes precede bullets, level.rs:138 / player/sync.rs:135)` | `part.rs`, `part/system.rs`, `part/sync.rs`, `red_robot.rs`, `red_robot/system.rs`, `red_robot/sync.rs`, `ecs.rs`/`ecs/setup.rs` (registration, `.after(bullet_settle)`), `red_robot.tscn:10782`, `docs/v3-tradeoffs.md` (rows: part, puff, raycasts, laser, second tree + AimBlend, RNG in glue, `exploded` from glue, blast) — the two cannot be split: the robot's death explodes the parts directly and `Part::explode` is removed | gates (+22 = 214); headless; harness (a), (b), (d), (e) both trees; **STOP 1** single player; **STOP 2** multiplayer |
 | 4 | `CLAUDE.md: entity-to-entity messages vs queue, engine-updated children rule, RNG in glue; spec: timing table; tradeoffs complete` | `CLAUDE.md`, `spec.md`, `docs/v3-tradeoffs.md`, `docs/v2-backlog.md` (#31 row marked done — moved to commit 3 with the code) | docs-only |
 
 Two STOPs after commit 3, checkpoint-mark commits as in V3-B; the `v2` worktree stays until the

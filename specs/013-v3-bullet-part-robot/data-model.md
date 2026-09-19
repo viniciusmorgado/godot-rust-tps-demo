@@ -107,13 +107,13 @@ the robot's five replicated fields) — the guard-dropped-before-engine-call rul
 
 ## Registration (`apply_register` arms)
 
-- `Initial::Bullet { shadow_mapping }` → `BulletTag`, `BulletStateC(Flying { time_alive: 5.0 })`
+- `Initial::Bullet { shadow_mapping, simulates }` → `BulletTag`, `BulletStateC(Flying { time_alive: 5.0 })`
   (`bullet.rs:68`), `BulletBasisZ(Vector3::ZERO)`, `Collided::default()`, `BulletIntents::default()`,
   `PendingBulletFx::default()`, `Simulates` iff server; `shadow_mapping` is kept in `BulletHandles`
   (glue-only value) — the plan stores it there, not as a component.
-- `Initial::Part { … }` → `PartTag`, `PartPhase::Attached`, `PartLifetimes`, `PartIntents::default()`,
+- `Initial::Part { lifetime, lifetime_random, disappearing_time, simulates }` → `PartTag`, `PartPhase::Attached`, `PartLifetimes`, `PartIntents::default()`,
   `PendingPartFx::default()`, `Simulates` iff server.
-- `Initial::Robot { state, health, dead, test_shoot, orientation, aim_blend }` → `RobotTag`,
+- `Initial::Robot { state, health, dead, test_shoot, orientation, aim_blend, simulates }` → `RobotTag`,
   `RobotState(state)`, `Health(health)`, `Dead` iff `dead` (`:119-123`), `TargetPosition(ZERO)`,
   `RobotCountersC(RobotCounters { aim_preparing: aim_prepare_time, shoot_countdown: if test_shoot
   { 0.0 } else { shoot_wait }, aim_countdown: aim_time })` (`:49-55`, `:115-117`),
@@ -209,4 +209,4 @@ New:
   `pending_trauma_expiry_flags_trauma_due`, `removal_timer_expiry_marks_remove`.
 - `ecs/setup.rs` (1): `robot_hit_apply_runs_after_bullet_settle_in_the_same_run` (R4).
 
-Total = 179 + 8 (commit 1) + 5 (commit 2) + 20 (commit 3) = 212.
+Total = 179 + 8 (commit 1) + 5 (commit 2) + 22 (commit 3: part 5, robot 14 + `robot_that_just_died_is_not_advanced` + `remote_hit_decrements_client_health_and_dies_at_zero`, setup 1) = 214.

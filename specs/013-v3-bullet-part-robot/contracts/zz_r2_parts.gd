@@ -1,3 +1,6 @@
+# NOTE (analyze finding 14): this probe kills the robot with DIRECT `robot.hit()` calls — valid on v2 and
+# on v3 before commit 3 only. After commit 3 `hit` is `call_remote` and a local method call only pushes the
+# remote-only `RobotHit`; the parity harness (contracts/zz_ecs_parity.gd case (b)) kills with scripted bullets.
 extends Node3D
 # R2 (specs/013): RigidBody3D determinism of the parts. The robot is killed at physics step 30 by
 # five hit() calls (hit is a callable #[rpc] method; call_local in v2). Per step, each part's

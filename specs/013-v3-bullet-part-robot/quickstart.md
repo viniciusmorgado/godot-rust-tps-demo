@@ -10,7 +10,7 @@ add ../oxide-godot-v2 v2` + `cargo build` + `--headless --import`). Paths from t
 cd oxide_godot_core && cargo build && cargo clippy && cargo test
 ```
 
-Expected: 187 after commit 1 (179 + 8 drain arms); 192 after commit 2 (+ 5 bullet/system); 212
+Expected: 187 after commit 1 (179 + 8 drain arms); 192 after commit 2 (+ 5 bullet/system); 214
 after commit 3 (+ 5 part/system + 14 red_robot/system + 1 setup) — data-model.md "Tests by
 name"; the 33 pure tests preserved by name; clippy at zero warnings.
 

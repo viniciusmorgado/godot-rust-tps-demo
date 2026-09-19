@@ -357,9 +357,13 @@ table); both checkpoints.
    position/extents, the blast instanced under the tree root at the hit, `:411-425`; when the
    collider is the tracked player → `PendingTrauma(Timer(0.1))`, `:437-453`); the `_clip_ray`
    of the Aim/Shooting branch (`:205`, order-insensitive: nothing reads the shader parameter
-   mid-tick, so it is a `SyncOut` write, not an `EngineQuery` one); the `AnimationTree` parameter
+   mid-tick, so it is a `SyncOut` write, not an `EngineQuery` one); the hit reaction (`randi()`
+   in glue, parameter, hit sound) and, on `just_died`, the death branch of FR-014/FR-019 (this
+   run, option (B)); the `AnimationTree` parameter
    writes (`transition_request`, `aiming/blend_amount`, `aim/blend_position`, `:469-488`);
-   LAST, for EVERY non-`Dead` robot on every peer: `advance(FixedDelta)` (US4).
+   LAST, for every robot that is neither `Dead` nor dying in this run (`just_died`): `advance(
+   FixedDelta)` (US4) — a robot is not advanced in the run it dies nor afterwards (v2 set the tree
+   inactive at `:294`; `AnimationMixer::advance()` does not check `active`, so the skip is explicit).
 6. **Given** `PendingTrauma` expiring in a later frame run, **When** its `Timer` fires, **Then**
    `SyncOut` pushes `AddTrauma { root_id: the tracked player's id, amount: 13.0 }` to the queue,
    which the next run's drain applies to the PLAYER entity (V3-B's arm) — the same path v2's
@@ -368,7 +372,10 @@ table); both checkpoints.
 7. **Given** a non-`Simulates` robot (client), **When** the fixed schedule runs, **Then** `SyncIn`
    reads the replicated `state`, `target_position` and the local `aim_preparing` from the node
    (`:134`), `Gameplay` builds the replay animation decision as `animate` did (`:456-490`), and
-   `SyncOut` writes the parameters and `advance`s; no movement, no raycast, no RPC.
+   `SyncOut` writes the parameters and `advance`s; no movement, no raycast, no RPC. **And** when
+   the network `RobotHit` arrives, the client runs v2's own handler logic on ITS components
+   (Edge Cases "The robot's `hit` timing"): `hit_step` on its `Health`, reaction, sound, and its
+   own death sequence at zero — `health`/`dead` are NOT replicated at runtime (spawn-only).
 8. **Given** the area signals (`:340-358`, physics-phase, emitted before `_physics_process`),
    **When** a `Player` body enters or exits, **Then** the handler pushes `RobotPlayerSeen { id,
    player: Some(instance_id) | None }` and the drain of the same step's fixed run sets
@@ -441,8 +448,15 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   emitted from glue, and on the server `RemovalTimer(10 s)` → `Remove`. Physics effects,
   replication samples and the observer all see the same step as v2. Remote peers receive
   `rpc("hit")` (`call_remote`); their handler pushes `RobotHit { id }` and their frame run
-  applies the visual half (reaction — with their own `randi()`, as v2's remote handler drew
-  its own — sound, death visuals, parts' visibility/unfreeze without velocities, `:167-169`).
+  applies v2's CLIENT-SIDE logic on the client's own components (analyze BLOCKER 1, 2026-09-19:
+  `health` and `dead` are spawn-only, `replication_mode = 0`, `red_robot.tscn:31-33`/`:40-42` —
+  a client never receives a runtime `dead`; in v2 every peer ran the `call_local` handler and
+  decremented its own `health`, `:289-307`): the `dead` guard and `hit_step` on the client's
+  `Health`, the reaction with their own `randi()` (as v2's per-peer handler drew its own), the
+  hit sound, and on `just_died`: `Dead`, the death visuals (tree inactive, model hidden, `Death`
+  visible, collision off, sparks), the every-peer half of the parts' explode (visibility public +
+  unfreeze, no velocities, `:164-169`), the explosion sound and the `exploded` emit (v2 `:306-307`
+  ran on every peer; no client listener today).
 - **`exploded` emitted from glue**: `level.rs`'s typed connection runs `_respawn_robot`
   synchronously inside the robot's `SyncOut`; it only spawns a `SceneTreeTimer` task (v2 code,
   unchanged) — no World access.
@@ -601,9 +615,12 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   through `EntityIndex`, runs the `dead` guard and `hit_step` (`:278-290`, pure) and flags the
   reaction/death intents; the robot's `SyncOut` of the same run draws the reaction `randi()`,
   writes the parameter and plays the hit sound on every hit of a live robot, then FR-014 on
-  death. The remote `RobotHit { id }` (from the `call_remote` RPC) is applied by the frame run on
-  non-`Simulates` robots: reaction (own `randi()`), sound, death visuals, parts' visibility/
-  unfreeze.
+  death. The remote `RobotHit { id }` (from the `call_remote` RPC) MUST be applied by the frame
+  run on non-`Simulates` robots as v2's client handler did (`:278-307`): `dead` guard, `hit_step`
+  on the client's own `Health` (spawn-only replication — the client keeps its own count),
+  reaction (own `randi()`), hit sound, and on `just_died` the `Dead` marker, the death visuals,
+  the parts' visibility/unfreeze, the explosion sound and the `exploded` emit. Test:
+  `remote_hit_decrements_client_health_and_dies_at_zero`.
 - **FR-020**: `RobotPlayerSeen` MUST set `TrackedPlayer` and the state (`Approach` on `Some`,
   `Idle` on `None`, `:345-356`) at drain time — the same physics step as v2 (the area signal is
   emitted before `_physics_process`, specs/011 research R1). `ResumeApproachRequested` MUST apply
@@ -614,8 +631,10 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   movement, raycast or RPC.
 - **FR-022**: The `AnimationTree` ordering MUST be settled by re-running the R1 experiment on the
   robot (US4 scenario 1) before the `.tscn` edit; if (B), `red_robot.tscn:10782` becomes
-  `callback_mode_process = 2` and `SyncOut` calls `advance(FixedDelta)` LAST for every
-  non-`Dead` robot on every peer, after the parameter writes; the edit is the milestone's one
+  `callback_mode_process = 2` and `SyncOut` calls `advance(FixedDelta)` LAST for every robot
+  that is neither `Dead` nor dying in this run, on every peer, after the parameter writes (a robot
+  is not advanced in the run it dies nor afterwards: v2's tree stopped at `set_active(false)`,
+  `:294`, and `AnimationMixer::advance()` ignores `active`); the edit is the milestone's one
   scene change and is listed in `docs/v3-tradeoffs.md`.
 - **FR-023**: Backlog #31 — CLOSED (user decision at plan review, 2026-09-19): the drain MUST
   apply `resume_approach_reset` (`model.rs`, `aim_preparing = aim_prepare_time`,
@@ -635,7 +654,8 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   `.:global_transform` (`bullet.tscn:10-13`); `#[var] test_shoot`, `#[var] aim_preparing`; the
   `#[export]`s `lifetime`, `lifetime_random`, `disappearing_time`, `fade_value`; `#[signal]
   exploded`; the `#[func]` names `resume_approach`, `shoot_check`, `_on_area_body_entered`,
-  `_on_area_body_exited`, `destroy` (bullet), `explode` (part, `pub(crate)`), `set_fade_value`;
+  `_on_area_body_exited`, `destroy` (bullet), `set_fade_value` (`explode` (part) is REMOVED per
+  the plan — no scene or script references it; its only caller was `red_robot.rs:302-304`);
   the `#[rpc]` names `hit`, `play_shoot`, `explode` (bullet), `destroy` (part) with their
   signatures; `Bullet::VELOCITY`; the `State` enum and its `via = i64` wire values; the class
   names `Bullet`, `Part`, `EnemyRobot`; `HitTarget`/`resolve`/`rpc_hit` (additive: `HitKind`).
@@ -776,7 +796,7 @@ inside the callback (same iteration).
 - Phase v3 (constitution 1.5.2). Zero behavior deviations from `v2` are sanctioned beyond
   measured frame-level shifts recorded in the table, the `call_remote` attributes of FR-004
   (same-step local effects, as in V3-B), the one scene edit of FR-022 (no observable behavior
-  change is its acceptance criterion) and, only if the user closes it, backlog #31.
+  change is its acceptance criterion) and backlog #31 (FR-023, closed).
 - **To verify at research time**: (1) the robot `AnimationTree` experiment (US4 — the R1 twin,
   not assumed); (2) `RayCast3D::is_colliding()`/`get_collision_point()` reflect the previous
   physics step's update (engine-updated on the physics tick) so `SyncIn` is the right read point
