@@ -5,6 +5,7 @@ use godot::builtin::{Transform3D, Vector2, Vector3};
 use godot::obj::InstanceId;
 
 use super::Handles;
+use crate::red_robot::State;
 
 /// What a bridge pushes to the queue from an engine callback (data-model.md "Events"). The
 /// `Register` variant carries `Gd<T>` handles, so this type has no `Send` bound — it only ever
@@ -46,6 +47,72 @@ pub enum InboundEvent {
         root_id: InstanceId,
         fx: PlayerFx,
     },
+    /// The bullet's `explode` RPC on a REMOTE peer (v2 `bullet.rs:137-146`; `call_remote`, the
+    /// simulating peer applies the effects inline in its fixed `SyncOut`).
+    BulletFx {
+        root_id: InstanceId,
+        fx: BulletFx,
+    },
+    /// The bullet animation's method track `destroy` (v2 `bullet.rs:148-154`), fired on every
+    /// peer; the drain frees only a `Simulates` entity.
+    BulletDestroy {
+        root_id: InstanceId,
+    },
+    /// The part's `destroy` RPC on a REMOTE peer (v2 `part.rs:194-215`).
+    PartFx {
+        root_id: InstanceId,
+        fx: PartFx,
+    },
+    /// The robot's `hit` RPC on a REMOTE peer (v2 `red_robot.rs:276-328`; option (B): the local
+    /// path is `RobotHitLocal`, written by the bullet's `GameplaySettle`).
+    RobotHit {
+        root_id: InstanceId,
+    },
+    /// The robot's `play_shoot` RPC on a REMOTE peer (v2 `red_robot.rs:330-333`).
+    RobotFx {
+        root_id: InstanceId,
+        fx: RobotFx,
+    },
+    /// The shoot animation's method track `shoot_check` (v2 `red_robot.rs:335-338`).
+    ShootRequested {
+        root_id: InstanceId,
+    },
+    /// The shoot animation's method track `resume_approach` (v2 `red_robot.rs:267-274`).
+    ResumeApproachRequested {
+        root_id: InstanceId,
+    },
+    /// `PlayerDetectionArea`'s `body_entered`/`body_exited` after the boundary `try_cast::<Player>`
+    /// (v2 `red_robot.rs:340-358`): `Some(id)` on entry, `None` on exit.
+    RobotPlayerSeen {
+        root_id: InstanceId,
+        player: Option<InstanceId>,
+    },
+}
+
+/// The bullet's remote RPC effects.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BulletFx {
+    Explode,
+}
+
+/// The part's remote RPC effects.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PartFx {
+    Destroy,
+}
+
+/// The robot's remote RPC effects (`hit` has its own event: it changes state).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RobotFx {
+    PlayShoot,
+}
+
+/// The same-run hit (specs/013 research R4): written by the bullet's `bullet_settle`
+/// (`GameplaySettle`) and read by the robot's `robot_hit_apply` in the same set, ordered after
+/// it; `update()`d once at the start of every FIXED run, before the drain.
+#[derive(Message, Clone, Copy)]
+pub struct RobotHitLocal {
+    pub robot: InstanceId,
 }
 
 /// The remote-peer RPC effects. No `Hit`: `hit` pushes `AddTrauma { amount: 0.75 }`.
@@ -80,6 +147,32 @@ pub enum Initial {
         initial_position: Vector3,
         orientation: Transform3D,
         start_rotation: Vector3,
+    },
+    /// → the bullet entity (specs/013 data-model.md): `shadow_mapping` is the `Settings` read of
+    /// v2 `bullet.rs:143`, done once in `ready`; `simulates` is `is_server()` (`:89`).
+    Bullet {
+        shadow_mapping: bool,
+        simulates: bool,
+    },
+    /// → the part entity: the three exports (v2 `part.rs:86-94`); `simulates` (`:167`).
+    Part {
+        lifetime: f32,
+        lifetime_random: f32,
+        disappearing_time: f32,
+        simulates: bool,
+    },
+    /// → the robot entity: the scene fields (v2 `red_robot.rs:35-47`), `test_shoot` (`:115-117`,
+    /// `:138-141`), the model's global transform with zero origin (`:111-112`), `aim_blend` = the
+    /// tree's `parameters/aim/blend_position` at `ready` (`red_robot.tscn:10785`, replacing the
+    /// per-step `get` of `:482-485`); `simulates` (`:133`).
+    Robot {
+        state: State,
+        health: i32,
+        dead: bool,
+        test_shoot: bool,
+        orientation: Transform3D,
+        aim_blend: Vector2,
+        simulates: bool,
     },
 }
 

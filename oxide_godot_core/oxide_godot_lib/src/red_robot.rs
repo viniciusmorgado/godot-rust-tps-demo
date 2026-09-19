@@ -9,7 +9,7 @@ use godot::prelude::*;
 use crate::part::Part;
 use crate::player::Player;
 
-mod model;
+pub(crate) mod model;
 
 /// The one raycast helper's typed result, replacing three duplicated raw `VarDictionary`
 /// inspections. Glue-only (holds `Gd<Object>`) — not part of `red_robot::model`'s pure surface.

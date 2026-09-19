@@ -5,13 +5,14 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::ScheduleLabel;
 
-use super::event::DoorBodyEntered;
+use super::event::{DoorBodyEntered, RobotHitLocal};
 use super::index::EntityIndex;
 use super::markers::{FixedDelta, FrameDelta, Tuning};
 use super::NodeHandles;
 use crate::camera_noise_shake::model::CameraShakeTuning;
 use crate::player::model::PlayerTuning;
 use crate::player_input::model::PlayerInputTuning;
+use crate::red_robot::model::RobotTuning;
 
 /// The tick phases (constitution 1.5.1, "ECS shape (v3)"). The FIXED schedule chains the seven
 /// `SyncIn → Gameplay → EngineQueryOrient → GameplayIntegrate → EngineQueryMove →
@@ -43,12 +44,15 @@ pub fn build_world() -> World {
     world.insert_resource(EntityIndex::default());
     world.insert_non_send(NodeHandles::default());
     world.insert_resource(Messages::<DoorBodyEntered>::default());
+    // The same-run hit message (specs/013 research R4): updated by the FIXED driver before the drain.
+    world.insert_resource(Messages::<RobotHitLocal>::default());
     world.insert_resource(FrameDelta(0.0));
     world.insert_resource(FixedDelta(0.0));
     // The model tuning structs as resources (specs/012 research R6), their `Default`s untouched.
     world.insert_resource(Tuning(PlayerTuning::default()));
     world.insert_resource(Tuning(PlayerInputTuning::default()));
     world.insert_resource(Tuning(CameraShakeTuning::default()));
+    world.insert_resource(Tuning(RobotTuning::default()));
     world
 }
 

@@ -34,12 +34,12 @@ BEFORE `add_child`, `is_instance_valid(part)` BEFORE reading a part (research R2
 
 ## Phase 1: Setup
 
-- [ ] T001 Verify the `v2` worktree (re-created for research R1/R2): `git worktree list` shows
+- [x] T001 Verify the `v2` worktree (re-created for research R1/R2): `git worktree list` shows
   `../oxide-godot-v2` at `e2932b4`; else `git worktree add ../oxide-godot-v2 v2`; then `cd
   ../oxide-godot-v2/oxide_godot_core && cargo build` and `cd ../oxide-godot && /usr/bin/godot.x86_64
   --headless --import --path .`. Verification: build clean, import prints `Initialize godot-rust
   (...)`.
-- [ ] T002 On `v3` at `9d0edec`: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
+- [x] T002 On `v3` at `9d0edec`: `cd oxide_godot_core && cargo build && cargo clippy && cargo test`
   → zero warnings, **179 passed** (paste the `test result:` line); `sed -n 10782p
   oxide-godot/enemies/red_robot/red_robot.tscn` prints `callback_mode_process = 0` (the line T023
   edits); `sed -n 10764p oxide-godot/enemies/red_robot/red_robot.tscn` prints `enabled = false`
@@ -61,7 +61,7 @@ untouched; the game still runs unchanged (no bridge touched).
 
 ### Commit 1 — `hittable.rs`, `ecs/event.rs`, `ecs/markers.rs`, `ecs/setup.rs`, `ecs/apply.rs`, `ecs.rs`
 
-- [ ] T003 [P] In `oxide_godot_core/oxide_godot_lib/src/hittable.rs` ADD (additive only — no
+- [x] T003 [P] In `oxide_godot_core/oxide_godot_lib/src/hittable.rs` ADD (additive only — no
   existing line changes; `HitTarget`, `resolve` `:16-24`, `rpc_hit` `:30-39` untouched, research R3):
   `#[derive(Clone, Copy, Debug, PartialEq, Eq)] pub enum HitKind { Player(InstanceId),
   Robot(InstanceId) }`; `pub fn kind_of(node: Gd<Node3D>) -> Option<HitKind>` = `resolve(node)`
@@ -71,7 +71,7 @@ untouched; the game still runs unchanged (no bridge touched).
   `src/obj/gd.rs:255`), wraps it in the existing `HitTarget` and calls the existing `rpc_hit()`
   (the by-name string stays spelled ONCE, `:33`/`:36`); a freed target (`Err`) is a no-op.
   Verification: compiles; `git diff -- hittable.rs | grep '^-' | grep -v '^---' | wc -l` = 0.
-- [ ] T004 [P] In `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` add the variants
+- [x] T004 [P] In `oxide_godot_core/oxide_godot_lib/src/ecs/event.rs` add the variants
   `InboundEvent::BulletFx { root_id: InstanceId, fx: BulletFx }`, `BulletDestroy { root_id }`,
   `PartFx { root_id, fx: PartFx }`, `RobotHit { root_id }`, `RobotFx { root_id, fx: RobotFx }`,
   `ShootRequested { root_id }`, `ResumeApproachRequested { root_id }`, `RobotPlayerSeen { root_id,
@@ -86,7 +86,7 @@ untouched; the game still runs unchanged (no bridge touched).
   struct RobotHitLocal { pub robot: InstanceId }` (research R4). Extend `queue.rs`'s test helper
   `key()` with the eight new arms (tags 8–15), as commit 1 of V3-B did. Verification: compiles;
   `Initial` stays `Copy`.
-- [ ] T005 [P] In `oxide_godot_core/oxide_godot_lib/src/ecs/markers.rs` add every component of
+- [x] T005 [P] In `oxide_godot_core/oxide_godot_lib/src/ecs/markers.rs` add every component of
   data-model.md "Components" verbatim, with its derives: bullet — `BulletTag`,
   `BulletStateC(BulletState)` (`use crate::bullet::pure::BulletState`; make `bullet.rs`'s inline
   `mod pure` `pub(crate) mod pure` — the ONE token change in that file this commit; its body and 3
@@ -110,12 +110,12 @@ untouched; the game still runs unchanged (no bridge touched).
   `TraumaDue(InstanceId)`, `PendingRobotFx(Vec<RobotFx>)`, `PendingRobotHits(u32)`.
   `Orientation`, `RootMotion`, `Velocity`, `Simulates` are reused from V3-B. Verification:
   compiles; `grep -c 'Gd<' ecs/markers.rs` = 0.
-- [ ] T006 [P] In `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs`: `build_world` inserts
+- [x] T006 [P] In `oxide_godot_core/oxide_godot_lib/src/ecs/setup.rs`: `build_world` inserts
   `Messages::<RobotHitLocal>::default()` and `Tuning(RobotTuning::default())`
   (`red_robot/model.rs:15-48`). No set changes (the seven-set fixed chain and the four-set frame
   chain are V3-B's). Verification: `both_schedules_run_on_an_empty_world` and the other V3-B setup
   tests pass unchanged.
-- [ ] T007 In `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` add the eight drain arms
+- [x] T007 In `oxide_godot_core/oxide_godot_lib/src/ecs/apply.rs` add the eight drain arms
   (data-model.md "Drain arms"; every unknown `root_id` dropped): `BulletFx { fx }` →
   `PendingBulletFx.0.push(fx)` (`bullet.rs:137-146`); `BulletDestroy` → insert `Remove` ONLY if the
   entity has `Simulates` (`:150-153`, v2's server-only guard; `world.get::<Simulates>(e).is_some()`);
@@ -142,7 +142,7 @@ untouched; the game still runs unchanged (no bridge touched).
   `robot_player_seen_resets_counters_on_entry` (same reset formula, same file) so the file stays at
   eight named tests. Depends on
   T004, T005, T006. Verification: eight tests pass.
-- [ ] T008 In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `Handles::Bullet(Box<BulletHandles>)`,
+- [x] T008 In `oxide_godot_core/oxide_godot_lib/src/ecs.rs` add `Handles::Bullet(Box<BulletHandles>)`,
   `Handles::Part(Box<PartHandles>)`, `Handles::Robot(Box<RobotHandles>)` with the field lists of
   data-model.md "Handles" (`BulletHandles { root: Gd<Bullet>, anim: Gd<AnimationPlayer>, collision:
   Gd<CollisionShape3D>, light: Gd<OmniLight3D>, shadow_mapping: bool }` — `shadow_mapping` lives
@@ -168,7 +168,7 @@ untouched; the game still runs unchanged (no bridge touched).
   `self.world.resource_mut::<Messages<RobotHitLocal>>().update()` right after `DoorBodyEntered`'s
   (`ecs.rs`, before the drain). Depends on T004, T005. Verification: compiles; `apply_register` is
   still the only writer of `NodeHandles.by_entity`.
-- [ ] T009 Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test` — zero
+- [x] T009 Gates: `cd oxide_godot_core && cargo build && cargo clippy && cargo test` — zero
   warnings; **187** = 179 + 8 (apply); paste the `test result:` line. Headless import +
   `main/main.tscn` + `level/level.tscn` clean (nothing engine-facing changed; a sanity run). Commit
   (R11 row 1) with a body (gate line, headless result, deviations): `ecs + hittable: HitKind, enemy

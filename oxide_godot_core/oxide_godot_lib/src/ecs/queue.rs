@@ -43,6 +43,14 @@ mod tests {
             InboundEvent::MouseLook { root_id, .. } => (5, root_id.to_i64()),
             InboundEvent::AddTrauma { root_id, .. } => (6, root_id.to_i64()),
             InboundEvent::PlayerFx { root_id, .. } => (7, root_id.to_i64()),
+            InboundEvent::BulletFx { root_id, .. } => (8, root_id.to_i64()),
+            InboundEvent::BulletDestroy { root_id } => (9, root_id.to_i64()),
+            InboundEvent::PartFx { root_id, .. } => (10, root_id.to_i64()),
+            InboundEvent::RobotHit { root_id } => (11, root_id.to_i64()),
+            InboundEvent::RobotFx { root_id, .. } => (12, root_id.to_i64()),
+            InboundEvent::ShootRequested { root_id } => (13, root_id.to_i64()),
+            InboundEvent::ResumeApproachRequested { root_id } => (14, root_id.to_i64()),
+            InboundEvent::RobotPlayerSeen { root_id, .. } => (15, root_id.to_i64()),
         }
     }
 

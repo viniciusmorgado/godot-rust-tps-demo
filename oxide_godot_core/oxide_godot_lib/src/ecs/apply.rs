@@ -5,9 +5,15 @@ use bevy_ecs::prelude::{Messages, World};
 
 use super::event::{DoorBodyEntered, InboundEvent, PlayerFx};
 use super::index::EntityIndex;
-use super::markers::{JumpQueued, PendingFx, PendingMouseLook, Remove, Trauma, Tuning};
+use super::markers::{
+    JumpQueued, PendingBulletFx, PendingFx, PendingMouseLook, PendingPartFx, PendingRobotFx,
+    PendingRobotHits, Remove, RobotCountersC, RobotState, ShootRequested, Simulates, TrackedPlayer,
+    Trauma, Tuning,
+};
 use super::NodeHandles;
 use crate::camera_noise_shake::model::{self, CameraShakeTuning};
+use crate::red_robot::model::{resume_approach_reset, RobotTuning};
+use crate::red_robot::State;
 
 /// Applies every non-`Register` event directly to the World (`Unregister`, `DoorBodyEntered`,
 /// `BlastAnimationFinished`, and the player's `JumpPressed`/`MouseLook`/`AddTrauma`/`PlayerFx`
@@ -76,6 +82,92 @@ pub fn apply_non_register(world: &mut World, event: InboundEvent) {
                 }
             }
         }
+        // ---- specs/013 (the enemy): data-model.md "Drain arms" ----
+        // v2 `bullet.rs:137-146` on a REMOTE peer: applied by the frame `SyncOut`.
+        InboundEvent::BulletFx { root_id, fx } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id)
+                && let Some(mut pending) = world.get_mut::<PendingBulletFx>(entity)
+            {
+                pending.0.push(fx);
+            }
+        }
+        // v2 `bullet.rs:150-153`: the method track fires on every peer, the server frees.
+        InboundEvent::BulletDestroy { root_id } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id)
+                && world.get::<Simulates>(entity).is_some()
+            {
+                world.entity_mut(entity).insert(Remove);
+            }
+        }
+        // v2 `part.rs:194-215` on a REMOTE peer: applied by the frame `SyncOut`.
+        InboundEvent::PartFx { root_id, fx } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id)
+                && let Some(mut pending) = world.get_mut::<PendingPartFx>(entity)
+            {
+                pending.0.push(fx);
+            }
+        }
+        // v2 `red_robot.rs:276-328` on a REMOTE peer (option (B): the local path is
+        // `RobotHitLocal`); the client's frame run applies v2's client-side handler per hit.
+        InboundEvent::RobotHit { root_id } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id)
+                && let Some(mut pending) = world.get_mut::<PendingRobotHits>(entity)
+            {
+                pending.0 += 1;
+            }
+        }
+        // v2 `red_robot.rs:330-333` on a REMOTE peer.
+        InboundEvent::RobotFx { root_id, fx } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id)
+                && let Some(mut pending) = world.get_mut::<PendingRobotFx>(entity)
+            {
+                pending.0.push(fx);
+            }
+        }
+        // v2 `red_robot.rs:335-338`: consumed by the next fixed run's `robot_decide`.
+        InboundEvent::ShootRequested { root_id } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id) {
+                world.entity_mut(entity).insert(ShootRequested);
+            }
+        }
+        // v2 `red_robot.rs:267-274`: the method track's reset, `model.rs:110-113`.
+        InboundEvent::ResumeApproachRequested { root_id } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id) {
+                reset_counters(world, entity);
+                if let Some(mut state) = world.get_mut::<RobotState>(entity) {
+                    state.0 = State::Approach;
+                }
+            }
+        }
+        // v2 `red_robot.rs:340-358`: the detection area. On entry the counters are reset FIRST
+        // (backlog #31 CLOSED, spec FR-023 — the one sanctioned behavior change), then `Approach`.
+        InboundEvent::RobotPlayerSeen { root_id, player } => {
+            if let Some(entity) = world.resource::<EntityIndex>().entity(root_id) {
+                if let Some(mut tracked) = world.get_mut::<TrackedPlayer>(entity) {
+                    tracked.0 = player;
+                }
+                let next = if player.is_some() {
+                    reset_counters(world, entity);
+                    State::Approach
+                } else {
+                    State::Idle
+                };
+                if let Some(mut state) = world.get_mut::<RobotState>(entity) {
+                    state.0 = next;
+                }
+            }
+        }
+    }
+}
+
+/// `resume_approach_reset` on the entity's counters (`aim_countdown` untouched, as v2's
+/// `resume_approach` never reset it, `red_robot.rs:268-273`).
+fn reset_counters(world: &mut World, entity: bevy_ecs::prelude::Entity) {
+    let tuning = world.resource::<Tuning<RobotTuning>>().0;
+    if let Some(mut counters) = world.get_mut::<RobotCountersC>(entity) {
+        let (aim_preparing, shoot_countdown) = resume_approach_reset(&tuning);
+        counters.0.aim_preparing = aim_preparing;
+        counters.0.shoot_countdown = shoot_countdown;
     }
 }
 
@@ -98,6 +190,7 @@ mod tests {
         world.insert_resource(EntityIndex::default());
         world.insert_resource(Messages::<DoorBodyEntered>::default());
         world.insert_resource(Tuning(CameraShakeTuning::default()));
+        world.insert_resource(Tuning(RobotTuning::default()));
         world
     }
 
@@ -213,5 +306,123 @@ mod tests {
         assert!(world.get::<PendingMouseLook>(e).unwrap().0.is_empty());
         assert!(world.get::<PendingFx>(e).unwrap().0.is_empty());
         assert_eq!(world.get::<Trauma>(e).unwrap().0, 0.0);
+    }
+
+    // ---- The enemy's drain arms (specs/013 T007) ----
+
+    use super::super::event::{BulletFx, PartFx, RobotFx};
+    use crate::red_robot::model::RobotCounters;
+
+    fn stale_counters() -> RobotCountersC {
+        RobotCountersC(RobotCounters { aim_preparing: 0.1, shoot_countdown: 2.0, aim_countdown: 0.3 })
+    }
+
+    /// One robot entity with the drain-touched components and stale counters, registered under id 7.
+    fn robot_world() -> (World, Entity) {
+        let mut world = world_with_index();
+        let entity = world
+            .spawn((
+                RobotState(State::Idle),
+                stale_counters(),
+                TrackedPlayer(None),
+                PendingRobotFx::default(),
+                PendingRobotHits::default(),
+            ))
+            .id();
+        world
+            .resource_mut::<EntityIndex>()
+            .register_if_absent(InstanceId::from_i64(7), || entity);
+        (world, entity)
+    }
+
+    #[test]
+    fn bullet_fx_explode_is_queued() {
+        let mut world = world_with_index();
+        let e = world.spawn(PendingBulletFx::default()).id();
+        world.resource_mut::<EntityIndex>().register_if_absent(root(), || e);
+        apply_non_register(&mut world, InboundEvent::BulletFx { root_id: root(), fx: BulletFx::Explode });
+        assert_eq!(world.get::<PendingBulletFx>(e).unwrap().0, vec![BulletFx::Explode]);
+    }
+
+    #[test]
+    fn bullet_destroy_marks_remove_only_on_simulates() {
+        let mut world = world_with_index();
+        let server = world.spawn(Simulates).id();
+        let client = world.spawn_empty().id();
+        world.resource_mut::<EntityIndex>().register_if_absent(InstanceId::from_i64(7), || server);
+        world.resource_mut::<EntityIndex>().register_if_absent(InstanceId::from_i64(8), || client);
+        apply_non_register(&mut world, InboundEvent::BulletDestroy { root_id: InstanceId::from_i64(7) });
+        apply_non_register(&mut world, InboundEvent::BulletDestroy { root_id: InstanceId::from_i64(8) });
+        assert!(world.get::<Remove>(server).is_some());
+        assert!(world.get::<Remove>(client).is_none());
+    }
+
+    #[test]
+    fn part_fx_destroy_is_queued() {
+        let mut world = world_with_index();
+        let e = world.spawn(PendingPartFx::default()).id();
+        world.resource_mut::<EntityIndex>().register_if_absent(root(), || e);
+        apply_non_register(&mut world, InboundEvent::PartFx { root_id: root(), fx: PartFx::Destroy });
+        assert_eq!(world.get::<PendingPartFx>(e).unwrap().0, vec![PartFx::Destroy]);
+    }
+
+    #[test]
+    fn robot_hit_is_counted_for_remote_peers() {
+        let (mut world, e) = robot_world();
+        apply_non_register(&mut world, InboundEvent::RobotHit { root_id: root() });
+        apply_non_register(&mut world, InboundEvent::RobotHit { root_id: root() });
+        assert_eq!(world.get::<PendingRobotHits>(e).unwrap().0, 2);
+    }
+
+    #[test]
+    fn robot_fx_play_shoot_is_queued() {
+        let (mut world, e) = robot_world();
+        apply_non_register(&mut world, InboundEvent::RobotFx { root_id: root(), fx: RobotFx::PlayShoot });
+        assert_eq!(world.get::<PendingRobotFx>(e).unwrap().0, vec![RobotFx::PlayShoot]);
+    }
+
+    #[test]
+    fn shoot_requested_inserts_marker() {
+        let (mut world, e) = robot_world();
+        assert!(world.get::<ShootRequested>(e).is_none());
+        apply_non_register(&mut world, InboundEvent::ShootRequested { root_id: root() });
+        assert!(world.get::<ShootRequested>(e).is_some());
+    }
+
+    #[test]
+    fn robot_player_seen_resets_counters_on_entry() {
+        let tuning = RobotTuning::default();
+        let (mut world, e) = robot_world();
+        let player = InstanceId::from_i64(42);
+        apply_non_register(&mut world, InboundEvent::RobotPlayerSeen { root_id: root(), player: Some(player) });
+        assert_eq!(world.get::<RobotState>(e).unwrap().0, State::Approach);
+        let counters = world.get::<RobotCountersC>(e).unwrap().0;
+        assert_eq!(counters.aim_preparing, tuning.aim_prepare_time);
+        assert_eq!(counters.shoot_countdown, tuning.shoot_wait);
+        assert_eq!(counters.aim_countdown, 0.3);
+        assert_eq!(world.get::<TrackedPlayer>(e).unwrap().0, Some(player));
+
+        // `resume_approach_requested_resets_state_and_counters` (T007): the method track's arm
+        // uses the same reset formula (v2 red_robot.rs:268-273).
+        world.entity_mut(e).insert((RobotState(State::Shooting), stale_counters()));
+        apply_non_register(&mut world, InboundEvent::ResumeApproachRequested { root_id: root() });
+        assert_eq!(world.get::<RobotState>(e).unwrap().0, State::Approach);
+        let counters = world.get::<RobotCountersC>(e).unwrap().0;
+        assert_eq!(counters.aim_preparing, tuning.aim_prepare_time);
+        assert_eq!(counters.shoot_countdown, tuning.shoot_wait);
+        assert_eq!(counters.aim_countdown, 0.3);
+    }
+
+    #[test]
+    fn robot_player_seen_none_sets_idle_without_reset() {
+        let (mut world, e) = robot_world();
+        world.entity_mut(e).insert((RobotState(State::Approach), TrackedPlayer(Some(InstanceId::from_i64(42)))));
+        apply_non_register(&mut world, InboundEvent::RobotPlayerSeen { root_id: root(), player: None });
+        assert_eq!(world.get::<RobotState>(e).unwrap().0, State::Idle);
+        let counters = world.get::<RobotCountersC>(e).unwrap().0;
+        assert_eq!(counters.aim_preparing, 0.1);
+        assert_eq!(counters.shoot_countdown, 2.0);
+        assert_eq!(counters.aim_countdown, 0.3);
+        assert_eq!(world.get::<TrackedPlayer>(e).unwrap().0, None);
     }
 }

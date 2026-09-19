@@ -10,7 +10,7 @@ use pure::BulletState;
 
 /// Replaces `hit: bool` + `time_alive: f32` (an invalid-state-admitting pair — nothing stopped
 /// `time_alive` from continuing to count down after `hit` was already `true`).
-mod pure {
+pub(crate) mod pure {
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum BulletState {
         Flying { time_alive: f32 },

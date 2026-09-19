@@ -7,27 +7,39 @@ use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
 use godot::classes::{
-    AnimationPlayer, AnimationTree, Area3D, AudioStreamPlayer, Camera3D, ColorRect, CpuParticles3D,
-    FastNoiseLite, INode, Marker3D, Node, Node3D, PackedScene, TextureRect, Timer,
+    AnimationPlayer, AnimationTree, Area3D, AudioStreamPlayer, AudioStreamPlayer3D, BoneAttachment3D,
+    Camera3D, CollisionShape3D, ColorRect, CpuParticles3D, FastNoiseLite, INode, Marker3D,
+    MeshInstance3D, MultiplayerSynchronizer, Node, Node3D, OmniLight3D, PackedScene, RayCast3D,
+    TextureRect, Timer,
 };
 use godot::obj::InstanceId;
 use godot::prelude::*;
 
-use event::{DoorBodyEntered, InboundEvent, Initial};
+use event::{DoorBodyEntered, InboundEvent, Initial, RobotHitLocal};
 use index::{EntityIndex, Registration};
 use markers::{
-    AimStateC, AirborneTime, BlastTag, CurrentAnimation, FixedDelta, FrameDelta, FrameIntents,
-    InitialPosition, JumpQueued, LookTarget, Motion, Orientation, OwnsInput, PeerId, PendingFx,
-    PendingMouseLook, PlayOpen, PlayerTag, Remove, ReplicatedInput, RootMotion, ShakePending,
-    ShakeTime, Simulates, StartEmitting, StartRotation, TickIntents, Trauma, Velocity,
+    AimBlend, AimStateC, AirborneTime, BlastTag, BulletBasisZ, BulletIntents, BulletStateC,
+    BulletTag, Collided, CurrentAnimation, Dead, FixedDelta, FrameDelta, FrameIntents, Health,
+    InitialPosition, JumpQueued, LookTarget, Motion, Orientation, OwnsInput, PartIntents,
+    PartLifetimes, PartPhase, PartTag, PeerId, PendingBulletFx, PendingFx, PendingMouseLook,
+    PendingPartFx, PendingRobotFx, PendingRobotHits, PendingTrauma, PlayOpen, PlayerTag,
+    RaycastAnswers, RemovalTimer, Remove, ReplicatedInput, RobotCountersC, RobotIntents,
+    RobotState, RobotTag, RootMotion, ShakePending, ShakeTime, ShootRequested, Simulates,
+    StartEmitting, StartRotation, TargetPosition, TickIntents, TrackedPlayer, Trauma, Tuning,
+    Velocity,
 };
 use setup::Phase;
 
+use crate::bullet::pure::BulletState;
+use crate::bullet::Bullet;
 use crate::door::system::DoorState;
+use crate::part::Part;
 use crate::part_disappear::system::{DisappearPhase, Lifetime};
 use crate::player::{Animations, Player};
 use crate::player_input::model::AimState;
 use crate::player_input::PlayerInputSynchronizer;
+use crate::red_robot::model::{RobotCounters, RobotTuning};
+use crate::red_robot::EnemyRobot;
 
 pub mod apply;
 pub mod event;
@@ -56,6 +68,56 @@ pub enum Handles {
     /// The player entity over three nodes (specs/012 research R5), boxed: twenty handles would
     /// otherwise dwarf the other variants (clippy `large_enum_variant`, gate at zero warnings).
     Player(Box<PlayerHandles>),
+    /// The bullet entity (specs/013 data-model.md), boxed like the player's.
+    Bullet(Box<BulletHandles>),
+    /// A part entity — one per part node of a robot (specs/013 data-model.md).
+    Part(Box<PartHandles>),
+    /// The robot entity (specs/013 data-model.md).
+    Robot(Box<RobotHandles>),
+}
+
+/// `Handles::Bullet`'s payload (v2 `bullet.rs:71-79`). `shadow_mapping` is the `Settings` read of
+/// `:143`, done once in `ready` — a glue-only value, so it lives here and not in a component.
+pub struct BulletHandles {
+    pub root: Gd<Bullet>,
+    pub anim: Gd<AnimationPlayer>,
+    pub collision: Gd<CollisionShape3D>,
+    pub light: Gd<OmniLight3D>,
+    pub shadow_mapping: bool,
+}
+
+/// `Handles::Part`'s payload (v2 `part.rs:101-118`). `root` is the user class: `set_fade_value`
+/// (the projection setter) is reached through `bind_mut()`.
+pub struct PartHandles {
+    pub root: Gd<Part>,
+    pub synchronizer: Gd<MultiplayerSynchronizer>,
+    pub col1: Gd<CollisionShape3D>,
+    pub col2: Gd<CollisionShape3D>,
+    pub puff_scene: Gd<PackedScene>,
+}
+
+/// `Handles::Robot`'s payload (v2 `red_robot.rs:62-105`): the twelve `OnReady` handles, the
+/// three parts (for the death branch, research R5), the two sparks, the impact scene, the RID and
+/// the dedicated-server flag read once. `root` is the user class: the five replicated fields
+/// are projected through `bind_mut()`, the guard dropped before any engine call.
+pub struct RobotHandles {
+    pub root: Gd<EnemyRobot>,
+    pub anim_tree: Gd<AnimationTree>,
+    pub shoot_anim: Gd<AnimationPlayer>,
+    pub model: Gd<Node3D>,
+    pub ray_from: Gd<BoneAttachment3D>,
+    pub ray_mesh: Gd<MeshInstance3D>,
+    pub laser_raycast: Gd<RayCast3D>,
+    pub laser_ember: Gd<CpuParticles3D>,
+    pub collision_shape: Gd<CollisionShape3D>,
+    pub explosion_sound: Gd<AudioStreamPlayer3D>,
+    pub hit_sound: Gd<AudioStreamPlayer3D>,
+    pub death: Gd<Node3D>,
+    pub parts: [Gd<Part>; 3],
+    pub sparks: [Gd<CpuParticles3D>; 2],
+    pub impact_effect_scene: Gd<PackedScene>,
+    pub rid: Rid,
+    pub is_dedicated_server: bool,
 }
 
 /// `Handles::Player`'s payload. `root` and `input` are the USER classes because their
@@ -94,6 +156,9 @@ impl Handles {
             Handles::Puff { root } => root.is_instance_valid(),
             Handles::Blast { root, .. } => root.is_instance_valid(),
             Handles::Player(p) => p.root.is_instance_valid(),
+            Handles::Bullet(p) => p.root.is_instance_valid(),
+            Handles::Part(p) => p.root.is_instance_valid(),
+            Handles::Robot(p) => p.root.is_instance_valid(),
         }
     }
 }
@@ -141,6 +206,9 @@ impl INode for EcsWorld {
         // R3: the door message buffers advance once per FIXED run, before the drain, so a message
         // is read exactly once and never survives more than two fixed runs.
         self.world.resource_mut::<Messages<DoorBodyEntered>>().update();
+        // specs/013 research R4: the same-run hit message likewise — written by the bullet's
+        // `GameplaySettle` and read by the robot's in the same run; one unread survives one run.
+        self.world.resource_mut::<Messages<RobotHitLocal>>().update();
         for ev in queue::drain() {
             match ev {
                 InboundEvent::Register { id, handles, initial } => {
@@ -239,6 +307,74 @@ fn apply_register(world: &mut World, id: InstanceId, handles: Handles, initial: 
                 e.insert(OwnsInput);
             }
         }
+        Initial::Bullet { shadow_mapping: _, simulates } => {
+            let mut e = world.entity_mut(entity);
+            e.insert((
+                BulletTag,
+                // v2 `bullet.rs:68`.
+                BulletStateC(BulletState::Flying { time_alive: 5.0 }),
+                BulletBasisZ(Vector3::ZERO),
+                Collided::default(),
+                BulletIntents::default(),
+                PendingBulletFx::default(),
+            ));
+            if simulates {
+                e.insert(Simulates);
+            }
+        }
+        Initial::Part { lifetime, lifetime_random, disappearing_time, simulates } => {
+            let mut e = world.entity_mut(entity);
+            e.insert((
+                PartTag,
+                PartPhase::Attached,
+                PartLifetimes { lifetime, lifetime_random, disappearing_time },
+                PartIntents::default(),
+                PendingPartFx::default(),
+            ));
+            if simulates {
+                e.insert(Simulates);
+            }
+        }
+        Initial::Robot { state, health, dead, test_shoot, orientation, aim_blend, simulates } => {
+            let tuning = world.resource::<Tuning<RobotTuning>>().0;
+            let mut e = world.entity_mut(entity);
+            e.insert((
+                RobotTag,
+                RobotState(state),
+                Health(health),
+                TargetPosition(Vector3::ZERO),
+                // v2 `red_robot.rs:49-55`; `test_shoot` zeroes the countdown at `ready` (`:115-117`).
+                RobotCountersC(RobotCounters {
+                    aim_preparing: tuning.aim_prepare_time,
+                    shoot_countdown: if test_shoot { 0.0 } else { tuning.shoot_wait },
+                    aim_countdown: tuning.aim_time,
+                }),
+                TrackedPlayer(None),
+                Orientation(orientation),
+                RootMotion(Transform3D::IDENTITY),
+                Velocity(Vector3::ZERO),
+                AimBlend(aim_blend),
+            ));
+            e.insert((
+                RobotIntents::default(),
+                RaycastAnswers::default(),
+                PendingTrauma::default(),
+                RemovalTimer::default(),
+                PendingRobotFx::default(),
+                PendingRobotHits::default(),
+            ));
+            // v2 `:119-123`: a robot that is dead at `ready` is never ticked nor advanced.
+            if dead {
+                e.insert(Dead);
+            }
+            // v2 `:138-141`: `test_shoot` also fires `shoot()` on the first physics step.
+            if test_shoot {
+                e.insert(ShootRequested);
+            }
+            if simulates {
+                e.insert(Simulates);
+            }
+        }
     }
     world.non_send_mut::<NodeHandles>().by_entity.insert(entity, handles);
 }
@@ -280,6 +416,11 @@ fn sync_out_remove(
                 Handles::Blast { mut root, .. } => root.queue_free(),
                 // No player is ever marked `Remove` by V3-B; the arm keeps the match exhaustive.
                 Handles::Player(mut p) => p.root.queue_free(),
+                // The bullet on the server (`destroy`), the parts on every peer (0.2 s after
+                // `destroy`), the robot on the server (10 s after death) — specs/013.
+                Handles::Bullet(mut p) => p.root.queue_free(),
+                Handles::Part(mut p) => p.root.queue_free(),
+                Handles::Robot(mut p) => p.root.queue_free(),
             }
         }
         index.remove_entity(entity);

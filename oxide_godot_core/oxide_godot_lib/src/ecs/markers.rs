@@ -3,11 +3,17 @@
 
 use bevy_ecs::prelude::{Component, Resource};
 use godot::builtin::{Quaternion, Transform3D, Vector2, Vector3};
+use godot::obj::InstanceId;
 
-use super::event::PlayerFx;
+use super::event::{BulletFx, PartFx, PlayerFx, RobotFx};
+use super::timer::Timer;
+use crate::bullet::pure::BulletState;
+use crate::hittable::HitKind;
 use crate::player::model::{AnimPlan, InputFrame};
 use crate::player::Animations;
 use crate::player_input::model::{AimState, CameraCue, InputSnapshot};
+use crate::red_robot::model::RobotCounters;
+use crate::red_robot::State;
 
 /// Written by `EcsWorld::process` before the frame schedule runs; systems never read the engine's
 /// delta themselves.
@@ -191,3 +197,164 @@ pub struct StartRotation(pub Vector3);
 /// no `ShakeOffset`, no `EngineQuery` member).
 #[derive(Component, Clone, Copy, Default)]
 pub struct ShakePending(pub Option<(f32, f64)>);
+
+// ---- The enemy entities (specs/013 data-model.md "Components") -----------------------------
+
+// bullet (bullet/system.rs)
+
+/// Selects bullet entities in the sync systems.
+#[derive(Component)]
+pub struct BulletTag;
+/// The pure state (v2 `bullet.rs:14-18`, `:68`), wrapped.
+#[derive(Component, Clone, Copy, PartialEq)]
+pub struct BulletStateC(pub BulletState);
+/// `basis.col_c()` read at `SyncIn` (v2 `bullet.rs:112`).
+#[derive(Component, Clone, Copy)]
+pub struct BulletBasisZ(pub Vector3);
+/// `move_and_collide`'s answer (v2 `bullet.rs:114-116`), resolved in `EngineQueryMove`.
+#[derive(Component, Clone, Copy, Default)]
+pub struct Collided {
+    pub hit: Option<HitKind>,
+    pub collided: bool,
+}
+/// The bullet tick's decisions (v2 `bullet.rs:98-131`).
+#[derive(Component, Clone, Copy, Default)]
+pub struct BulletIntents {
+    pub active: bool,
+    pub explode: bool,
+    pub hit: Option<HitKind>,
+    pub disable_collision: bool,
+}
+/// Remote-peer RPC effects in arrival order, consumed by the frame `SyncOut`.
+#[derive(Component, Default)]
+pub struct PendingBulletFx(pub Vec<BulletFx>);
+
+// part (part/system.rs)
+
+/// Selects part entities in the sync systems.
+#[derive(Component)]
+pub struct PartTag;
+/// The part's lifecycle (v2 `part.rs:162-215`): attached until the robot dies, then the wait
+/// timer, the fade, and the 0.2 s before the node is freed.
+#[derive(Component, Debug, PartialEq)]
+pub enum PartPhase {
+    Attached,
+    Waiting(Timer),
+    Fading { counter: f32 },
+    Destroyed(Timer),
+}
+/// The three exports (v2 `part.rs:86-94`).
+#[derive(Component, Clone, Copy)]
+pub struct PartLifetimes {
+    pub lifetime: f32,
+    pub lifetime_random: f32,
+    pub disappearing_time: f32,
+}
+/// The frame's decisions (v2 `part.rs:139-144`).
+#[derive(Component, Clone, Copy, Default)]
+pub struct PartIntents {
+    pub fade: Option<f32>,
+    pub destroy: bool,
+}
+/// Remote-peer RPC effects in arrival order.
+#[derive(Component, Default)]
+pub struct PendingPartFx(pub Vec<PartFx>);
+
+// robot (red_robot/system.rs)
+
+/// Selects robot entities in the sync systems.
+#[derive(Component)]
+pub struct RobotTag;
+/// v2 `red_robot.rs:47`: the tick runs `Without<Dead>`; inserted at registration when the scene
+/// says so and by the death branch.
+#[derive(Component)]
+pub struct Dead;
+/// v2 `red_robot.rs:45`.
+#[derive(Component, Clone, Copy, PartialEq)]
+pub struct RobotState(pub State);
+/// v2 `red_robot.rs:42`.
+#[derive(Component, Clone, Copy)]
+pub struct Health(pub i32);
+/// v2 `red_robot.rs:39`.
+#[derive(Component, Clone, Copy)]
+pub struct TargetPosition(pub Vector3);
+/// v2 `red_robot.rs:49-55` (`aim_preparing` inside), the model's struct wrapped.
+#[derive(Component, Clone, Copy)]
+pub struct RobotCountersC(pub RobotCounters);
+/// v2 `red_robot.rs:58` — an id, never a `Gd`.
+#[derive(Component, Clone, Copy)]
+pub struct TrackedPlayer(pub Option<InstanceId>);
+/// v2 `red_robot.rs:482-485`'s tree `get`, now a component (spec FR-016).
+#[derive(Component, Clone, Copy)]
+pub struct AimBlend(pub Vector2);
+/// v2 `red_robot.rs:35-36`, `:335-338`: the flag the next fixed run's `robot_decide` consumes.
+#[derive(Component)]
+pub struct ShootRequested;
+/// The robot's `SyncIn` snapshot (v2 `red_robot.rs:153`, `:164`, `:180`, `:199-202`, `:249-250`,
+/// `:478`, `:493`).
+#[derive(Component, Clone, Copy)]
+pub struct RobotFrame {
+    pub global_transform: Transform3D,
+    pub gravity: Vector3,
+    pub velocity: Vector3,
+    pub player_origin: Option<Vector3>,
+    pub ray_from: Transform3D,
+    pub ray_mesh: Transform3D,
+    pub ray_mesh_z: f32,
+    pub laser_colliding: bool,
+    pub laser_point: Vector3,
+}
+/// The non-`Simulates` replay input (v2 `red_robot.rs:134`).
+#[derive(Component, Clone, Copy)]
+pub struct ReplayRobot {
+    pub state: State,
+    pub target_position: Vector3,
+    pub aim_preparing: f32,
+}
+/// v2 `animate`'s tree writes (`red_robot.rs:469-488`): the transition request and, when the
+/// target is set, `(aiming/blend_amount, aim/blend_position)`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AnimDecision {
+    pub request: &'static str,
+    pub aim: Option<(f32, Vector2)>,
+}
+/// The robot tick's decisions, read by `robot_query`, `move_robot` and `sync_out_robot`.
+#[derive(Component, Clone, Default)]
+pub struct RobotIntents {
+    pub idle_branch: bool,
+    pub raycast: Option<(Vector3, Vector3)>,
+    pub shoot: bool,
+    pub clip: Option<f32>,
+    pub play_shoot: bool,
+    pub anim: Option<AnimDecision>,
+    pub hit: bool,
+    pub just_died: bool,
+}
+/// The shoot raycast's answer (v2 `red_robot.rs:405-409`, `:428-432`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShotResult {
+    pub max_dist: f32,
+    pub hit: Option<(Vector3, Option<InstanceId>)>,
+}
+/// `robot_query`'s answers, consumed by `robot_step_and_animate` and `sync_out_robot`.
+#[derive(Component, Clone, Copy, Default)]
+pub struct RaycastAnswers {
+    pub sees_player: Option<bool>,
+    pub shot: Option<ShotResult>,
+}
+/// v2 `red_robot.rs:437-453`'s `SceneTreeTimer(trauma_delay)`, stepped by the frame schedule;
+/// the id is the player to shake.
+#[derive(Component, Default)]
+pub struct PendingTrauma(pub Option<(Timer, InstanceId)>);
+/// v2 `red_robot.rs:309-326`'s `SceneTreeTimer(removal_delay)`, stepped by the frame schedule.
+#[derive(Component, Default)]
+pub struct RemovalTimer(pub Option<Timer>);
+/// Set by `robot_timers` on expiry; `sync_out_robot_frame` pushes `AddTrauma` and removes it.
+#[derive(Component)]
+pub struct TraumaDue(pub InstanceId);
+/// Remote-peer RPC effects in arrival order.
+#[derive(Component, Default)]
+pub struct PendingRobotFx(pub Vec<RobotFx>);
+/// Remote-peer `hit` count since the last frame run (the client's own `hit_step` path).
+#[derive(Component, Default)]
+pub struct PendingRobotHits(pub u32);

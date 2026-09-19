@@ -9,7 +9,7 @@ mod player_input;
 mod player;
 mod bullet;
 mod door;
-mod hittable;
+pub mod hittable;
 mod part;
 mod red_robot;
 mod flying_forklift;
