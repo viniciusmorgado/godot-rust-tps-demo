@@ -1,34 +1,34 @@
 <!--
 SYNC IMPACT REPORT
 
-Version change: 1.5.0 → 1.5.1 (PATCH — correction of a wrong justification in Principle I,
-v3 block, "Dependency policy" bullet; no rule added, removed or redefined. The obligation is
-unchanged: `bevy_ecs` is still built without `multi_threaded`. Only the stated REASON is fixed.)
+Version change: 1.5.1 → 1.5.2 (PATCH — Principle I, v3 block, "Scope" bullet corrected against
+its own criterion: `flying_forklift` moves from the list of modules rewritten in ECS to the list
+of modules that stay as v2 code. The bullet itself declares that moving a module between the
+lists is a PATCH amendment. No rule added, removed or redefined.)
 
 Principles:
-  I. Three-Phase Port — v3 "Dependency policy" bullet's parenthesis corrected. It claimed that
-     "gdext is built without `experimental-threads`"; the workspace has had that feature enabled
-     since v1 milestone D (`oxide_godot_core/Cargo.toml:7`, needed for
-     `ResourceLoader::load_threaded_*`). Replaced with the accurate reason: the Godot API is
-     main-thread only, and `experimental-threads` only widens gdext's own API surface — it does
-     not make the engine thread-safe nor `Gd<T>` `Send` (`RawGd.obj: *mut T`, godot-core 0.5.5
-     `src/obj/raw_gd.rs:32`, has no `Send`/`Sync` impl under any feature).
+  I. Three-Phase Port — v3 "Scope" bullet: the ECS-rewritten list becomes the nine modules
+     `player`, `player_input`, `camera_noise_shake`, `bullet`, `part`, `part_disappear`, `blast`,
+     `red_robot`, `door`; `flying_forklift` joins the stay-as-v2 list with the reason "(one-shot
+     `ready`: picks a model with `randf()` and applies the shadow setting; no per-tick state —
+     fails the bullet's own criterion)".
+  II. Verifiable Port Cycle — unchanged.
+  III. Interface vs. Implementation (including "ECS shape (v3)") — unchanged.
 
-Sections: none changed (Governance, versioning policy, Ratified and Last Amended dates are
-  untouched — the amendment happens on the same day as 1.5.0).
+Motivating case: V3-C scoping on 2026-09-18. `flying_forklift.rs:46-63` is the class's whole
+`ICharacterBody3D` impl and its only callback is `ready` (`:48`): it applies the shadow setting
+to its spot light and picks one of three models with `randf()`; the class has no `process`,
+no `physics_process`, no signal or RPC handler and no per-tick state, so there is nothing a
+system could operate on. The bullet's own criterion ("a module enters the ECS when it has
+per-tick state that systems can operate on together") excludes it.
 
-Motivating case: found while writing `specs/011-v3-ecs-core-leaves/spec.md` (Assumptions) on
-  2026-09-18, which flagged the wording for a PATCH amendment instead of correcting it in place.
-  Verified in `oxide_godot_core/Cargo.toml:7` and godot-core 0.5.5 `src/obj/raw_gd.rs:32`.
+Sections: none changed (Governance, versioning policy, Ratified date unchanged; Last Amended
+stays 2026-09-18 — same day as 1.5.0 and 1.5.1).
 
-Templates checked:
-  - .specify/templates/plan-template.md: its "Constitution Check" gate resolves dynamically from
-    the live constitution at plan time; no static edit required, and none made.
+Templates: no template edit needed (the plan template's Constitution Check resolves the
+principles dynamically).
 
-Follow-up required outside this command: none (the spec's Assumptions bullet that flagged the
-  wording may be shortened at plan time to cite 1.5.1; not required).
-
-Deferred TODOs: none — no placeholder token left unresolved.
+Follow-ups outside this command: none. Deferred TODOs: none.
 -->
 
 # Oxide Godot Constitution
@@ -61,7 +61,7 @@ This project is the port of the Godot TPS Demo (GDScript) to Rust via godot-rust
 - v3 has TWO objectives, both mandatory in the final result of every user story: (1) the two pillars of v2 are KEPT — idiomatic Rust leaning on the type system, and the interface/implementation separation of Principle III (engine-facing glue thin, domain logic pure); (2) the ECS layer sits OVER the nodes: gameplay logic lives in systems scheduled by one World/one Schedule; no gameplay node runs per-frame logic of its own.
 - Explicit NON-objectives, recorded so they are not re-litigated: cache locality / data-layout performance is NOT a goal of v3 and MUST NOT be used to justify a design choice; no engine subsystem is replaced (physics, rendering, animation, multiplayer replication, scene instancing remain Godot's); no full `bevy` App, no `godot-bevy`, no other engine brought into the project.
 - Dependency policy: `bevy_ecs` only, pinned to a stable release line (no `-rc`), with `default-features = false, features = ["std"]` — no `bevy_reflect`, no `async_executor`, no `multi_threaded` (the Godot API is main-thread only; gdext's `experimental-threads` feature — enabled in this workspace since v1 milestone D for `ResourceLoader::load_threaded_*` — only widens gdext's own API surface and does NOT make the engine thread-safe or `Gd<T>` `Send`: `RawGd.obj: *mut T` has no `Send`/`Sync` impl under any feature). Any additional supporting crate requires justification in the spec that introduces it and is listed there.
-- Scope (fixed by this constitution; moving a module between the lists is a PATCH amendment): modules rewritten in ECS — `player`, `player_input`, `camera_noise_shake`, `bullet`, `part`, `part_disappear`, `blast`, `red_robot`, `door`, `flying_forklift`. Modules that stay as v2 code, untouched except for the calls required to integrate with the ECS layer — `settings` (configuration read once), `menu` (UI), `main_scene` (scene-tree manager), `level` (one-shot GI setup and prefab spawner — it keeps calling `instantiate`; the spawned node's bridge registers the entity), `debug_label` (engine metrics overlay). Criterion: a module enters the ECS when it has per-tick state that systems can operate on together; configuration, UI and scene-tree infrastructure do not.
+- Scope (fixed by this constitution; moving a module between the lists is a PATCH amendment): modules rewritten in ECS — `player`, `player_input`, `camera_noise_shake`, `bullet`, `part`, `part_disappear`, `blast`, `red_robot`, `door`. Modules that stay as v2 code, untouched except for the calls required to integrate with the ECS layer — `settings` (configuration read once), `menu` (UI), `main_scene` (scene-tree manager), `level` (one-shot GI setup and prefab spawner — it keeps calling `instantiate`; the spawned node's bridge registers the entity), `debug_label` (engine metrics overlay), `flying_forklift` (one-shot `ready`: picks a model with `randf()` and applies the shadow setting; no per-tick state — fails the bullet's own criterion). Criterion: a module enters the ECS when it has per-tick state that systems can operate on together; configuration, UI and scene-tree infrastructure do not.
 - Behavioral parity: the baseline of v3 is branch `v2` (which already contains the v1 and v2 bug fixes). Each user story ends with observable behavior identical to `v2`, verified by the same means (headless validation, parity harness run on a `v2` worktree and on `v3` with separate user-data directories and seeded RNG, user visual checkpoints). The ONLY behavior changes allowed are open items of `docs/v2-backlog.md` explicitly listed in the user story's spec (marked done in that file in the closing commit) — no separate v3 backlog is created. Timing shifts caused by moving `godot::task`-based awaits to tick-driven timer components count as behavior changes and are allowed only when listed in the spec with the measured difference.
 - Preserved surfaces (Principle II still applies): scene files remain the prefabs; every `#[export]`/`#[var]` referenced by the scenes and every `SceneReplicationConfig` property keeps its name and a compatible type as a projection of the components; `#[func]`/`#[rpc]`/`#[signal]` names referenced by scenes stay.
 - Where the ECS abstraction touches the engine (physics queries mid-tick, root motion from `AnimationTree`, replication through node properties, scene instancing), the touch point MUST be recorded in `docs/v3-tradeoffs.md` (module, what the engine owns, why the ECS cannot hide it, how the sync layer handles it) in the same commit — same role `docs/api-gaps.md` had in v2. The api-gap rule of v2 continues to apply unchanged.
@@ -150,4 +150,4 @@ This constitution takes precedence over any other practice, convention, document
 
 **Compliance review**: every spec, plan and task MUST explicitly declare the phase (v1, v2 or v3) it belongs to, per Principle I. Planning and code reviews MUST verify that the work respects the restrictions of the declared phase — in particular, that no abstraction, refactoring or optimization is introduced during v1. Reviews MUST likewise verify compliance with Principle II (Verifiable Port Cycle) in every GDScript script port. Work that violates the current phase must be rejected or redirected to the correct phase's backlog. Port reviews MUST further confirm that the dependency order was respected, that no exported or replicated property name was changed, and that noticed improvements were recorded in `docs/v2-backlog.md`. Reviews MUST confirm that every bug fix in v1 meets the four requirements of Principle I (spec, isolation in code, commit, `docs/upstream-bugs.md`) and that no improvement was introduced under the label of a fix. v2 reviews MUST additionally verify compliance with Principle III (Interface vs. Implementation) — that `I<Base>` trait impls and `#[godot_api] impl X` blocks contain only glue, that pure logic carries unit tests, that no per-frame or per-event node/resource lookup was introduced, and that no dynamic access appears outside the residual cases listed in the touching spec — that behavioral parity with `v1` was evidenced (headless validation, parity harness run on both branches, user visual checkpoints), and that every `docs/v2-backlog.md` item a spec claims to close was actually closed and marked done in that file. v3 reviews MUST additionally verify that no gameplay bridge has `process`/`physics_process`, that no engine callback borrows the World, that engine access appears only in `SyncIn`/`EngineQuery`/`SyncOut` systems and bridges, that each `EngineQuery` set and each engine touch point is recorded in `docs/v3-tradeoffs.md`, that the excluded modules (`settings`, `menu`, `main_scene`, `level`, `debug_label`) were not rewritten in ECS, that parity with `v2` was evidenced (headless, seeded harness on both trees, visual checkpoints), and that the only behavior changes are open `docs/v2-backlog.md` items listed in the spec.
 
-**Version**: 1.5.1 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-18
+**Version**: 1.5.2 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-18
