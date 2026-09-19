@@ -86,6 +86,7 @@ pub fn build_frame() -> Schedule {
     schedule.configure_sets((Phase::SyncIn, Phase::Gameplay, Phase::EngineQuery, Phase::SyncOut).chain());
     schedule.add_systems(crate::part_disappear::system::advance.in_set(Phase::Gameplay));
     schedule.add_systems(crate::player_input::system::input_decide.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::camera_noise_shake::system::shake_decide.in_set(Phase::Gameplay));
     schedule
 }
 

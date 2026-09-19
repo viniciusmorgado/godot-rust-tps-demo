@@ -388,7 +388,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
 
 ### Commit 3 — `camera_noise_shake/system.rs`, `camera_noise_shake/sync.rs`, `camera_noise_shake.rs`, `player/sync.rs` (`apply_player_fx`, trauma component), `player.rs` (handlers push only), `ecs.rs`, `docs/v3-tradeoffs.md`
 
-- [ ] T020 [P] [US3] Create `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake/system.rs`
+- [x] T020 [P] [US3] Create `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake/system.rs`
   (pure; `pub(crate) mod system;`; `model.rs` untouched): `pub fn shake_decide(tuning:
   Res<Tuning<CameraShakeTuning>>, dt: Res<FrameDelta>, q: Query<(&mut Trauma, &mut ShakeTime, &mut
   ShakePending), With<PlayerTag>>)` — if `trauma.0 > 0.0` (v2 `camera_noise_shake.rs:45`):
@@ -397,7 +397,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   Tests: `shake_runs_only_while_trauma_positive` (`Trauma(0)` → `None`; `Trauma(0.5)` → `Some`),
   `decay_and_time_advance_in_v2_order` (values equal a direct `decay`/`advance_time`/`shake`
   chain). Verification: 2 tests pass; no `godot::classes`.
-- [ ] T021 [US3] Create `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake/sync.rs` (glue;
+- [x] T021 [US3] Create `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake/sync.rs` (glue;
   `pub(crate) mod sync;`): ONE system `fn sync_out_shake(tuning: Res<Tuning<CameraShakeTuning>>,
   handles: NonSendMut<NodeHandles>, q: Query<(Entity, &StartRotation, &ShakePending)>)`
   (`SyncOut`): on `Some((shake, time))` → `samples = [noise[0].get_noise_1d(time as f32),
@@ -414,13 +414,13 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   `set_emitting(true)`, `fire_cooldown.start()`, `snd_shoot.play()` (`:147-152`; its trauma was
   applied at drain time). Depends on T020, T005. Verification: compiles; `grep -n 'EngineQuery'
   camera_noise_shake/sync.rs` empty.
-- [ ] T022 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake.rs` as the
+- [x] T022 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/camera_noise_shake.rs` as the
   camera sub-bridge: keep the three `FastNoiseLite` fields and `#[init(val = (randi() as i32))]
   noise_seed` (`:17-24`, same init call order), `start_rotation`, `ready` (`:29-42` verbatim), the
   two accessors of T013; ADD `root_id: OnReady<InstanceId>` via `get_owner()`; DELETE `trauma`,
   `time`, `process` (`:44-59`), `add_trauma` (`:64-67`). Verification: `grep -n 'fn process\|
   add_trauma\|trauma' camera_noise_shake.rs` empty (except the doc comment).
-- [ ] T023 [US3] In `oxide_godot_core/oxide_godot_lib/src/player.rs`: `hit` → `queue::push(
+- [x] T023 [US3] In `oxide_godot_core/oxide_godot_lib/src/player.rs`: `hit` → `queue::push(
   InboundEvent::AddTrauma { root_id: self.base().instance_id(), amount: 0.75 })` (`:157-159`);
   `add_camera_shake_trauma(&mut self, amount: f64)` → `queue::push(InboundEvent::AddTrauma { …,
   amount })` (`:161-165`; `red_robot.rs:452` unchanged); the v2 typed call removed. In
@@ -429,15 +429,15 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   `Res<Tuning<CameraShakeTuning>>` to its parameters (this commit owns the component path).
   Depends on T021, T022. Verification: `grep -n 'CameraNoiseShake\|add_trauma' player.rs
   player/sync.rs` shows only the `cast::<CameraNoiseShake>()` in `ready` and the model call.
-- [ ] T024 [US3] In `ecs.rs`'s `add_engine_systems` register (frame): `camera_noise_shake::sync::
+- [x] T024 [US3] In `ecs.rs`'s `add_engine_systems` register (frame): `camera_noise_shake::sync::
   sync_out_shake.in_set(Phase::SyncOut).before(sync_out_remove)`,
   `player::sync::apply_player_fx.in_set(Phase::SyncOut).before(sync_out_remove)`; in
   `ecs/setup.rs::build_frame`: `camera_noise_shake::system::shake_decide.in_set(Phase::Gameplay)`.
   Depends on T021. Verification: setup tests pass.
-- [ ] T025 [US3] Append to `docs/v3-tradeoffs.md` the row: noise samples (`sync_out_shake`, a
+- [x] T025 [US3] Append to `docs/v3-tradeoffs.md` the row: noise samples (`sync_out_shake`, a
   sync-only pair — the engine owns `FastNoiseLite`; three reads per frame while `Trauma > 0`, R8).
   Verification: 14 rows.
-- [ ] T026 [US3] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
+- [x] T026 [US3] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
   warnings; **179** = 177 + 2 (shake); paste the line. Headless import, `main.tscn`, `level.tscn`
   clean. Harness on both trees as T019: case (d) camera shake (`player.hit()` at frame 30; per
   frame `Camera3D.rotation`), and RE-RUN (b) and (c) (the trauma path changed: `Shoot` trauma at

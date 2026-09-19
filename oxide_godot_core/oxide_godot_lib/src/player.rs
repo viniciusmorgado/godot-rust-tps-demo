@@ -176,16 +176,17 @@ impl Player {
         self.push_fx(PlayerFx::Shoot);
     }
 
+    // `hit` (v2 `player.rs:157-159`) only ever added 0.75 of trauma: it pushes `AddTrauma`,
+    // which the drain applies to the entity's `Trauma` before the next schedule run.
     #[rpc(authority, call_local, unreliable)]
     fn hit(&mut self) {
         self.add_camera_shake_trauma(0.75);
     }
 
-    // Commit 2 keeps v2's typed trauma path (research R10); commit 3 pushes `AddTrauma`.
+    // Also called typed by `red_robot.rs` (`pub(crate)`, spec FR-004).
     #[rpc(authority, call_local, unreliable)]
     pub(crate) fn add_camera_shake_trauma(&mut self, amount: f64) {
-        let camera = self.player_input.bind().camera_camera.clone();
-        camera.cast::<CameraNoiseShake>().bind_mut().add_trauma(amount);
+        queue::push(InboundEvent::AddTrauma { root_id: self.base().instance_id(), amount });
     }
 }
 

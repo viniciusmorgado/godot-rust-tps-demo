@@ -389,4 +389,13 @@ pub fn add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule) {
     frame.add_systems(
         crate::player_input::sync::sync_out_input.in_set(Phase::SyncOut).before(sync_out_remove),
     );
+    // The camera shake (sync-only pair) and the remote-peer RPC effects. No ordering among the
+    // frame `SyncOut` systems is needed: `sync_out_input` writes the input node, `color_rect`
+    // and `camera_anim`; `apply_player_fx` writes the `Player` node's `current_animation`, the
+    // tree, the sounds, the particles and `fire_cooldown`; `sync_out_shake` writes the camera's
+    // rotation — disjoint nodes and disjoint components.
+    frame.add_systems(
+        crate::camera_noise_shake::sync::sync_out_shake.in_set(Phase::SyncOut).before(sync_out_remove),
+    );
+    frame.add_systems(crate::player::sync::apply_player_fx.in_set(Phase::SyncOut).before(sync_out_remove));
 }

@@ -10,11 +10,12 @@ use godot::prelude::*;
 use super::Animations;
 use super::model::{AnimPlan, InputFrame};
 use super::system::replay_plan;
-use crate::camera_noise_shake::CameraNoiseShake;
+use crate::camera_noise_shake::model::{CameraShakeTuning, add_trauma};
+use crate::ecs::event::PlayerFx;
 use crate::ecs::markers::{
     BodyState, CurrentAnimation, FixedDelta, InitialPosition, InputFrameC, JumpQueued, Motion,
-    Orientation, OrientTarget, PlayerTag, ReplayState, RootMotion, Simulates, TickIntents, Tuning,
-    Velocity,
+    Orientation, OrientTarget, PendingFx, PlayerTag, ReplayState, RootMotion, Simulates,
+    TickIntents, Trauma, Tuning, Velocity,
 };
 use crate::ecs::{Handles, NodeHandles};
 use crate::player::model::PlayerTuning;
@@ -208,6 +209,7 @@ type SyncOutPlayerQuery<'w, 's> = Query<
         &'static Motion,
         &'static mut CurrentAnimation,
         &'static TickIntents,
+        &'static mut Trauma,
         Has<Simulates>,
         Option<&'static ReplayState>,
     ),
@@ -225,11 +227,21 @@ type SyncOutPlayerQuery<'w, 's> = Query<
 /// research R1 option (B)), so this is where v2's child processing happened.
 pub fn sync_out_player(
     dt: Res<FixedDelta>,
+    shake_tuning: Res<Tuning<CameraShakeTuning>>,
     mut handles: NonSendMut<NodeHandles>,
     mut players: SyncOutPlayerQuery,
 ) {
-    for (entity, orientation, initial_position, motion, mut current_animation, intents, simulates, replay) in
-        &mut players
+    for (
+        entity,
+        orientation,
+        initial_position,
+        motion,
+        mut current_animation,
+        intents,
+        mut trauma,
+        simulates,
+        replay,
+    ) in &mut players
     {
         let Some(Handles::Player(p)) = handles.by_entity.get_mut(&entity) else {
             continue;
@@ -272,9 +284,9 @@ pub fn sync_out_player(
                 p.muzzle_particle.set_emitting(true);
                 p.fire_cooldown.start();
                 p.snd_shoot.play();
-                // Commit 2 keeps v2's trauma path (research R10); commit 3 writes the `Trauma`
-                // component instead.
-                p.camera.clone().cast::<CameraNoiseShake>().bind_mut().add_trauma(0.35);
+                // v2 `:153` → `camera_noise_shake.rs:64-67`: the trauma lives on the entity now;
+                // this frame's `shake_decide` sees it.
+                trauma.0 = add_trauma(trauma.0, 0.35, &shake_tuning.0);
             }
 
             // Remote peers only (`call_remote`): no handler runs on this peer.
@@ -296,5 +308,53 @@ pub fn sync_out_player(
             apply_anim(&mut p.anim_tree, plan);
         }
         p.anim_tree.advance(dt.0);
+    }
+}
+
+/// `SyncOut`, FRAME schedule, non-`Simulates` entities only (FR-015; option (b)): the
+/// `jump`/`land`/`shoot` RPC handlers of a REMOTE peer, applied in arrival order exactly as v2's
+/// handlers did (`player.rs:134-154`): `Jump`/`Land` write the animation (the tree parameters
+/// through `apply_anim` and the node's `current_animation` field, as `apply_anim` set
+/// `self.current_animation`, `:172-177`) and play the sound; `Shoot` restarts both particles,
+/// starts the cooldown and plays the sound — its trauma was applied by the drain
+/// (`ecs/apply.rs`), so this frame's `shake_decide` already saw it. The `bind_mut()` guard is
+/// dropped before the sound plays.
+pub fn apply_player_fx(
+    mut handles: NonSendMut<NodeHandles>,
+    mut players: Query<(Entity, &mut PendingFx), Without<Simulates>>,
+) {
+    for (entity, mut pending) in &mut players {
+        if pending.0.is_empty() {
+            continue;
+        }
+        let Some(Handles::Player(p)) = handles.by_entity.get_mut(&entity) else {
+            continue;
+        };
+        for fx in pending.0.drain(..) {
+            match fx {
+                PlayerFx::Jump => {
+                    apply_anim(&mut p.anim_tree, AnimPlan::JumpUp);
+                    {
+                        p.root.bind_mut().current_animation = Animations::JumpUp;
+                    }
+                    p.snd_jump.play();
+                }
+                PlayerFx::Land => {
+                    apply_anim(&mut p.anim_tree, AnimPlan::JumpDown);
+                    {
+                        p.root.bind_mut().current_animation = Animations::JumpDown;
+                    }
+                    p.snd_land.play();
+                }
+                PlayerFx::Shoot => {
+                    p.shoot_particle.restart();
+                    p.shoot_particle.set_emitting(true);
+                    p.muzzle_particle.restart();
+                    p.muzzle_particle.set_emitting(true);
+                    p.fire_cooldown.start();
+                    p.snd_shoot.play();
+                }
+            }
+        }
     }
 }
