@@ -573,7 +573,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   robot (hit reactions and sound per hit, parts fly and fade, puffs, the robot gone after 10 s and
   respawned by `level`); bullets exploding on walls and on expiry — all as in v2; ask whether
   backlog #29's FPS observation persists and record the answer. Do not proceed until confirmed.
-- [ ] T027 [US3] 🛑 **STOP 2 — user visual checkpoint (2), multiplayer on one machine**. Tell the
+- [x] T027 [US3] 🛑 **STOP 2 — user visual checkpoint (2), multiplayer on one machine**. Tell the
   user explicitly: "Checkpoint (2): please test multiplayer now" — host in one instance, join
   from a second through the demo's menu; the client sees the host's robots move, aim and shoot and
   take hit reactions; parts fly, fade and puff on the client; a client's bullet kills a robot and
