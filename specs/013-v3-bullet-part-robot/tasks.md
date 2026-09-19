@@ -567,7 +567,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   with a body (gate, headless, the four diffs, the R1 re-run lines of T023, deviations): `part +
   red_robot: bridges, part phase machine on the frame schedule, robot seven-set tick with same-run
   hit (RobotHitLocal), robot AnimationTree MANUAL + advance (R1 option B)`.
-- [ ] T026 [US3] 🛑 **STOP 1 — user visual checkpoint (1), single player** (spec SC-005, FR-031).
+- [x] T026 [US3] 🛑 **STOP 1 — user visual checkpoint (1), single player** (spec SC-005, FR-031).
   Tell the user explicitly: "Checkpoint (1): please test now" — a robot approaches, aims and fires
   the laser (clip, ember, blast); being hit by the laser (camera shake after 0.1 s); killing a
   robot (hit reactions and sound per hit, parts fly and fade, puffs, the robot gone after 10 s and
