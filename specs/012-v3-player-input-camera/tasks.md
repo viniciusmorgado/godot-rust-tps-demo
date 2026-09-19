@@ -488,7 +488,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
 - [x] T032 Final gates + headless (`cargo build && cargo clippy && cargo test` → **179**; import;
   `main.tscn`; `level.tscn`); commit (R10 row 4): `CLAUDE.md: v3 sub-bridge pattern +
   two-EngineQuery tick; spec: measured timing differences filled; tradeoffs complete`.
-- [ ] T033 Cleanup and count: `git worktree remove ../oxide-godot-v2 && git worktree prune`;
+- [x] T033 Cleanup and count: `git worktree remove ../oxide-godot-v2 && git worktree prune`;
   `find . -name 'zz_*' -not -path '*/specs/*'` returns nothing; `git status` clean;
   `git log --oneline <tasks-commit>..HEAD` where `<tasks-commit>` is the commit that added this
   file (`git log --format=%h --diff-filter=A -- specs/012-v3-player-input-camera/tasks.md`) —
