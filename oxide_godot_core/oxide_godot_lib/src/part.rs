@@ -1,15 +1,25 @@
+//! The part's bridge (constitution 1.5.2 "ECS shape (v3)"; specs/013 contracts
+//! enemy-entities.md §1): a scene child of the robot with its own class and synchronizer, so it
+//! registers ITSELF in `ready` (it outlives the robot's death sequence, replicates and is freed
+//! independently), unregisters in `exit_tree`, and its remote `destroy` handler pushes. No
+//! per-frame logic: the phase machine is `part/system.rs` (pure) + `part/sync.rs` (engine).
+//! `explode` is gone — the robot's `SyncOut` explodes the parts directly (research R5).
+
 use godot::classes::{
-    CollisionShape3D, CpuParticles3D, IRigidBody3D, Material, MeshInstance3D,
-    MultiplayerSynchronizer, Node, Os, PackedScene, RigidBody3D, ShaderMaterial,
+    CollisionShape3D, IRigidBody3D, Material, MeshInstance3D, MultiplayerSynchronizer, Node, Os,
+    PackedScene, RigidBody3D, ShaderMaterial,
 };
-use godot::global::randf;
 use godot::prelude::*;
 
-use pure::{fade_curve, random_angular_velocity, should_destroy, wait_time};
+use crate::ecs::event::{InboundEvent, Initial, PartFx};
+use crate::ecs::{Handles, PartHandles, queue};
+
+pub(crate) mod sync;
+pub(crate) mod system;
 
 /// The fade/lifetime math (`v1`: `part.rs:54,57,90-93,95`) — all glam/std, no engine call,
 /// verified against the 1.4.1 purity rule (research.md R1).
-mod pure {
+pub(crate) mod pure {
     use godot::prelude::*;
 
     /// v1: `part.rs:54`.
@@ -96,8 +106,6 @@ pub struct Part {
     #[var(set = set_fade_value)]
     fade_value: f32,
 
-    disappearing_counter: f32,
-
     #[init(node = "MultiplayerSynchronizer")]
     synchronizer: OnReady<Gd<MultiplayerSynchronizer>>,
     #[init(node = "Col1")]
@@ -120,8 +128,9 @@ pub struct Part {
 
 #[godot_api]
 impl IRigidBody3D for Part {
+    /// v2 `part.rs:123-136` minus `set_process(false)` (there is no callback), then the
+    /// registration with the three exports and `simulates = is_server()` (`:167`).
     fn ready(&mut self) {
-        self.base_mut().set_process(false);
         if !Os::singleton().has_feature("dedicated_server") {
             let mut mesh_inst = self.model_mesh.clone();
             let mesh = mesh_inst.get_mesh().unwrap();
@@ -133,23 +142,37 @@ impl IRigidBody3D for Part {
             mat.set_next_pass(&next_pass);
             self.material = Some(mat);
         }
+
+        let simulates = self.base().get_multiplayer().unwrap().is_server();
+        queue::push(InboundEvent::Register {
+            id: self.base().instance_id(),
+            handles: Handles::Part(Box::new(PartHandles {
+                root: self.to_gd(),
+                synchronizer: self.synchronizer.clone(),
+                col1: self.col1.clone(),
+                col2: self.col2.clone(),
+                puff_scene: self.part_disappear_scene.clone(),
+            })),
+            initial: Initial::Part {
+                lifetime: self.lifetime,
+                lifetime_random: self.lifetime_random,
+                disappearing_time: self.disappearing_time,
+                simulates,
+            },
+        });
     }
 
-    fn process(&mut self, delta: f64) {
-        let fade = fade_curve(self.disappearing_counter, self.disappearing_time);
-        self.set_fade_value(fade);
-        self.disappearing_counter += delta as f32;
-        if should_destroy(self.disappearing_counter, self.disappearing_time) {
-            self.base_mut().rpc("destroy", &[]);
-            self.base_mut().set_process(false);
-        }
+    fn exit_tree(&mut self) {
+        queue::push(InboundEvent::Unregister { id: self.base().instance_id() });
     }
 }
 
 #[godot_api]
 impl Part {
+    /// The projection setter (`fade_value`): written by `sync_out_part` on the server and by the
+    /// engine's replication on the clients — the shader write stays inside the bridge.
     #[func]
-    fn set_fade_value(&mut self, value: f32) {
+    pub(crate) fn set_fade_value(&mut self, value: f32) {
         self.fade_value = value;
         if let Some(mat) = &self.material {
             mat.get_next_pass()
@@ -159,75 +182,10 @@ impl Part {
         }
     }
 
-    #[func]
-    pub(crate) fn explode(&mut self) {
-        // Start synching.
-        self.synchronizer.set_visibility_public(true);
-        self.base_mut().set_freeze_enabled(false);
-        if !self.base().get_multiplayer().unwrap().is_server() {
-            return;
-        }
-        self.col1.set_disabled(false);
-        self.col2.set_disabled(false);
-        self.base_mut().set_linear_velocity(3.0 * Vector3::UP);
-        let angular = random_angular_velocity(randf() as f32, randf() as f32, randf() as f32);
-        self.base_mut().set_angular_velocity(angular);
-        let wait = wait_time(self.lifetime, self.lifetime_random, randf() as f32);
-
-        // backlog #5's async pattern (part_disappear.rs's established shape) instead of
-        // connect_other.
-        let mut this = self.to_gd();
-        godot::task::spawn(async move {
-            this.get_tree()
-                .create_timer(wait as f64)
-                .signals()
-                .timeout()
-                .to_future()
-                .await;
-            if !this.is_instance_valid() {
-                return;
-            }
-            this.set_process(true);
-        });
-    }
-
-    #[rpc(authority, call_local, unreliable)]
+    /// Remote peers only (spec FR-004, option (b)): the server instances the puff inline in its
+    /// frame `SyncOut`; here the effect is queued for this peer's frame run (`sync_out_part`).
+    #[rpc(authority, call_remote, unreliable)]
     fn destroy(&mut self) {
-        let mut puff: Gd<CpuParticles3D> = self.part_disappear_scene.instantiate_as::<CpuParticles3D>();
-        let mut parent = self.puff_parent();
-        parent.add_child(&puff);
-        let origin = self.base().get_global_transform().origin;
-        puff.set_global_position(origin);
-
-        let mut this = self.to_gd();
-        godot::task::spawn(async move {
-            this.get_tree()
-                .create_timer(0.2)
-                .signals()
-                .timeout()
-                .to_future()
-                .await;
-            if !this.is_instance_valid() {
-                return;
-            }
-            this.queue_free();
-        });
-    }
-}
-
-impl Part {
-    /// backlog #15: the puff's parent is the ROBOT's own parent, not `Death` (which decouples
-    /// the puff's lifetime from the robot's 10s-after-death removal — research.md R7). The
-    /// 3-hop walk from a `Part`: `Death` -> `EnemyRobot` -> the robot's own parent. Falls back
-    /// to the LAST successfully-resolved ancestor if the chain is shorter (e.g. a standalone
-    /// `Part` with no `Death`/`EnemyRobot` ancestors, as in the parity harness) -- never panics.
-    fn puff_parent(&self) -> Gd<Node> {
-        let death = self.base().get_parent();
-        let robot = death.as_ref().and_then(|d| d.get_parent());
-        let robots_parent = robot.as_ref().and_then(|r| r.get_parent());
-        robots_parent
-            .or(robot)
-            .or(death)
-            .expect("Part must have at least an immediate parent")
+        queue::push(InboundEvent::PartFx { root_id: self.base().instance_id(), fx: PartFx::Destroy });
     }
 }

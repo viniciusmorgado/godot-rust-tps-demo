@@ -287,7 +287,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
 
 ### Commit 3 — `part/system.rs`, `red_robot/system.rs`, `part/sync.rs`, `red_robot/sync.rs`, `part.rs`, `red_robot.rs`, `ecs.rs`/`ecs/setup.rs`, `red_robot.tscn:10782`, `docs/v3-tradeoffs.md`, `docs/v2-backlog.md`
 
-- [ ] T016 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/part/system.rs` (pure;
+- [x] T016 [P] [US2] Create `oxide_godot_core/oxide_godot_lib/src/part/system.rs` (pure;
   `pub(crate) mod system;` in `part.rs`; `mod pure` made `pub(crate)`, body untouched): `pub fn
   part_phase_tick(dt: Res<FrameDelta>, q: Query<(Entity, &mut PartPhase, &PartLifetimes, &mut
   PartIntents)>, commands: Commands)` — `intents = default` each frame; `Waiting(timer)`:
@@ -303,7 +303,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   `destroy` and `Destroyed(_)`; a second run leaves `destroy = false`),
   `destroyed_timer_expiry_marks_remove` (`Destroyed(Timer::new(dt))` → `Remove` present).
   Verification: 5 tests pass; no `godot::classes`.
-- [ ] T017 [P] [US3] Create `oxide_godot_core/oxide_godot_lib/src/red_robot/system.rs` (pure;
+- [x] T017 [P] [US3] Create `oxide_godot_core/oxide_godot_lib/src/red_robot/system.rs` (pure;
   `pub(crate) mod system;` in `red_robot.rs`; `model.rs` untouched): `pub fn robot_decide(tuning,
   dt, q: Query<(Entity, &RobotFrame, &RobotState, &RobotCountersC, &TrackedPlayer, &mut
   TargetPosition, &mut RobotIntents, Has<ShootRequested>), (With<Simulates>, Without<Dead>)>,
@@ -355,7 +355,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   marker gone; second run no shoot), `replay_builds_animation_from_replicated_fields`,
   `robot_hit_apply_ignores_dead_robot`, `pending_trauma_expiry_flags_trauma_due`,
   `removal_timer_expiry_marks_remove`. Verification: 14 tests pass; no `godot::classes`.
-- [ ] T018 [US2] Create `oxide_godot_core/oxide_godot_lib/src/part/sync.rs` (glue; `pub(crate)
+- [x] T018 [US2] Create `oxide_godot_core/oxide_godot_lib/src/part/sync.rs` (glue; `pub(crate)
   mod sync;`): `pub(crate) fn puff_parent(root: &Gd<Part>) -> Gd<Node>` (v2 `part.rs:224-232`
   verbatim on the handle, backlog #15's comment moved with it); `fn sync_out_part(handles:
   NonSendMut<NodeHandles>, q: Query<(Entity, &PartIntents, &mut PendingPartFx, &mut PartPhase,
@@ -367,7 +367,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   `PendingPartFx` — `Destroy` → the same puff writes and `*phase = Destroyed(Timer::new(0.2))`
   (`:202-214`; the client frees its own node through `Remove`, research R7). Depends on T016,
   T008. Verification: compiles; `grep -n 'free()' part/sync.rs` empty.
-- [ ] T019 [US3] Create `oxide_godot_core/oxide_godot_lib/src/red_robot/sync.rs` (glue;
+- [x] T019 [US3] Create `oxide_godot_core/oxide_godot_lib/src/red_robot/sync.rs` (glue;
   `pub(crate) mod sync;`): `fn sync_in_robot(handles: NonSend<NodeHandles>, q: Query<(Entity,
   &TrackedPlayer, Has<Simulates>), (With<RobotTag>, Without<Dead>)>, commands: Commands)` —
   `RobotFrame { global_transform: p.root.get_global_transform(), gravity: p.root.get_gravity(),
@@ -457,7 +457,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   the sixteenth test of that file. Depends on T017, T008. Verification: compiles; `grep -n
   'free()' red_robot/sync.rs` empty; `grep -c 'randf()' red_robot/sync.rs` = 4 (the per-part
   draws) and `grep -c 'randi()' red_robot/sync.rs` = 2 (local + remote reaction).
-- [ ] T020 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/part.rs` as the bridge: keep
+- [x] T020 [US2] Rewrite `oxide_godot_core/oxide_godot_lib/src/part.rs` as the bridge: keep
   `pub(crate) mod pure` (body untouched), the four `#[export]`s (`:86-97`), the handles
   (`:101-118`, the model-mesh-by-index comment kept), `material`; `ready` = v2 `:123-136` minus
   `set_process(false)` — the material duplication with the upstream bug fix #2 comment (`:129-130`)
@@ -471,7 +471,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   Complexity Tracking), the private `puff_parent` (`:224-232`, moved to `part/sync.rs`). Depends on
   T018. Verification: `grep -n 'fn process\|fn explode\|godot::task' part.rs` empty; `grep -c
   call_remote part.rs` = 1; the four `#[export]` attributes unchanged; the bug-fix comment present.
-- [ ] T021 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/red_robot.rs` as the bridge: keep
+- [x] T021 [US3] Rewrite `oxide_godot_core/oxide_godot_lib/src/red_robot.rs` as the bridge: keep
   `State` (`:21-28`), `#[var] test_shoot`, the four replicated `#[export]`s, `#[var] aim_preparing`
   (`:35-50`; all now projection fields, `pub(crate)`), `is_dedicated_server` (`:62-63`), the RID,
   `impact_effect_scene` (`:68-69`), the twelve `OnReady` handles (`:71-105`); DELETE `shoot_countdown`,
@@ -497,7 +497,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   process\|fn animate\|fn shoot\b\|_clip_ray\|raycast_to\|godot::task' red_robot.rs` empty; `grep -c
   call_remote red_robot.rs` = 2; `grep -c call_local red_robot.rs` = 0; `hittable.rs`, `level.rs`
   still compile unchanged.
-- [ ] T022 [US3] Registration + the R4 test: in `ecs.rs`'s `add_engine_systems` (fixed)
+- [x] T022 [US3] Registration + the R4 test: in `ecs.rs`'s `add_engine_systems` (fixed)
   `red_robot::sync::sync_in_robot.in_set(Phase::SyncIn).after(sweep_dead_nodes)`,
   `robot_query.in_set(Phase::EngineQueryOrient)`, `move_robot.in_set(Phase::EngineQueryMove)
   .before(crate::bullet::sync::move_bullet)` (analyze MAJOR 2: in v2 the robots — spawned under
@@ -521,7 +521,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   `Messages::update()`; ONE `run` → `Health == 0`, `hit && just_died`; then `Collided::default()`,
   `update()`, a second run → `Health` still 0). Depends on T019, T018. Verification: the test and
   V3-A/V3-B's setup tests pass.
-- [ ] T023 [US4] The `.tscn` edit, then research R1's probe re-run on the REAL build: edit
+- [x] T023 [US4] The `.tscn` edit, then research R1's probe re-run on the REAL build: edit
   `oxide-godot/enemies/red_robot/red_robot.tscn` line 10782 from `callback_mode_process = 0` to
   `callback_mode_process = 2` (the `AnimationTree` → MANUAL; research R1, option B; the
   milestone's ONE scene edit) — the edit MUST precede the run, because with the ECS robot of
@@ -534,7 +534,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   the commit body. Delete the probe files from both trees. Verification: `git diff
   oxide-godot/enemies/red_robot/red_robot.tscn` shows exactly that one changed line; the diff of
   the two probe logs is empty.
-- [ ] T024 [US3] Append to `docs/v3-tradeoffs.md` the rows (contracts/enemy-entities.md §5):
+- [x] T024 [US3] Append to `docs/v3-tradeoffs.md` the rows (contracts/enemy-entities.md §5):
   `part` — the `RigidBody3D` simulated and replicated by the engine, the fade through the node's
   setter (`sync_out_part`); the puff instanced from the part's `SyncOut` and the remote handler;
   `red_robot` — the raycasts in `EngineQueryOrient` (`robot_query`); the laser `RayCast3D` read at
@@ -546,7 +546,7 @@ cannot be split. **Independent Test**: 214 tests with the 5 + 25 pure tests unto
   `Part::explode` removed. Mark backlog **#31 done** in `docs/v2-backlog.md` citing spec FR-023
   and this commit (the drain resets the counters on detection-area entry). Verification: 23
   rows; `grep -n '^| 31 ' docs/v2-backlog.md` shows the done marker.
-- [ ] T025 [US3] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
+- [x] T025 [US3] Gates + headless + harness: `cargo build && cargo clippy && cargo test` — zero
   warnings; **214** = 192 + 5 (part/system) + 16 (red_robot/system) + 1 (setup); the 5 + 25 pure
   tests still listed by name; paste the `test result:` line. Headless: import, `main/main.tscn`
   ×2, `level/level.tscn` clean vs `CLAUDE.md`'s catalog. Harness on BOTH trees as T015 (the four

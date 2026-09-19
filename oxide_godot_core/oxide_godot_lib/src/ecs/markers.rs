@@ -304,6 +304,16 @@ pub struct RobotFrame {
     pub laser_colliding: bool,
     pub laser_point: Vector3,
 }
+/// Research R8's one-step buffer: the laser `RayCast3D`'s read of the PREVIOUS fixed run. A live
+/// `RayCast3D` child updates after its parent's priority-0 callback and before the `i32::MAX`
+/// driver, so a `SyncIn` read is one step newer than v2's read inside `physics_process`
+/// (`red_robot.rs:200-202`); `RobotFrame.laser_*` is filled from this buffer, and this buffer
+/// from the run's read. The ray is enabled by the shoot animation (V3-C Session 3, harness (d)).
+#[derive(Component, Clone, Copy)]
+pub struct LaserBuffer {
+    pub colliding: bool,
+    pub point: Vector3,
+}
 /// The non-`Simulates` replay input (v2 `red_robot.rs:134`).
 #[derive(Component, Clone, Copy)]
 pub struct ReplayRobot {

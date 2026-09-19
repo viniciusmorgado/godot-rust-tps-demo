@@ -10779,7 +10779,7 @@ lower_fade = 1.0
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1618570170]
 root_node = NodePath("../RedRobotModel")
 root_motion_track = NodePath("Armature/Skeleton3D:MASTER")
-callback_mode_process = 0
+callback_mode_process = 2
 tree_root = SubResource("52")
 anim_player = NodePath("../RedRobotModel/AnimationPlayer")
 parameters/aim/blend_position = Vector2(0.00479996, 0.126638)

@@ -84,6 +84,15 @@ pub fn build_fixed() -> Schedule {
     schedule.add_systems(crate::player::system::tick_settle.in_set(Phase::GameplaySettle));
     schedule.add_systems(crate::bullet::system::bullet_step.in_set(Phase::Gameplay));
     schedule.add_systems(crate::bullet::system::bullet_settle.in_set(Phase::GameplaySettle));
+    schedule.add_systems(crate::red_robot::system::robot_decide.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::red_robot::system::robot_step_and_animate.in_set(Phase::GameplayIntegrate));
+    schedule.add_systems(crate::red_robot::system::robot_replay.in_set(Phase::GameplayIntegrate));
+    // The same-run hit (specs/013 research R4): the reader is ordered after the writer.
+    schedule.add_systems(
+        crate::red_robot::system::robot_hit_apply
+            .in_set(Phase::GameplaySettle)
+            .after(crate::bullet::system::bullet_settle),
+    );
     schedule
 }
 
@@ -93,6 +102,8 @@ pub fn build_frame() -> Schedule {
     schedule.add_systems(crate::part_disappear::system::advance.in_set(Phase::Gameplay));
     schedule.add_systems(crate::player_input::system::input_decide.in_set(Phase::Gameplay));
     schedule.add_systems(crate::camera_noise_shake::system::shake_decide.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::part::system::part_phase_tick.in_set(Phase::Gameplay));
+    schedule.add_systems(crate::red_robot::system::robot_timers.in_set(Phase::Gameplay));
     schedule
 }
 
@@ -227,5 +238,43 @@ mod tests {
         schedule.add_systems(count_probes.in_set(Phase::EngineQueryOrient));
         schedule.run(&mut world);
         assert_eq!(world.resource::<Seen>().0, 1);
+    }
+
+    /// specs/013 research R4: a message written by `bullet_settle` is read by `robot_hit_apply`
+    /// in the SAME fixed run (both in `GameplaySettle`, ordered), exactly once.
+    #[test]
+    fn robot_hit_apply_runs_after_bullet_settle_in_the_same_run() {
+        use godot::obj::InstanceId;
+
+        use super::super::markers::{BulletIntents, BulletStateC, Collided, Health, RobotIntents, RobotTag, Simulates};
+        use crate::bullet::pure::BulletState;
+        use crate::hittable::HitKind;
+
+        let mut world = build_world();
+        let mut fixed = build_fixed();
+        let id = InstanceId::from_i64(7);
+        let robot = world.spawn((RobotTag, Health(1), RobotIntents::default())).id();
+        world.resource_mut::<EntityIndex>().register_if_absent(id, || robot);
+        let bullet = world
+            .spawn((
+                BulletStateC(BulletState::Flying { time_alive: 4.0 }),
+                BulletIntents::default(),
+                Collided { hit: Some(HitKind::Robot(id)), collided: true },
+                Simulates,
+            ))
+            .id();
+
+        world.resource_mut::<Messages<RobotHitLocal>>().update();
+        fixed.run(&mut world);
+        assert_eq!(world.get::<Health>(robot).unwrap().0, 0);
+        let intents = world.get::<RobotIntents>(robot).unwrap();
+        assert!(intents.hit);
+        assert!(intents.just_died);
+
+        // The next run re-reads nothing: consumed exactly once.
+        world.entity_mut(bullet).insert(Collided::default());
+        world.resource_mut::<Messages<RobotHitLocal>>().update();
+        fixed.run(&mut world);
+        assert_eq!(world.get::<Health>(robot).unwrap().0, 0);
     }
 }

@@ -540,12 +540,33 @@ pub fn add_engine_systems(fixed: &mut Schedule, frame: &mut Schedule) {
     );
     frame.add_systems(crate::player::sync::apply_player_fx.in_set(Phase::SyncOut).before(sync_out_remove));
     // The bullet (specs/013 research R7): the fixed tick's sync/query members and the frame
-    // run's remote-`explode` applier. `move_bullet` is ordered after the robot's `move_robot`
-    // (v2's tree order, `level.tscn`) from commit 3 on, where `move_robot` is registered.
+    // run's remote-`explode` applier.
     fixed.add_systems(crate::bullet::sync::sync_in_bullet.in_set(Phase::SyncIn).after(sweep_dead_nodes));
     fixed.add_systems(crate::bullet::sync::move_bullet.in_set(Phase::EngineQueryMove));
     fixed.add_systems(crate::bullet::sync::sync_out_bullet.in_set(Phase::SyncOut).before(sync_out_remove));
     frame.add_systems(
         crate::bullet::sync::sync_out_bullet_frame.in_set(Phase::SyncOut).before(sync_out_remove),
+    );
+    // The robot and the parts (specs/013 research R6/R7). `move_robot` precedes `move_bullet`
+    // inside `EngineQueryMove` (analyze MAJOR 2): in v2 the robots — spawned under
+    // `SpawnedNodes` at level start, `level.rs:138` — precede the bullets in tree order, so the
+    // robot's `move_and_slide` ran before the bullet's `move_and_collide` every step and the
+    // bullet collided with the robot's POST-move body; bevy leaves two systems of one set
+    // unordered, so the order is pinned (v2's exception — a robot respawned after a bullet
+    // already existed — is not reproduced; `docs/v3-tradeoffs.md`).
+    fixed.add_systems(crate::red_robot::sync::sync_in_robot.in_set(Phase::SyncIn).after(sweep_dead_nodes));
+    fixed.add_systems(crate::red_robot::sync::robot_query.in_set(Phase::EngineQueryOrient));
+    fixed.add_systems(
+        crate::red_robot::sync::move_robot
+            .in_set(Phase::EngineQueryMove)
+            .before(crate::bullet::sync::move_bullet),
+    );
+    fixed.add_systems(crate::red_robot::sync::sync_out_robot.in_set(Phase::SyncOut).before(sync_out_remove));
+    // Frame `SyncOut`: `sync_out_part` writes the part nodes (fade, puff) and `PartPhase`;
+    // `sync_out_robot_frame` writes the robot nodes and, on a remote death, the parts'
+    // visibility/freeze — disjoint components, and the node writes are order-insensitive.
+    frame.add_systems(crate::part::sync::sync_out_part.in_set(Phase::SyncOut).before(sync_out_remove));
+    frame.add_systems(
+        crate::red_robot::sync::sync_out_robot_frame.in_set(Phase::SyncOut).before(sync_out_remove),
     );
 }

@@ -9,7 +9,7 @@
 #   func _ready() -> void: process_physics_priority = -2147483648
 #   func _physics_process(_d: float) -> void: get_parent()._observe_physics()
 # Both scripts are set BEFORE add_child (V3-A's lesson). Bodies are positioned BEFORE add_child.
-# Run: godot --headless --path . --fixed-fps 60 --quit-after <a,b:900 c:450 d:200 e:305> zz_ecs_parity.tscn -- --case=a|b|c|d|e
+# Run: godot --headless --path . --fixed-fps 60 --quit-after <a,b:900 c:450 d:700 e:305> zz_ecs_parity.tscn -- --case=a|b|c|d|e
 # Log: "$XDG_DATA_HOME/godot/app_userdata/Third-Person Shooter Demo/zz_ecs_parity_<case>.log"
 #   "F<frame> key=value ..."  observer lines, state at the START of the frame's process pass (parity evidence)
 #   "P<step> key=value ..."   physics-step lines from the probe at physics priority i32::MIN
@@ -39,6 +39,7 @@ var last_health := 5
 var last_dead := false
 var last_state := -1
 var last_shoot_playing := false
+var initial_root_children := 0
 var last_root_children := 0
 var last_self_children := 0
 var last_cam_rot := Vector3.ZERO
@@ -69,7 +70,11 @@ func _ready() -> void:
 	if case != "c":
 		robot = load(ROBOT_SCENE).instantiate(); robot_alive = true
 		robot.position = Vector3(0, 0.05, 0)                # facing +Z (red_robot/model.rs:90-95)
-		if case == "d": robot.test_shoot = true            # → shoot_countdown = 0 at ready, shoot() on the first step
+		# (d) does NOT set robot.test_shoot (V3-C Session 3 lesson): its zeroed shoot_countdown is a
+		# stale value that FR-023's reset on detection-area entry (backlog #31) overwrites, so on v3
+		# the pre-check came 6 s later than v2's immediate one and the robot had walked closer —
+		# a different scene, not a timing shift. (d) follows (a)'s sequence instead (pre-check
+		# ~P362, Aim, Shooting ~P432, the shot ~F566) and needs --quit-after 700.
 		add_child(robot)
 		anim_tree = robot.get_node("AnimationTree")
 		shoot_anim = robot.get_node("ShootAnimation")
@@ -77,7 +82,8 @@ func _ready() -> void:
 		ember = robot.get_node("RedRobotModel/Armature/Skeleton3D/RayFrom/LaserEmber")
 		for n in ["PartShield1", "PartShield2", "PartHead"]: parts.append(robot.get_node("Death/" + n))
 		last_health = robot.health
-		last_root_children = get_tree().get_root().get_child_count()
+		initial_root_children = get_tree().get_root().get_child_count()   # v3's tree root also holds the EcsWorld autoload: log DELTAS
+		last_root_children = initial_root_children
 		last_self_children = get_child_count()
 	if case == "d": _add_player(8.0)                        # in front, from step 1
 	if case == "c": _spawn_bullet(Vector3(0, 1, 0), Vector3(100, 1, 0))
@@ -122,7 +128,7 @@ func _observe() -> void:
 					_log("RAW F%d ShootAnimation.playing=%s" % [f, playing]); last_shoot_playing = playing
 				var rc := get_tree().get_root().get_child_count()
 				if rc != last_root_children:
-					_log("RAW F%d root_children=%d (blast spawn)" % [f, rc]); last_root_children = rc
+					_log("RAW F%d root_children=+%d (blast spawn)" % [f, rc - initial_root_children]); last_root_children = rc
 		"b":
 			if f >= 30 and f % 30 == 0 and death_step < 0 and is_instance_valid(robot):
 				_spawn_bullet(Vector3(0, 1.2, 6), robot.global_position + Vector3(0, 1.2, 0)); _log("RAW F%d bullet_spawned" % f)
@@ -137,7 +143,7 @@ func _observe() -> void:
 		"d":
 			var rc := get_tree().get_root().get_child_count()
 			if rc != last_root_children:
-				_log("RAW F%d root_children=%d (blast spawn)" % [f, rc]); last_root_children = rc
+				_log("RAW F%d root_children=+%d (blast spawn)" % [f, rc - initial_root_children]); last_root_children = rc
 			var mat: ShaderMaterial = ray_mesh.get_surface_override_material(0)
 			var clip = mat.get_shader_parameter("clip") if mat != null else null
 			var cam := player.get_node("CameraBase/CameraRot/SpringArm3D/Camera3D")
