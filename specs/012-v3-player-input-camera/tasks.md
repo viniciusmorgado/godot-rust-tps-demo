@@ -449,7 +449,7 @@ the v2 path); multiplayer remote effects arrive with commit 3.
   user explicitly: "Checkpoint (1): please test now" — run the game, walk, jump, aim, shoot a
   robot, get hit (shake), fall off the map and respawn, all as in v2; ask whether backlog #29's
   FPS observation persists and record the answer. Do not proceed until confirmed.
-- [ ] T028 [US3] 🛑 **STOP 2 — user visual checkpoint (2), multiplayer on one machine**. Tell the
+- [x] T028 [US3] 🛑 **STOP 2 — user visual checkpoint (2), multiplayer on one machine**. Tell the
   user explicitly: "Checkpoint (2): please test multiplayer now" — host in one instance, join
   from a second through the demo's menu; the remote player's movement, animation
   (`current_animation`/`motion` projection) and aim replicate as in v2; each client controls only
