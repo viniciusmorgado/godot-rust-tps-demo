@@ -134,7 +134,7 @@ the robot's five replicated fields) — the guard-dropped-before-engine-call rul
 | `RobotFx { PlayShoot }` | `PendingRobotFx.0.push(fx)` | `:330-333` |
 | `ShootRequested` | insert the `ShootRequested` marker | `:335-338` |
 | `ResumeApproachRequested` | `RobotState = Approach`; counters `aim_preparing`, `shoot_countdown` = `resume_approach_reset` | `:267-274` |
-| `RobotPlayerSeen { player }` | `TrackedPlayer = player`; `RobotState = Approach` on `Some`, `Idle` on `None`; counters untouched (backlog #31 deferred, FR-023) | `:340-358` |
+| `RobotPlayerSeen { player }` | `TrackedPlayer = player`; `RobotState = Approach` on `Some`, `Idle` on `None`; on `Some` ALSO `resume_approach_reset` on the counters BEFORE the state write (backlog #31 CLOSED, FR-023) | `:340-358`, `:268-273` |
 
 ## Systems (signatures; research R6/R7 for the sets and the v2 lines)
 

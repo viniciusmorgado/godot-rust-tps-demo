@@ -66,7 +66,7 @@ Principle I v3 under 1.5.2 (`flying_forklift` excluded) — touched: `bullet.rs`
 `red_robot.tscn:10782`, docs; untouched: the three pure cores (`bullet.rs`'s `mod pure` gains
 only `pub(crate)`), `player*`, `camera_noise_shake*`, `door*`, `part_disappear*`, `blast.rs`,
 `level.rs`, `flying_forklift.rs`, `settings*`, `menu*`, `main_scene.rs`, `debug_label.rs`;
-preserved surfaces of FR-024; backlog #31 default deferred (user decision at this review).
+preserved surfaces of FR-024; backlog #31 CLOSED (user decision at this review, 2026-09-19 — FR-023's reset in the drain; the one sanctioned behavior change).
 
 **Scale/Scope**: 3 bridges (155 + 233 + 511 lines today), 6 new files, `Handles`/`Initial` +3
 variants each, 8 drain arms, 1 message type, ~16 systems, 33 new tests, 9 tradeoffs rows.
@@ -87,7 +87,7 @@ variants each, 8 drain arms, 1 message type, ~16 systems, 33 new tests, 9 tradeo
   the stay-as-v2 list and is untouched; the excluded modules untouched (SC-006). `hittable.rs` is
   not on either list (a shared helper): it changes ADDITIVELY under FR-025 — Complexity
   Tracking. PASS.
-- Parity baseline `v2`; behavior changes: none sanctioned by default (#31 deferred); the four
+- Parity baseline `v2`; behavior changes: ONE sanctioned — #31's counter reset on detection-area entry (FR-023, timing table); the four
   `call_remote` attributes and the `.tscn` line are spec-sanctioned outcomes (Complexity
   Tracking); timing shifts only via the table. PASS.
 - Preserved surfaces (Principle II): FR-024's list — replicated names, the `#[var]`/`#[export]`s,
@@ -139,7 +139,7 @@ names, the `Model` node path); build + headless per commit. PASS.
 checkpoints) in the `/speckit-implement` summaries; tradeoffs rows per commit.
 
 **Result**: PASS. Four spec-sanctioned outcomes recorded in Complexity Tracking. One decision
-for the user at this review: backlog #31 (FR-023), planned as DEFERRED — say so to close it.
+for the user at this review: backlog #31 (FR-023) — CLOSED by the user (2026-09-19); commit 3 applies the reset and marks the row done.
 
 ## Project Structure
 

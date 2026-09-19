@@ -19,11 +19,11 @@ the seven-set fixed tick, the `call_remote` rule (option (b)), `Handles` for use
 `AnimationTree` MANUAL + `advance` rule (a second tree, the robot's), `Tuning<T>`, the harness
 with `seed(1)` first and the joypad purge.
 
-- **Backlog items closed by this spec**: none by default. ONE candidate, the user decides at
-  plan review: **#31** (reset `aim_preparing`/`shoot_countdown`/`aim_countdown` when the player
-  enters the detection area). Default: deferred — the drain sets `Approach` without touching the
-  counters, as v2 `red_robot.rs:345-348` does. If closed, FR-023's variant applies and the
-  backlog row is marked done in the closing commit.
+- **Backlog items closed by this spec**: **#31** (reset `aim_preparing`/`shoot_countdown`/
+  `aim_countdown` when the player enters the detection area) — CLOSED by user decision at plan
+  review, 2026-09-19: the drain applies `resume_approach_reset` on `RobotPlayerSeen { Some }`
+  (FR-023), the one sanctioned behavior change of this milestone; v2 `red_robot.rs:345-348` set
+  `Approach` with the stale counters. The backlog row is marked done in commit 3.
 - **Backlog items explicitly deferred**: #29 (occasional FPS drop — observe at checkpoint (1)
   only), #30 (`door.tscn` never instanced — stays open).
 - **Residual dynamic access kept after this milestone** (`.rpc("name")`, the one sanctioned form,
@@ -373,7 +373,9 @@ table); both checkpoints.
    **When** a `Player` body enters or exits, **Then** the handler pushes `RobotPlayerSeen { id,
    player: Some(instance_id) | None }` and the drain of the same step's fixed run sets
    `TrackedPlayer` and the state (`Approach`/`Idle`) — the same step as v2's inline write.
-   Backlog #31 deferred: the counters are untouched (FR-023).
+   Backlog #31 CLOSED (FR-023): on `Some`, the counters are reset with `resume_approach_reset`
+   (`aim_preparing = aim_prepare_time`, `shoot_countdown = shoot_wait`) — the sanctioned
+   behavior change; harness case (a) records its effect in the timing table.
 9. **Given** harness case (a) — the robot alone, a static `Player` body placed inside the
    detection area at frame 10 — **When** both trees log per step `state`, `target_position`,
    `aim_preparing`, the origin, the transition request and `aim/blend_position`, RAW the
@@ -615,11 +617,15 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   `callback_mode_process = 2` and `SyncOut` calls `advance(FixedDelta)` LAST for every
   non-`Dead` robot on every peer, after the parameter writes; the edit is the milestone's one
   scene change and is listed in `docs/v3-tradeoffs.md`.
-- **FR-023**: Backlog #31 variant: by default the drain does NOT reset the counters on `Approach`
-  entry (v2 behavior). If the user closes #31 at plan review, the drain applies
-  `resume_approach_reset` on `RobotPlayerSeen { Some }` and the backlog row is marked done in
-  the closing commit; the harness case (a) then records the difference in the timing table as
-  the sanctioned behavior change.
+- **FR-023**: Backlog #31 — CLOSED (user decision at plan review, 2026-09-19): the drain MUST
+  apply `resume_approach_reset` (`model.rs`, `aim_preparing = aim_prepare_time`,
+  `shoot_countdown = shoot_wait`; `aim_countdown` untouched — `resume_approach` never reset it
+  either, `:268-273`) on `RobotPlayerSeen { player: Some(_) }` before setting `Approach`; the
+  backlog row is marked done in commit 3 citing this FR; harness case (a) records every
+  differing frame in the "Measured timing differences" table as the ONE sanctioned behavior
+  change of the milestone (expected: a robot re-entered after leaving `Aim`/`Shooting` fires its
+  first pre-check `shoot_wait` seconds after re-entry instead of on the stale countdown; a robot
+  entered for the first time is unchanged — the initial values already equal the reset).
 
 **Preserved surfaces and scope (Principle I v3, Principle II)**
 
@@ -642,8 +648,8 @@ the origin on `v2` and on `v3` (research experiment, then harness case (e)) is i
   additively (`HitKind`, a local-dispatch helper); `resolve`/`rpc_hit` keep their signatures.
   `red_robot.tscn` changes only
   by FR-022's property; no other scene changes.
-- **FR-026**: Backlog: #31 per FR-023; #29 observed at checkpoint (1); #30 stays open; no v3
-  backlog file.
+- **FR-026**: Backlog: #31 CLOSED per FR-023 (row marked done in commit 3); #29 observed at
+  checkpoint (1); #30 stays open; no v3 backlog file.
 
 **Cross-cutting (constitution 1.5.2 compliance)**
 
